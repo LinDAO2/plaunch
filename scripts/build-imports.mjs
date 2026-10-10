@@ -15,10 +15,6 @@ You're free to use this game and code in any project, personal or commercial. Th
 Christopher Straker dedicated the original gist under CC0 1.0.
 `
 
-function b64(buf) {
-  return `data:image/png;base64,${Buffer.from(buf).toString('base64')}`
-}
-
 async function filesUnder(dir, names) {
   const out = {}
   for (const name of names) {
@@ -46,7 +42,8 @@ async function build2048() {
   const files = await filesUnder(dir, names)
   let html = files['index.html'].toString('utf8')
   html = html.replace(/<hr>\s*<p>[\s\S]*?<\/p>\s*<hr>\s*<p>[\s\S]*?<\/p>/, '')
-  html = html.replace(/<link\b[^>]*>/gi, '')
+  html = html.replace(/<link\b[^>]*rel=["'](?:shortcut icon|apple-touch-icon|icon)["'][^>]*>/gi, '')
+  html = html.replace(/<link\b[^>]*apple-touch-startup-image[^>]*>/gi, '')
   files['index.html'] = html
   let css = files['style/main.css'].toString('utf8')
   css = css.replace(/@import url\(fonts\/clear-sans\.css\);\s*/, '')
@@ -66,11 +63,10 @@ async function buildRacer() {
   html = html.replace(/<audio[\s\S]*?<\/audio>/, '')
   html = html.replace('<script src="stats.js"></script>', '')
   html = html.replace('</head>', '<style>#controls{display:none!important}</style></head>')
-  const bg = b64(await readFile(path.join(dir, 'images/background.png')))
-  const sprites = b64(await readFile(path.join(dir, 'images/sprites.png')))
+  const art = await readFile(path.join(process.cwd(), 'scripts/lane-art.js'), 'utf8')
   html = html.replace(
     '<script src="common.js"></script>',
-    `<script>window.PG_IMAGES={background:${JSON.stringify(bg)},sprites:${JSON.stringify(sprites)}};</script>\n<script src="common.js"></script>`
+    `<script>${art}</script>\n<script src="common.js"></script>`
   )
   let common = (await readFile(path.join(dir, 'common.js'), 'utf8'))
   common = common.replace(
@@ -187,9 +183,13 @@ const BUILDERS = {
 }
 
 const postersOnly = process.argv.includes('--posters')
+const skipPosters = process.argv.includes('--no-posters')
+const onlyArg = process.argv.find((arg) => arg.startsWith('--only='))
+const only = onlyArg ? onlyArg.slice('--only='.length) : ''
 
 if (!postersOnly) {
 for (const entry of CURATED) {
+  if (only && entry.id !== only) continue
   const built = await BUILDERS[entry.id]()
   const bundled = bundleFiles(built.files, { entry: built.entry })
   if (!bundled.ok) throw new Error(`${entry.id}: ${bundled.errors.join('; ')}`)
@@ -217,6 +217,8 @@ for (const entry of CURATED) {
   console.log(entry.id, Buffer.byteLength(html))
 }
 }
+
+if (skipPosters) process.exit(0)
 
 const posterDir = path.join(process.cwd(), 'public', 'posters')
 const pages = new Map()

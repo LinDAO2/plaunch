@@ -107,10 +107,21 @@ async function wake(page, id) {
     return
   }
   if (id === 'tile-2048') {
-    for (const key of ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowDown']) {
+    await page.waitForSelector('.tile-inner', { timeout: 8000 })
+    await page.evaluate(() => {
+      const root = document.getElementById('pg-root')
+      if (root) root.style.transform = 'none'
+    })
+    for (const key of ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown']) {
       await page.keyboard.press(key)
-      await page.waitForTimeout(90)
+      await page.waitForTimeout(140)
     }
+    const painted = await page.evaluate(() => {
+      const tiles = [...document.querySelectorAll('.tile-inner')]
+      const colors = tiles.map((el) => getComputedStyle(el).backgroundColor)
+      return tiles.length >= 2 && colors.some((color) => color && color !== 'rgba(0, 0, 0, 0)' && color !== 'rgb(0, 0, 0)')
+    })
+    if (!painted) throw new Error('2048 tiles are not painted')
     return
   }
   if (id === 'stack-blocks') {
@@ -133,7 +144,9 @@ export async function captureGame(browser, url, id) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 })
     await page.waitForTimeout(250)
     await wake(page, id)
-    const png = await frameFromPage(page)
+    const png = id === 'tile-2048'
+      ? await page.locator('.game-container').screenshot({ type: 'png' })
+      : await frameFromPage(page)
     if (!png || png.length < 800 || png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
       throw new Error(`empty poster for ${id}`)
     }
