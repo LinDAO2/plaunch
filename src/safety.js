@@ -1,5 +1,6 @@
 import { requestModelText } from './ai/generate.js'
 import { resolveProvider } from './ai/providers.js'
+import { safetyModelOnPublish } from './config.js'
 
 const RULES = [
   { category: 'sexual content involving minors', pattern: /\b(csam|child\s*porn|underage\s*(?:sex|porn)|loli|shota)\b/i },
@@ -37,9 +38,11 @@ function cleanReason(value, fallback) {
   return reason || fallback || 'policy'
 }
 
-export async function classifySafety({ text, env = {}, fetchImpl }) {
+export async function classifySafety({ text, env = {}, fetchImpl, model }) {
   const local = blocklistReason(text)
   if (local) return { flagged: true, reason: local, source: 'blocklist' }
+  const enabled = model === undefined ? safetyModelOnPublish(env) : Boolean(model)
+  if (!enabled) return { flagged: false, reason: '', source: 'skipped' }
   if (!env.GEMINI_API_KEY) return { flagged: false, reason: '', source: 'none' }
   try {
     const provider = resolveProvider({ ...env, AI_PROVIDER: 'gemini' })

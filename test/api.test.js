@@ -834,6 +834,36 @@ describe('discover and moderation', { concurrency: false }, () => {
       await server.close()
     }
   })
+
+  test('SAFETY_MODEL_ON_PUBLISH=false publishes without calling Gemini', async () => {
+    let calls = 0
+    const server = await startServer({
+      env: { GEMINI_API_KEY: 'safety-key', SAFETY_MODEL_ON_PUBLISH: 'false' },
+      seed: false,
+      fetchImpl: async () => {
+        calls += 1
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"flag":true,"reason":"hate"}' }] } }] }), { status: 200 })
+      }
+    })
+    try {
+      const client = createClient(server.base)
+      await client.prime()
+      const published = await client.request('POST', '/api/games', {
+        name: 'Quiet garden', description: 'Tap the flowers', type: 'tap', duration: 10, accent: '#339966'
+      })
+      assert.equal(published.status, 201)
+      assert.equal(published.data.game.status, 'published')
+      assert.equal(calls, 0)
+      const held = await client.request('POST', '/api/games', {
+        name: 'Blocked garden', description: 'nsfw porn night', type: 'tap', duration: 10, accent: '#339966'
+      })
+      assert.equal(held.status, 201)
+      assert.equal(held.data.game.status, 'pending')
+      assert.equal(calls, 0)
+    } finally {
+      await server.close()
+    }
+  })
 })
 
 describe('guest creators', { concurrency: false }, () => {

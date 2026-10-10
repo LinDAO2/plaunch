@@ -229,7 +229,7 @@ function actorHash(req, ctx) {
   return createHash('sha256').update(`${session}|${ip}`).digest('hex')
 }
 
-async function stampListing(fields, body, previous, env, fetchImpl) {
+async function stampListing(fields, body, previous, env, fetchImpl, safetyModel) {
   fields.tags = tagsFor({
     prompt: body.prompt,
     name: fields.name,
@@ -240,7 +240,8 @@ async function stampListing(fields, body, previous, env, fetchImpl) {
   const verdict = await classifySafety({
     text: [body.prompt, fields.name, fields.description, fields.tier === 'freeform' ? fields.freeformHtml : ''].filter(Boolean).join('\n'),
     env,
-    fetchImpl
+    fetchImpl,
+    model: safetyModel
   })
   if (verdict.flagged) {
     fields.status = 'pending'
@@ -550,7 +551,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     const user = await requireCreator(req, ctx, db)
     const body = await readJson(req, HTML_LIMIT)
     const { fields, spec } = fieldsForSave(body, null)
-    const verdict = await stampListing(fields, body, null, config.env, fetchImpl)
+    const verdict = await stampListing(fields, body, null, config.env, fetchImpl, config.safetyModelOnPublish)
     const { game, version } = await createGame(db, fields, spec, user.id)
     if (verdict.flagged) await recordHold(db, { actorId: user.id, gameId: game.id, reason: verdict.reason, source: verdict.source })
     const assets = await listAssets(db, game.id)
@@ -628,7 +629,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
       if (!existing) throw new HttpError(404, 'Game not found', 'not_found')
       const body = await readJson(req, HTML_LIMIT)
       const { fields, spec } = fieldsForSave(body, existing)
-      const verdict = await stampListing(fields, body, existing, config.env, fetchImpl)
+      const verdict = await stampListing(fields, body, existing, config.env, fetchImpl, config.safetyModelOnPublish)
       const { game, version } = await updateGame(db, id, fields, spec, user.id)
       if (verdict.flagged) await recordHold(db, { actorId: user.id, gameId: game.id, reason: verdict.reason, source: verdict.source })
       const assets = await listAssets(db, id)

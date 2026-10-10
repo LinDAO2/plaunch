@@ -90,6 +90,15 @@ test('config refuses a production boot without Postgres and a session secret', (
   assert.equal(prod.usercontentOrigin, 'https://usercontent.example')
   assert.equal(prod.cookieSecure, true)
   assert.equal(prod.seedOnEmpty, false)
+  assert.equal(prod.safetyModelOnPublish, true)
+  assert.equal(loadConfig({
+    NODE_ENV: 'production',
+    SESSION_SECRET: 'prod-secret',
+    DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground',
+    PUBLIC_BASE_URL: 'https://play.example.com',
+    USERCONTENT_ORIGIN: 'https://usercontent.example',
+    SAFETY_MODEL_ON_PUBLISH: 'false'
+  }).safetyModelOnPublish, false)
   assert.equal(databaseKind(prod.databaseUrl), 'postgres')
   assert.equal(databaseKind('pglite:memory'), 'pglite')
 })
@@ -148,6 +157,9 @@ test('production refuses a sandbox on the same host or registrable domain', () =
     USERCONTENT_ORIGIN: 'https://usercontent.play.example.com'
   })
   assert.equal(dev.usercontentOrigin, 'https://usercontent.play.example.com')
+  assert.equal(dev.safetyModelOnPublish, false)
+  assert.equal(loadConfig({ NODE_ENV: 'development', SAFETY_MODEL_ON_PUBLISH: 'true' }).safetyModelOnPublish, true)
+  assert.equal(loadConfig({}).safetyModelOnPublish, false)
 })
 
 test('logs redact secrets', () => {
@@ -791,7 +803,7 @@ test('gemini safety classification runs only when the blocklist is clean and a k
     calls += 1
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"flag":true,"reason":"hate"}' }] } }] }), { status: 200 })
   }
-  const hit = await classifySafety({ text: 'a sunny garden tap', env: { GEMINI_API_KEY: 'k' }, fetchImpl })
+  const hit = await classifySafety({ text: 'a sunny garden tap', env: { GEMINI_API_KEY: 'k', NODE_ENV: 'production' }, fetchImpl })
   assert.equal(calls, 1)
   assert.equal(hit.flagged, true)
   assert.equal(hit.source, 'gemini')
@@ -799,9 +811,40 @@ test('gemini safety classification runs only when the blocklist is clean and a k
   const local = await classifySafety({ text: 'nsfw porn', env: { GEMINI_API_KEY: 'k' }, fetchImpl })
   assert.equal(calls, 1)
   assert.equal(local.source, 'blocklist')
-  const offline = await classifySafety({ text: 'a sunny garden tap', env: {}, fetchImpl })
+  const offline = await classifySafety({ text: 'a sunny garden tap', env: { NODE_ENV: 'production' }, fetchImpl })
   assert.equal(offline.flagged, false)
   assert.equal(calls, 1)
+})
+
+test('SAFETY_MODEL_ON_PUBLISH=false skips the Gemini safety call and keeps the blocklist', async () => {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"flag":true,"reason":"hate"}' }] } }] }), { status: 200 })
+  }
+  const skipped = await classifySafety({
+    text: 'a sunny garden tap',
+    env: { GEMINI_API_KEY: 'k', NODE_ENV: 'production', SAFETY_MODEL_ON_PUBLISH: 'false' },
+    fetchImpl
+  })
+  assert.equal(calls, 0)
+  assert.equal(skipped.flagged, false)
+  assert.equal(skipped.source, 'skipped')
+  const dev = await classifySafety({
+    text: 'a sunny garden tap',
+    env: { GEMINI_API_KEY: 'k', NODE_ENV: 'development' },
+    fetchImpl
+  })
+  assert.equal(calls, 0)
+  assert.equal(dev.source, 'skipped')
+  const local = await classifySafety({
+    text: 'nsfw porn',
+    env: { GEMINI_API_KEY: 'k', SAFETY_MODEL_ON_PUBLISH: 'false' },
+    fetchImpl
+  })
+  assert.equal(local.source, 'blocklist')
+  assert.equal(local.flagged, true)
+  assert.equal(calls, 0)
 })
 
 test('screenshot artifacts use the first directory mkdir accepts', async () => {

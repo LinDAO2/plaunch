@@ -77,7 +77,7 @@ Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it d
 
 Discover is at `/discover`. Trending ranks unique `play_started` events from the last 24 hours. The same session and IP hash counts once, a burst of three starts inside two minutes is left out, and the creator's own signed-in plays are left out. New is chronological. Featured is set by a moderator.
 
-`ADMIN_EMAILS` is a comma-separated moderator list. Moderators use `/admin` to review abuse reports, hide or unhide a game, archive it, feature it, and ban an account. Those actions are written to `audit_log`. A title, description, or prompt that hits the blocklist is stored as `pending` and stays off Discover until a moderator unhides it. When `GEMINI_API_KEY` is set, publish also asks Gemini for a safety classification, and a flagged game is held the same way.
+`ADMIN_EMAILS` is a comma-separated moderator list. Moderators use `/admin` to review abuse reports, hide or unhide a game, archive it, feature it, and ban an account. Those actions are written to `audit_log`. A title, description, or prompt that hits the blocklist is stored as `pending` and stays off Discover until a moderator unhides it. When `GEMINI_API_KEY` is set, publish can also ask Gemini for a safety classification, and a flagged game is held the same way. That call spends quota. `SAFETY_MODEL_ON_PUBLISH=false` skips it. The default is on in production and off in development. The blocklist still runs.
 
 `/privacy` and `/terms` are drafts. They say they need legal review and are not in effect.
 

@@ -12,6 +12,21 @@ function intEnv(value, fallback) {
   return n
 }
 
+export function flagEnv(value, fallback) {
+  if (value === undefined || value === '') return fallback
+  if (value === true || value === false) return value
+  const v = String(value).trim().toLowerCase()
+  if (v === '1' || v === 'true' || v === 'yes' || v === 'on') return true
+  if (v === '0' || v === 'false' || v === 'no' || v === 'off') return false
+  return fallback
+}
+
+// Publish-time Gemini safety spends quota. On in production, off in development, unless set.
+export function safetyModelOnPublish(env = {}) {
+  const nodeEnv = env.NODE_ENV || 'development'
+  return flagEnv(env.SAFETY_MODEL_ON_PUBLISH, nodeEnv !== 'development')
+}
+
 export function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development'
   const sessionFromEnv = typeof env.SESSION_SECRET === 'string' ? env.SESSION_SECRET : ''
@@ -81,6 +96,7 @@ export function loadConfig(env = process.env) {
     usercontentPort: intEnv(env.USERCONTENT_PORT, portOf(sandboxOrigin, 43921)),
     serverRole: serverRole(env.SERVER_ROLE),
     worldGuestCap: intEnv(env.WORLD_GUEST_CAP, 8),
+    safetyModelOnPublish: safetyModelOnPublish(env),
     adminEmails: adminEmails(env.ADMIN_EMAILS),
     mainOrigins: [],
     warnings,
