@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function () {
+  function makeStore() {
+    var bag = Object.create(null);
+    var keys = [];
+    var api = {
+      getItem: function (key) {
+        key = String(key);
+        return Object.prototype.hasOwnProperty.call(bag, key) ? bag[key] : null;
+      },
+      setItem: function (key, value) {
+        key = String(key);
+        if (!Object.prototype.hasOwnProperty.call(bag, key)) keys.push(key);
+        bag[key] = String(value);
+      },
+      removeItem: function (key) {
+        key = String(key);
+        if (!Object.prototype.hasOwnProperty.call(bag, key)) return;
+        delete bag[key];
+        keys = keys.filter(function (item) { return item !== key; });
+      },
+      clear: function () { bag = Object.create(null); keys = []; },
+      key: function (index) { return keys[index] == null ? null : keys[index]; }
+    };
+    Object.defineProperty(api, 'length', { get: function () { return keys.length; } });
+    Object.defineProperty(api, '__playground', { value: true });
+    return api;
+  }
+  function install(name, api) {
+    try {
+      Object.defineProperty(window, name, { configurable: true, get: function () { return api; } });
+    } catch (err) {
+      try { window[name] = api; } catch (err2) {}
+    }
+  }
+  var memory = makeStore();
+  var session = makeStore();
+  install('localStorage', memory);
+  install('sessionStorage', session);
+  window.Playground = window.Playground || {};
+  window.Playground.submitScore = function (n) {
+    var points = Math.max(0, Math.min(100000, Math.floor(Number(n) || 0)));
+    try { parent.postMessage({ type: 'playground-score', points: points }, '*'); } catch (err) {}
+  };
+})();</script>
+
+  <title>Grid Snake</title>
+  <meta charset="UTF-8">
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    border: 1px solid white;
+  }
+  </style>
+
+<style>html,body{margin:0!important;padding:0!important;height:100%;background:#000;overflow:hidden;}
+#pg-root{position:absolute;left:0;top:0;width:max-content;height:max-content;transform-origin:0 0;}
+#pg-start,#pg-credit,#pg-pad{font-family:sans-serif;}
+#pg-start{position:fixed;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;background:#000;color:#e7e9ea;font-size:20px;}
+#pg-start[hidden]{display:none;}
+#pg-credit{position:fixed;top:6px;left:8px;z-index:4;margin:0;padding:2px 6px;background:#000;color:#e7e9ea;font-size:12px;}
+#pg-pad{position:fixed;left:8px;right:8px;bottom:8px;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;}
+#pg-pad button{pointer-events:auto;width:52px;height:44px;margin:2px;background:#000;color:#e7e9ea;border:1px solid #2f3336;font-size:16px;}
+#pg-dpad{display:grid;grid-template-columns:52px 52px 52px;grid-template-rows:44px 44px 44px;}
+#pg-up{grid-column:2;grid-row:1;}
+#pg-left{grid-column:1;grid-row:2;}
+#pg-right{grid-column:3;grid-row:2;}
+#pg-down{grid-column:2;grid-row:3;}
+#pg-actions{display:flex;gap:8px;}</style>
+</head>
+<body>
+<button id="pg-start" type="button">Tap to start</button>
+<p id="pg-credit">Original by Christopher Straker (CC0-1.0)</p>
+<div id="pg-pad">
+<div id="pg-dpad">
+<button id="pg-up" type="button" aria-label="Up">↑</button>
+<button id="pg-left" type="button" aria-label="Left">←</button>
+<button id="pg-right" type="button" aria-label="Right">→</button>
+<button id="pg-down" type="button" aria-label="Down">↓</button>
+</div>
+<div id="pg-actions">
+<button id="pg-a" type="button">A</button>
+<button id="pg-b" type="button">B</button>
+</div>
+</div>
+<div id="pg-root">
+
+<canvas width="400" height="400" id="game"></canvas>
+<script>
+var canvas = document.getElementById('game');
+var context = canvas.getContext('2d');
+
+
+
+var grid = 16;
+var count = 0;
+
+var snake = {
+  x: 160,
+  y: 160,
+
+  
+  dx: grid,
+  dy: 0,
+
+  
+  cells: [],
+
+  
+  maxCells: 4
+};
+var apple = {
+  x: 320,
+  y: 320
+};
+
+
+
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+
+function loop() {
+  requestAnimationFrame(loop);
+
+  
+  if (++count < 4) {
+    return;
+  }
+
+  count = 0;
+  context.clearRect(0,0,canvas.width,canvas.height);
+
+  
+  snake.x += snake.dx;
+  snake.y += snake.dy;
+
+  
+  if (snake.x < 0) {
+    snake.x = canvas.width - grid;
+  }
+  else if (snake.x >= canvas.width) {
+    snake.x = 0;
+  }
+
+  
+  if (snake.y < 0) {
+    snake.y = canvas.height - grid;
+  }
+  else if (snake.y >= canvas.height) {
+    snake.y = 0;
+  }
+
+  
+  snake.cells.unshift({x: snake.x, y: snake.y});
+
+  
+  if (snake.cells.length > snake.maxCells) {
+    snake.cells.pop();
+  }
+
+  
+  context.fillStyle = 'red';
+  context.fillRect(apple.x, apple.y, grid-1, grid-1);
+
+  
+  context.fillStyle = 'green';
+  snake.cells.forEach(function(cell, index) {
+
+    
+    context.fillRect(cell.x, cell.y, grid-1, grid-1);
+
+    
+    if (cell.x === apple.x && cell.y === apple.y) {
+      snake.maxCells++;
+      if (!snake.score) snake.score = 0;
+      snake.score += 1;
+      if (window.Playground) Playground.submitScore(snake.score);
+
+      
+      apple.x = getRandomInt(0, 25) * grid;
+      apple.y = getRandomInt(0, 25) * grid;
+    }
+
+    
+    for (var i = index + 1; i < snake.cells.length; i++) {
+
+      
+      if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+        snake.x = 160;
+        snake.y = 160;
+        snake.cells = [];
+        snake.maxCells = 4;
+        snake.score = 0;
+        snake.dx = grid;
+        snake.dy = 0;
+
+        apple.x = getRandomInt(0, 25) * grid;
+        apple.y = getRandomInt(0, 25) * grid;
+      }
+    }
+  });
+}
+
+
+document.addEventListener('keydown', function(e) {
+  
+  
+  
+  
+
+  
+  if (e.which === 37 && snake.dx === 0) {
+    snake.dx = -grid;
+    snake.dy = 0;
+  }
+  
+  else if (e.which === 38 && snake.dy === 0) {
+    snake.dy = -grid;
+    snake.dx = 0;
+  }
+  
+  else if (e.which === 39 && snake.dx === 0) {
+    snake.dx = grid;
+    snake.dy = 0;
+  }
+  
+  else if (e.which === 40 && snake.dy === 0) {
+    snake.dy = grid;
+    snake.dx = 0;
+  }
+});
+
+
+requestAnimationFrame(loop);
+</script>
+
+</div>
+<script>(function () {
+  var root = document.getElementById('pg-root');
+  function fit() {
+    if (!root) return;
+    root.style.transform = 'none';
+    var w = root.scrollWidth;
+    var h = root.scrollHeight;
+    if (w < 8 || h < 8) {
+      var canvas = root.querySelector('canvas');
+      if (canvas) {
+        w = canvas.width || canvas.offsetWidth || w;
+        h = canvas.height || canvas.offsetHeight || h;
+      }
+    }
+    if (w < 8) w = 320;
+    if (h < 8) h = 320;
+    var scale = Math.min(window.innerWidth / w, window.innerHeight / h);
+    if (!isFinite(scale) || scale <= 0) scale = 1;
+    var tx = Math.round((window.innerWidth - w * scale) / 2);
+    var ty = Math.round((window.innerHeight - h * scale) / 2);
+    root.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+    try {
+      parent.postMessage({ type: 'playground-fit', width: Math.round(w * scale), height: Math.round(h * scale) }, '*');
+    } catch (err) {}
+  }
+  window.addEventListener('resize', fit);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fit);
+  else fit();
+  window.addEventListener('load', function () { fit(); setTimeout(fit, 60); });
+  var selector = document.documentElement.getAttribute('data-pg-score');
+  if (selector) {
+    var arm = function () {
+      var el = document.querySelector(selector);
+      if (!el || typeof MutationObserver !== 'function') return;
+      var last = null;
+      var send = function () {
+        var n = parseInt(String(el.textContent).replace(/[^0-9]/g, ''), 10);
+        if (!isFinite(n) || n === last) return;
+        last = n;
+        if (window.Playground) window.Playground.submitScore(n);
+      };
+      new MutationObserver(send).observe(el, { childList: true, characterData: true, subtree: true });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
+    else arm();
+  }
+  var start = document.getElementById('pg-start');
+  function unlock() {
+    if (start) start.hidden = true;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      try {
+        var ctx = new AC();
+        if (ctx.resume) ctx.resume();
+      } catch (err) {}
+    }
+    var media = document.querySelectorAll('audio,video');
+    for (var i = 0; i < media.length; i++) {
+      try { var play = media[i].play; if (play) play.call(media[i]); } catch (err) {}
+    }
+  }
+  if (start) {
+    start.addEventListener('pointerdown', function (event) {
+      event.preventDefault();
+      unlock();
+    });
+  }
+  function emit(type, key, code) {
+    var ev;
+    try {
+      ev = new KeyboardEvent(type, { key: key, bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'keyCode', { get: function () { return code; } });
+      Object.defineProperty(ev, 'which', { get: function () { return code; } });
+    } catch (err) {
+      ev = null;
+    }
+    if (!ev || ev.keyCode !== code) {
+      ev = document.createEvent('Event');
+      ev.initEvent(type, true, true);
+      ev.key = key;
+      ev.keyCode = code;
+      ev.which = code;
+    }
+    document.dispatchEvent(ev);
+    window.dispatchEvent(ev);
+  }
+  function bind(el, pairs) {
+    if (!el) return;
+    var timer = 0;
+    function down(event) {
+      event.preventDefault();
+      pairs.forEach(function (pair) { emit('keydown', pair[0], pair[1]); });
+      if (timer) clearInterval(timer);
+      timer = setInterval(function () {
+        pairs.forEach(function (pair) { emit('keydown', pair[0], pair[1]); });
+      }, 140);
+    }
+    function up(event) {
+      if (event) event.preventDefault();
+      if (timer) clearInterval(timer);
+      timer = 0;
+      pairs.forEach(function (pair) { emit('keyup', pair[0], pair[1]); });
+    }
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('pointercancel', up);
+  }
+  bind(document.getElementById('pg-up'), [['ArrowUp', 38]]);
+  bind(document.getElementById('pg-down'), [['ArrowDown', 40]]);
+  bind(document.getElementById('pg-left'), [['ArrowLeft', 37]]);
+  bind(document.getElementById('pg-right'), [['ArrowRight', 39]]);
+  bind(document.getElementById('pg-a'), [['z', 90], [' ', 32]]);
+  bind(document.getElementById('pg-b'), [['x', 88]]);
+})();</script>
+</body>
+</html>

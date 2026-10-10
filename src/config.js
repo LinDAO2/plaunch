@@ -98,6 +98,7 @@ export function loadConfig(env = process.env) {
     worldGuestCap: intEnv(env.WORLD_GUEST_CAP, 8),
     safetyModelOnPublish: safetyModelOnPublish(env),
     adminEmails: adminEmails(env.ADMIN_EMAILS),
+    githubToken: typeof env.GITHUB_TOKEN === 'string' ? env.GITHUB_TOKEN.trim() : '',
     mainOrigins: [],
     warnings,
     env

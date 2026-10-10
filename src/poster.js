@@ -231,11 +231,16 @@ export function renderPoster(game) {
   const scale = title.length > 12 ? 8 : 10
   const titleWidth = title.length * 6 * scale
   drawText(rgb, title, Math.max(80, Math.round((SIZE - titleWidth) / 2)), 80, scale, paper)
+  if (game.credit?.author) {
+    const credit = label(`ORIGINAL BY ${game.credit.author} ${game.credit.license || ''}`, 42)
+    const creditWidth = credit.length * 6 * 4
+    drawText(rgb, credit, Math.max(48, Math.round((SIZE - creditWidth) / 2)), 168, 4, paper)
+  }
   return encodePng(SIZE, SIZE, rgb)
 }
 
 export function posterPng(game) {
-  const key = `${game.id}|${game.updatedAt}|${game.name}|${game.accent}|${game.type}`
+  const key = `${game.id}|${game.updatedAt}|${game.name}|${game.accent}|${game.type}|${game.credit?.author || ''}|${game.credit?.license || ''}`
   const cached = cache.get(key)
   if (cached) return cached
   const png = renderPoster(game)

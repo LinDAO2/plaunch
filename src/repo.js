@@ -37,7 +37,22 @@ export function mapGame(row) {
     freeformHtml: row.freeform_html || null,
     tags: readTags(row.tags),
     featured: row.featured === true,
-    flagReason: row.flag_reason || ''
+    flagReason: row.flag_reason || '',
+    credit: readCredit(row.credit)
+  }
+}
+
+function readCredit(value) {
+  const parsed = parseJson(value)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+  return {
+    author: typeof parsed.author === 'string' ? parsed.author : '',
+    license: typeof parsed.license === 'string' ? parsed.license : '',
+    source: typeof parsed.source === 'string' ? parsed.source : '',
+    sha: typeof parsed.sha === 'string' ? parsed.sha : '',
+    origin: parsed.origin === 'curated' || parsed.origin === 'community' ? parsed.origin : '',
+    copyleftConfirmed: parsed.copyleftConfirmed === true,
+    permissionConfirmed: parsed.permissionConfirmed === true
   }
 }
 
@@ -64,7 +79,8 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     generation: game.generation,
     canEdit,
     tags: game.tags || [],
-    featured: game.featured === true
+    featured: game.featured === true,
+    credit: game.credit?.author ? game.credit : null
   }
   if (canEdit) out.flagReason = game.flagReason || ''
   if (includeSpec) out.spec = game.spec
@@ -143,10 +159,10 @@ export async function createGame(db, fields, spec, userId) {
     const tier = fields.tier === 'freeform' ? 'freeform' : 'spec'
     const status = fields.status === 'pending' ? 'pending' : 'published'
     const inserted = await tx.query(
-      `insert into games (id, owner_id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tier, freeform_html, tags, featured, flag_reason)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11::jsonb, $12, $12, $13, $14, $15, $16::jsonb, false, $17)
+      `insert into games (id, owner_id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tier, freeform_html, tags, featured, flag_reason, credit)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11::jsonb, $12, $12, $13, $14, $15, $16::jsonb, false, $17, $18::jsonb)
        returning *`,
-      [id, userId, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, status, fields.generation || 'manual', spec == null ? null : JSON.stringify(spec), now, status === 'published' ? now : null, tier, tier === 'freeform' ? fields.freeformHtml : null, JSON.stringify(fields.tags || []), fields.flagReason || '']
+      [id, userId, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, status, fields.generation || 'manual', spec == null ? null : JSON.stringify(spec), now, status === 'published' ? now : null, tier, tier === 'freeform' ? fields.freeformHtml : null, JSON.stringify(fields.tags || []), fields.flagReason || '', JSON.stringify(fields.credit || {})]
     )
     const game = mapGame(inserted.rows[0])
     const version = await insertVersion(tx, game, userId)

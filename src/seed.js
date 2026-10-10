@@ -2,6 +2,7 @@ import { EXAMPLE_GAMES } from './arcade/examples.js'
 import { tagsFor } from './ai/tags.js'
 import { specFromGame } from './ai/gamespec.js'
 import { featuredWorlds } from './blocks/spec.js'
+import { loadCurated } from './imports/catalog.js'
 
 const CLASSICS = [
   { id: 'click-frenzy', name: 'Click Frenzy', description: 'Tap as fast as you can.', type: 'tap', duration: 10, accent: '#a88bff', createdAt: '2026-10-09T00:00:00Z' },
@@ -37,6 +38,21 @@ export async function seed(db) {
       await tx.query(
         `insert into game_assets (game_id, kind, uri, meta) values ($1, 'accent', $2, '{"role":"theme-color"}'::jsonb)`,
         [game.id, game.accent]
+      )
+    }
+    for (const game of await loadCurated()) {
+      const result = await tx.query(
+        `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tags, featured, tier, freeform_html, credit)
+         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', null, $7, $7, $7, $8::jsonb, false, 'freeform', $9, $10::jsonb)
+         on conflict (id) do nothing
+         returning id`,
+        [game.id, game.name, game.description, game.type, game.duration, game.accent, game.createdAt, JSON.stringify(game.tags), game.freeformHtml, JSON.stringify(game.credit)]
+      )
+      if (!result.rows.length) continue
+      inserted += 1
+      await tx.query(
+        'insert into game_versions (game_id, version, snapshot) values ($1, 1, $2::jsonb)',
+        [game.id, JSON.stringify({ id: game.id, name: game.name, credit: game.credit, generation: 'seed', status: 'published', tier: 'freeform' })]
       )
     }
   })

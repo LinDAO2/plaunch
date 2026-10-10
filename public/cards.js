@@ -204,5 +204,20 @@ export function gameCard(game, { label, playHref }) {
   share.setAttribute('aria-label', 'Share')
   share.append(icon('share'))
   card.append(link, share)
+  if (game.credit?.author) {
+    const credit = document.createElement('p')
+    credit.className = 'card-credit'
+    const license = game.credit.license || 'unspecified'
+    credit.append(document.createTextNode(`Original by ${game.credit.author} (${license}) - `))
+    if (typeof game.credit.source === 'string' && /^https:\/\/\S+$/.test(game.credit.source)) {
+      const source = document.createElement('a')
+      source.href = game.credit.source
+      source.textContent = 'source'
+      source.target = '_blank'
+      source.rel = 'noreferrer'
+      credit.append(source)
+    }
+    card.append(credit)
+  }
   return { card, bottom, share, link }
 }

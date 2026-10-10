@@ -1,4 +1,4 @@
-export const TAGS = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap']
+export const TAGS = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap', 'opensource', 'community']
 
 const HINTS = [
   ['runner', ['runner', 'endless', 'cactus', 'cacti', 'flappy', 'side-scroll', 'sidescroller']],

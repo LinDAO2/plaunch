@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function () {
+  function makeStore() {
+    var bag = Object.create(null);
+    var keys = [];
+    var api = {
+      getItem: function (key) {
+        key = String(key);
+        return Object.prototype.hasOwnProperty.call(bag, key) ? bag[key] : null;
+      },
+      setItem: function (key, value) {
+        key = String(key);
+        if (!Object.prototype.hasOwnProperty.call(bag, key)) keys.push(key);
+        bag[key] = String(value);
+      },
+      removeItem: function (key) {
+        key = String(key);
+        if (!Object.prototype.hasOwnProperty.call(bag, key)) return;
+        delete bag[key];
+        keys = keys.filter(function (item) { return item !== key; });
+      },
+      clear: function () { bag = Object.create(null); keys = []; },
+      key: function (index) { return keys[index] == null ? null : keys[index]; }
+    };
+    Object.defineProperty(api, 'length', { get: function () { return keys.length; } });
+    Object.defineProperty(api, '__playground', { value: true });
+    return api;
+  }
+  function install(name, api) {
+    try {
+      Object.defineProperty(window, name, { configurable: true, get: function () { return api; } });
+    } catch (err) {
+      try { window[name] = api; } catch (err2) {}
+    }
+  }
+  var memory = makeStore();
+  var session = makeStore();
+  install('localStorage', memory);
+  install('sessionStorage', session);
+  window.Playground = window.Playground || {};
+  window.Playground.submitScore = function (n) {
+    var points = Math.max(0, Math.min(100000, Math.floor(Number(n) || 0)));
+    try { parent.postMessage({ type: 'playground-score', points: points }, '*'); } catch (err) {}
+  };
+})();</script>
+
+  <title>Brick Bounce</title>
+  <meta charset="UTF-8">
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  </style>
+
+<style>html,body{margin:0!important;padding:0!important;height:100%;background:#000;overflow:hidden;}
+#pg-root{position:absolute;left:0;top:0;width:max-content;height:max-content;transform-origin:0 0;}
+#pg-start,#pg-credit,#pg-pad{font-family:sans-serif;}
+#pg-start{position:fixed;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;background:#000;color:#e7e9ea;font-size:20px;}
+#pg-start[hidden]{display:none;}
+#pg-credit{position:fixed;top:6px;left:8px;z-index:4;margin:0;padding:2px 6px;background:#000;color:#e7e9ea;font-size:12px;}
+#pg-pad{position:fixed;left:8px;right:8px;bottom:8px;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;}
+#pg-pad button{pointer-events:auto;width:52px;height:44px;margin:2px;background:#000;color:#e7e9ea;border:1px solid #2f3336;font-size:16px;}
+#pg-dpad{display:grid;grid-template-columns:52px 52px 52px;grid-template-rows:44px 44px 44px;}
+#pg-up{grid-column:2;grid-row:1;}
+#pg-left{grid-column:1;grid-row:2;}
+#pg-right{grid-column:3;grid-row:2;}
+#pg-down{grid-column:2;grid-row:3;}
+#pg-actions{display:flex;gap:8px;}</style>
+</head>
+<body>
+<button id="pg-start" type="button">Tap to start</button>
+<p id="pg-credit">Original by Christopher Straker (CC0-1.0)</p>
+<div id="pg-pad">
+<div id="pg-dpad">
+<button id="pg-up" type="button" aria-label="Up">↑</button>
+<button id="pg-left" type="button" aria-label="Left">←</button>
+<button id="pg-right" type="button" aria-label="Right">→</button>
+<button id="pg-down" type="button" aria-label="Down">↓</button>
+</div>
+<div id="pg-actions">
+<button id="pg-a" type="button">A</button>
+<button id="pg-b" type="button">B</button>
+</div>
+</div>
+<div id="pg-root">
+
+<canvas width="400" height="500" id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const context = canvas.getContext('2d');
+
+
+
+const level1 = [
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  ['R','R','R','R','R','R','R','R','R','R','R','R','R','R'],
+  ['R','R','R','R','R','R','R','R','R','R','R','R','R','R'],
+  ['O','O','O','O','O','O','O','O','O','O','O','O','O','O'],
+  ['O','O','O','O','O','O','O','O','O','O','O','O','O','O'],
+  ['G','G','G','G','G','G','G','G','G','G','G','G','G','G'],
+  ['G','G','G','G','G','G','G','G','G','G','G','G','G','G'],
+  ['Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y'],
+  ['Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y']
+];
+
+
+const colorMap = {
+  'R': 'red',
+  'O': 'orange',
+  'G': 'green',
+  'Y': 'yellow'
+};
+
+
+const brickGap = 2;
+const brickWidth = 25;
+const brickHeight = 12;
+
+
+
+
+const wallSize = 12;
+const bricks = [];
+
+
+
+for (let row = 0; row < level1.length; row++) {
+  for (let col = 0; col < level1[row].length; col++) {
+    const colorCode = level1[row][col];
+
+    bricks.push({
+      x: wallSize + (brickWidth + brickGap) * col,
+      y: wallSize + (brickHeight + brickGap) * row,
+      color: colorMap[colorCode],
+      width: brickWidth,
+      height: brickHeight
+    });
+  }
+}
+
+const paddle = {
+  
+  x: canvas.width / 2 - brickWidth / 2,
+  y: 440,
+  width: brickWidth,
+  height: brickHeight,
+
+  
+  dx: 0
+};
+
+const ball = {
+  x: 130,
+  y: 260,
+  width: 5,
+  height: 5,
+
+  
+  speed: 2,
+
+  
+  dx: 0,
+  dy: 0
+};
+
+
+
+function collides(obj1, obj2) {
+  return obj1.x < obj2.x + obj2.width &&
+         obj1.x + obj1.width > obj2.x &&
+         obj1.y < obj2.y + obj2.height &&
+         obj1.y + obj1.height > obj2.y;
+}
+
+
+function loop() {
+  requestAnimationFrame(loop);
+  context.clearRect(0,0,canvas.width,canvas.height);
+
+  
+  paddle.x += paddle.dx;
+
+  
+  if (paddle.x < wallSize) {
+    paddle.x = wallSize
+  }
+  else if (paddle.x + brickWidth > canvas.width - wallSize) {
+    paddle.x = canvas.width - wallSize - brickWidth;
+  }
+
+  
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  
+  
+  if (ball.x < wallSize) {
+    ball.x = wallSize;
+    ball.dx *= -1;
+  }
+  else if (ball.x + ball.width > canvas.width - wallSize) {
+    ball.x = canvas.width - wallSize - ball.width;
+    ball.dx *= -1;
+  }
+  
+  if (ball.y < wallSize) {
+    ball.y = wallSize;
+    ball.dy *= -1;
+  }
+
+  
+  if (ball.y > canvas.height) {
+    ball.x = 130;
+    ball.y = 260;
+    ball.dx = 0;
+    ball.dy = 0;
+  }
+
+  
+  if (collides(ball, paddle)) {
+    ball.dy *= -1;
+
+    
+    
+    ball.y = paddle.y - ball.height;
+  }
+
+  
+  
+  for (let i = 0; i < bricks.length; i++) {
+    const brick = bricks[i];
+
+    if (collides(ball, brick)) {
+      
+      bricks.splice(i, 1);
+      if (!window.__pgScore) window.__pgScore = 0;
+      window.__pgScore += 10;
+      if (window.Playground) Playground.submitScore(window.__pgScore);
+
+      
+      
+      
+      if (ball.y + ball.height - ball.speed <= brick.y ||
+          ball.y >= brick.y + brick.height - ball.speed) {
+        ball.dy *= -1;
+      }
+      
+      else {
+        ball.dx *= -1;
+      }
+
+      break;
+    }
+  }
+
+  
+  context.fillStyle = 'lightgrey';
+  context.fillRect(0, 0, canvas.width, wallSize);
+  context.fillRect(0, 0, wallSize, canvas.height);
+  context.fillRect(canvas.width - wallSize, 0, wallSize, canvas.height);
+
+  
+  if (ball.dx || ball.dy) {
+    context.fillRect(ball.x, ball.y, ball.width, ball.height);
+  }
+
+  
+  bricks.forEach(function(brick) {
+    context.fillStyle = brick.color;
+    context.fillRect(brick.x, brick.y, brick.width, brick.height);
+  });
+
+  
+  context.fillStyle = 'cyan';
+  context.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+}
+
+
+document.addEventListener('keydown', function(e) {
+  
+  if (e.which === 37) {
+    paddle.dx = -3;
+  }
+  
+  else if (e.which === 39) {
+    paddle.dx = 3;
+  }
+
+  
+  
+  
+  if (ball.dx === 0 && ball.dy === 0 && e.which === 32) {
+    ball.dx = ball.speed;
+    ball.dy = ball.speed;
+  }
+});
+
+
+document.addEventListener('keyup', function(e) {
+  if (e.which === 37 || e.which === 39) {
+    paddle.dx = 0;
+  }
+});
+
+
+requestAnimationFrame(loop);
+</script>
+
+</div>
+<script>(function () {
+  var root = document.getElementById('pg-root');
+  function fit() {
+    if (!root) return;
+    root.style.transform = 'none';
+    var w = root.scrollWidth;
+    var h = root.scrollHeight;
+    if (w < 8 || h < 8) {
+      var canvas = root.querySelector('canvas');
+      if (canvas) {
+        w = canvas.width || canvas.offsetWidth || w;
+        h = canvas.height || canvas.offsetHeight || h;
+      }
+    }
+    if (w < 8) w = 320;
+    if (h < 8) h = 320;
+    var scale = Math.min(window.innerWidth / w, window.innerHeight / h);
+    if (!isFinite(scale) || scale <= 0) scale = 1;
+    var tx = Math.round((window.innerWidth - w * scale) / 2);
+    var ty = Math.round((window.innerHeight - h * scale) / 2);
+    root.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+    try {
+      parent.postMessage({ type: 'playground-fit', width: Math.round(w * scale), height: Math.round(h * scale) }, '*');
+    } catch (err) {}
+  }
+  window.addEventListener('resize', fit);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fit);
+  else fit();
+  window.addEventListener('load', function () { fit(); setTimeout(fit, 60); });
+  var selector = document.documentElement.getAttribute('data-pg-score');
+  if (selector) {
+    var arm = function () {
+      var el = document.querySelector(selector);
+      if (!el || typeof MutationObserver !== 'function') return;
+      var last = null;
+      var send = function () {
+        var n = parseInt(String(el.textContent).replace(/[^0-9]/g, ''), 10);
+        if (!isFinite(n) || n === last) return;
+        last = n;
+        if (window.Playground) window.Playground.submitScore(n);
+      };
+      new MutationObserver(send).observe(el, { childList: true, characterData: true, subtree: true });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
+    else arm();
+  }
+  var start = document.getElementById('pg-start');
+  function unlock() {
+    if (start) start.hidden = true;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      try {
+        var ctx = new AC();
+        if (ctx.resume) ctx.resume();
+      } catch (err) {}
+    }
+    var media = document.querySelectorAll('audio,video');
+    for (var i = 0; i < media.length; i++) {
+      try { var play = media[i].play; if (play) play.call(media[i]); } catch (err) {}
+    }
+  }
+  if (start) {
+    start.addEventListener('pointerdown', function (event) {
+      event.preventDefault();
+      unlock();
+    });
+  }
+  function emit(type, key, code) {
+    var ev;
+    try {
+      ev = new KeyboardEvent(type, { key: key, bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'keyCode', { get: function () { return code; } });
+      Object.defineProperty(ev, 'which', { get: function () { return code; } });
+    } catch (err) {
+      ev = null;
+    }
+    if (!ev || ev.keyCode !== code) {
+      ev = document.createEvent('Event');
+      ev.initEvent(type, true, true);
+      ev.key = key;
+      ev.keyCode = code;
+      ev.which = code;
+    }
+    document.dispatchEvent(ev);
+    window.dispatchEvent(ev);
+  }
+  function bind(el, pairs) {
+    if (!el) return;
+    var timer = 0;
+    function down(event) {
+      event.preventDefault();
+      pairs.forEach(function (pair) { emit('keydown', pair[0], pair[1]); });
+      if (timer) clearInterval(timer);
+      timer = setInterval(function () {
+        pairs.forEach(function (pair) { emit('keydown', pair[0], pair[1]); });
+      }, 140);
+    }
+    function up(event) {
+      if (event) event.preventDefault();
+      if (timer) clearInterval(timer);
+      timer = 0;
+      pairs.forEach(function (pair) { emit('keyup', pair[0], pair[1]); });
+    }
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('pointercancel', up);
+  }
+  bind(document.getElementById('pg-up'), [['ArrowUp', 38]]);
+  bind(document.getElementById('pg-down'), [['ArrowDown', 40]]);
+  bind(document.getElementById('pg-left'), [['ArrowLeft', 37]]);
+  bind(document.getElementById('pg-right'), [['ArrowRight', 39]]);
+  bind(document.getElementById('pg-a'), [['z', 90], [' ', 32]]);
+  bind(document.getElementById('pg-b'), [['x', 88]]);
+})();</script>
+</body>
+</html>

@@ -28,7 +28,8 @@ let lastGeneration = 'manual'
 let authMode = 'login'
 let activeTag = ''
 let baseSpawnRate = null
-const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap']
+const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap', 'opensource', 'community']
+const TAG_LABELS = { opensource: 'Open source', community: 'Community' }
 
 const runtime = createRuntime({
   root: $('game'),
@@ -443,7 +444,7 @@ function paintTags() {
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'tag' + (activeTag === tag ? ' on' : '')
-    button.textContent = tag || 'All'
+    button.textContent = TAG_LABELS[tag] || tag || 'All'
     button.addEventListener('click', () => {
       activeTag = tag
       paintTags()
@@ -816,4 +817,47 @@ async function boot() {
   }
 }
 
+function bindImport() {
+  const open = $('bring-open')
+  const dialog = $('bring-dialog')
+  const form = $('bring-form')
+  if (!open || !dialog || !form) return
+  open.addEventListener('click', () => dialog.showModal())
+  $('bring-cancel').addEventListener('click', () => dialog.close())
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const status = $('bring-status')
+    status.textContent = 'Importing…'
+    try {
+      const payload = {
+        name: $('bring-name').value,
+        author: $('bring-author').value,
+        url: $('bring-url').value,
+        ref: $('bring-ref').value,
+        subpath: $('bring-subpath').value,
+        html: $('bring-html').value,
+        confirmUnmodified: $('bring-unmodified').checked,
+        confirmPermission: $('bring-permission').checked
+      }
+      const file = $('bring-file').files && $('bring-file').files[0]
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) throw new Error('File is larger than 2MB')
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+        }
+        payload.filename = file.name
+        payload.dataBase64 = btoa(binary)
+      }
+      const data = await api('/import', 'POST', payload)
+      dialog.close()
+      location.href = `/g/${data.game.id}`
+    } catch (error) {
+      status.textContent = error.message || 'Import failed'
+    }
+  })
+}
+
+bindImport()
 boot()

@@ -7,6 +7,15 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'publ
 
 let playTemplate
 
+export function creditMarkup(credit) {
+  if (!credit?.author) return ''
+  const label = `Original by ${escapeHtml(credit.author)} (${escapeHtml(credit.license || 'unspecified')})`
+  if (typeof credit.source === 'string' && /^https:\/\/\S+$/.test(credit.source)) {
+    return `${label} - <a href="${escapeHtml(credit.source)}" rel="noreferrer">source</a>`
+  }
+  return label
+}
+
 export async function renderPlayPage(game, { embed = false } = {}) {
   if (!playTemplate) playTemplate = await readFile(path.join(ROOT, 'play.html'), 'utf8')
   const accent = /^#[0-9a-fA-F]{6}$/.test(game.accent) ? game.accent : '#a88bff'
@@ -17,8 +26,9 @@ export async function renderPlayPage(game, { embed = false } = {}) {
     SLUG: escapeHtml(game.id),
     ACCENT: accent,
     MECHANIC: escapeHtml(String(game.type || '').toUpperCase()),
-    BODY_CLASS: embed ? 'play-body embed' : 'play-body',
-    GATE_ATTR: embed ? '' : 'hidden'
+    BODY_CLASS: embed ? `play-body embed${game.tier === 'freeform' ? ' freeform-play' : ''}` : 'play-body',
+    GATE_ATTR: embed ? '' : 'hidden',
+    CREDIT: creditMarkup(game.credit)
   }
   return playTemplate.replace(/__([A-Z_]+)__/g, (_, key) => values[key] ?? '')
 }
@@ -89,6 +99,7 @@ ${siteTag}
 <h1>${name}</h1>
 <p>${description}</p>
 <p class="by">By ${escapeHtml(game.creator || 'Playground')}</p>
+${game.credit?.author ? `<p class="hint">${creditMarkup(game.credit)}</p>` : ''}
 <a class="primary" href="${playPath}">Play</a>
 <a href="${studioPath}">Open in studio</a>
 <section class="leaderboard">

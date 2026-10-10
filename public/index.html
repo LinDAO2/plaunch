@@ -13,6 +13,7 @@
 <p id="gen-mode" class="badge">Template</p>
 <nav>
 <a href="/discover">Discover</a>
+<button id="bring-open" class="nav-btn" type="button">Import</button>
 <a href="#ask">Create</a>
 <a class="dash-link" href="/studio/dashboard">Dashboard</a>
 <a id="admin-link" href="/admin" hidden>Moderation</a>
@@ -149,6 +150,37 @@
 </form>
 </div>
 <div id="toast" role="status" class="toast" hidden></div>
+<dialog id="bring-dialog">
+<form id="bring-form">
+<h2>Bring your game</h2>
+<p class="hint">Paste HTML, upload a .html or .zip under 2MB, or point at a GitHub repo. Playground pins a commit, checks the license, and fits the game to the embed.</p>
+<label for="bring-url">GitHub repository</label>
+<input id="bring-url" type="url" placeholder="https://github.com/owner/repo" autocomplete="off">
+<div class="twocol">
+<div>
+<label for="bring-ref">Ref</label>
+<input id="bring-ref" placeholder="branch, tag, or SHA" autocomplete="off">
+</div>
+<div>
+<label for="bring-subpath">Subpath</label>
+<input id="bring-subpath" placeholder="optional folder" autocomplete="off">
+</div>
+</div>
+<label for="bring-html">Or paste HTML</label>
+<textarea id="bring-html" placeholder="<!doctype html>"></textarea>
+<label for="bring-file">Or upload .html / .zip</label>
+<input id="bring-file" type="file" accept=".html,.htm,.zip,text/html">
+<label for="bring-name">Name</label>
+<input id="bring-name" maxlength="45" placeholder="Shown on the card">
+<label for="bring-author">Author</label>
+<input id="bring-author" maxlength="80" placeholder="Your name, if this is yours">
+<label class="check"><input id="bring-unmodified" type="checkbox"> The copy is unmodified, and the source link can be shown (GPL, AGPL, LGPL, MPL)</label>
+<label class="check"><input id="bring-permission" type="checkbox"> I am the author / I have permission</label>
+<p id="bring-status" class="hint" role="status"></p>
+<button class="primary" type="submit">Import</button>
+<button id="bring-cancel" class="outline" type="button">Close</button>
+</form>
+</dialog>
 <script type="module" src="/app.js"></script>
 </body>
 </html>

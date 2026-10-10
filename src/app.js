@@ -4,6 +4,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { aiStatus } from './ai/generate.js'
 import { assertFreeform } from './ai/freeform-check.js'
+import { inspectImport } from './imports/bundle.js'
+import { importBroughtGame } from './imports/service.js'
 import { validateGameSpec } from './ai/gamespec.js'
 import { generateIdea } from './ai/idea.js'
 import { restyleTemplate } from './templates/generate.js'
@@ -101,7 +103,7 @@ const MIME = {
   '.png': 'image/png',
   '.woff2': 'font/woff2'
 }
-const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'seed'])
+const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'seed', 'import'])
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const SLUG = /^[a-z0-9-]{1,48}$/
 
@@ -262,6 +264,7 @@ function generationOf(value, fallback = 'manual') {
 }
 
 const HTML_LIMIT = 256_000
+const IMPORT_LIMIT = 4_000_000
 
 function present(config, game, options = {}) {
   const out = publicGame(game, options)
@@ -276,12 +279,19 @@ function present(config, game, options = {}) {
 function fieldsForSave(body, previous) {
   if (body.tier === 'freeform') {
     const html = typeof body.html === 'string' ? body.html : (previous?.freeformHtml || '')
-    const checked = assertFreeform(html)
-    if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
+    const imported = generationOf(body.generation, previous?.generation || '') === 'import'
     const fields = validateGameInput({ ...body, type: 'arcade' })
     fields.generation = generationOf(body.generation, previous?.generation || 'manual')
     fields.tier = 'freeform'
-    fields.freeformHtml = checked.html
+    if (imported) {
+      const errors = inspectImport(html)
+      if (errors.length) throw new HttpError(400, errors.join('; '), 'import_rejected')
+      fields.freeformHtml = html
+    } else {
+      const checked = assertFreeform(html)
+      if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
+      fields.freeformHtml = checked.html
+    }
     return { fields, spec: null }
   }
   const fields = validateGameInput(body)
@@ -576,6 +586,18 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     return sendJson(res, 200, { games }, ctx)
   }
 
+  if (method === 'POST' && pathname === '/api/import') {
+    const user = await requireCreator(req, ctx, db)
+    const body = await readJson(req, IMPORT_LIMIT)
+    const { game, version } = await importBroughtGame(db, user, body, {
+      token: config.githubToken,
+      fetchImpl,
+      env: config.env,
+      safetyModel: config.safetyModelOnPublish
+    })
+    return sendJson(res, 201, { game: present(config, game, { canEdit: true }), url: `/g/${game.id}`, version }, ctx)
+  }
+
   if (method === 'POST' && pathname === '/api/games') {
     const user = await requireCreator(req, ctx, db)
     const body = await readJson(req, HTML_LIMIT)
@@ -656,7 +678,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
       const user = await requireCreator(req, ctx, db)
       const existing = await getGameRow(db, id)
       if (!existing) throw new HttpError(404, 'Game not found', 'not_found')
-      const body = await readJson(req, HTML_LIMIT)
+      const body = await readJson(req, existing.generation === 'import' ? IMPORT_LIMIT : HTML_LIMIT)
       const { fields, spec } = fieldsForSave(body, existing)
       const verdict = await stampListing(fields, body, existing, config.env, fetchImpl, config.safetyModelOnPublish)
       const { game, version } = await updateGame(db, id, fields, spec, user.id)

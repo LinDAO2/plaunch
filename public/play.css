@@ -192,3 +192,13 @@ body.embed.world-play .game {
   min-height: 0;
   margin-top: 8px;
 }
+body.embed.freeform-play .side,
+body.embed.freeform-play .play-head,
+body.embed.freeform-play .play-top,
+body.embed.freeform-play .legal-foot,
+body.embed.freeform-play .game-bar { display: none !important; }
+body.embed.freeform-play .play-shell { width: 480px; height: 480px; max-width: 480px; margin: 0; padding: 0; overflow: hidden; }
+body.embed.freeform-play .play-stage,
+body.embed.freeform-play .stage,
+body.embed.freeform-play .game { width: 480px; height: 480px; max-height: 480px; margin: 0; }
+body.embed.freeform-play .game.freeform-on .field { bottom: 0; }

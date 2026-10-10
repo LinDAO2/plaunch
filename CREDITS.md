@@ -29,3 +29,16 @@ Logic was reimplemented after reading these sources. Licenses were checked on th
 | Maze Chomper | Dots and one chaser on a grid. The chaser walks toward the player by Manhattan distance. It does not use the named chase personalities of the commercial maze game. The sprite is a square, not a wedge. | — |
 | Jump Up | Bounce up a stack of platforms. Reference: Straker gist `b96a4a68bd6d79cf75a833d98a2b654f` (README states CC0 1.0). | CC0 1.0 |
 | Match-3 | Original swap-and-clear. | — |
+
+## Curated imports
+
+These six games are vendored, not reimplemented. Each `imports/<id>/` folder has the original license, a `PIN.json` with the commit or gist version, and a `game.html` that was inlined to one document. Network calls, analytics, and external fonts were removed. Titles that would use a trademark were renamed. 2048 stays 2048.
+
+| Game | Original | Pinned revision | License |
+| --- | --- | --- | --- |
+| 2048 | Gabriele Cirulli, github.com/gabrielecirulli/2048 | `478b6ec346e3787f589e4af751378d06ded4cbbc` | MIT |
+| Lane Racer | Jake Gordon, github.com/jakesgordon/javascript-racer | `3e8a060b5900755db27f899612a74a77427c853e` | MIT |
+| Stack | Jake Gordon, github.com/jakesgordon/javascript-tetris | `e5c0c42f7dac0f3514a55eff656c6e22e95d68ed` | MIT |
+| Grid Snake | Christopher Straker, gist ff00b4b49669ad3dec890306d348adc4 | `728aa4da4835c0d321a22ea4ccbe588a8c28c418` | CC0 1.0 |
+| Brick Bounce | Christopher Straker, gist 98a2aed6a7686d26c04810f08bfaf66b | `9e2eb0baf8cc542ae08f21bb8f543a093da3fc3d` | CC0 1.0 |
+| Tower Bounce | Christopher Straker, gist b96a4a68bd6d79cf75a833d98a2b654f | `8ceae530dc7e03987c38622e22c7de5251b619cc` | CC0 1.0 |

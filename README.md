@@ -1,4 +1,4 @@
-# Playground — game launchpad v1.0.0
+# Playground — game launchpad v1.1.0
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
@@ -7,6 +7,8 @@ Ideas that do not fit that arcade spec use the freeform tier: one self-contained
 Blocks is a first-party voxel runtime (`world` in GameSpec v1.2). Two featured worlds, Blocks: Grassland and Blocks: Candy Moon, share one map per slug over a same-origin WebSocket. Guests play without an account. `WORLD_GUEST_CAP` limits anonymous sockets per IP. A moderator can reset a world from the moderation page.
 
 Creating a game does not ask for an account. The first visit sets an HttpOnly guest cookie and a guest user row. That browser can generate, preview, publish, edit, and archive its own games. Email login stays available as "Save your games" and moves those games onto the account. `AI_DAILY_LIMIT_PER_GUEST` caps generation per guest and per IP. A per-IP publish limit, the safety hold, and moderator bans still apply. Sign in with X stays off unless `X_CLIENT_ID` and `X_CLIENT_SECRET` are set, and the OAuth exchange is not implemented yet.
+
+Discover includes six credited open-source games under the Open source tag: 2048, Lane Racer, Stack, Grid Snake, Brick Bounce, and Tower Bounce. Each page and `/r` card links the author, license, and source. Import, in the header, accepts a GitHub repo, pasted HTML, or a `.html` / `.zip` upload. The server pins a commit, checks the license, inlines the page, and serves it from the sandbox. Permissive licenses (MIT, BSD, Apache-2.0, ISC, Zlib, Unlicense, CC0, WTFPL) can be hosted as-is. GPL, AGPL, LGPL, and MPL need a confirmation that the copy is unmodified. No license needs “I am the author / I have permission”. `GITHUB_TOKEN` is optional.
 
 This is a development build. Leaderboards rank **checked** scores by default. Scores without a valid round token stay **unverified** and show on a separate tab. That is not a claim of human verification. Token interest is still only a checkbox: there is no wallet, minting, or chain code. Rosebud is not integrated.
 

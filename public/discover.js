@@ -2,7 +2,8 @@ import { gameCard } from '/cards.js'
 import { api, ensureCsrf } from '/client-api.js'
 
 const $ = (id) => document.getElementById(id)
-const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap']
+const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap', 'opensource', 'community']
+const TAG_LABELS = { opensource: 'Open source', community: 'Community' }
 const typeNames = { tap: 'Tap', reaction: 'Reaction', guess: 'Guess', dodge: 'Dodge', arcade: 'Arcade', world: 'Blocks' }
 let view = 'new'
 let tag = ''
@@ -14,7 +15,7 @@ function paintTags() {
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'tag' + (tag === name ? ' on' : '')
-    button.textContent = name || 'All'
+    button.textContent = TAG_LABELS[name] || name || 'All'
     button.addEventListener('click', () => {
       tag = name
       paintTags()
