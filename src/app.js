@@ -13,27 +13,29 @@ import { log } from './log.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { createRateLimiter } from './rate-limit.js'
 import {
-  addScore,
   archiveGame,
+  consumeAiCredit,
   createAbuseReport,
   createGame,
   createSession,
   createUser,
+  dashboardFor,
   deleteSession,
   findUserByEmail,
   findUserBySession,
   getGameRow,
+  incrementShares,
   listAssets,
   listOwnedGames,
   listPublishedGames,
   listScores,
   publicGame,
-  openRound,
-  rankedForGame,
   recordEvent,
   specForSave,
+  submitScore,
   updateGame
 } from './repo.js'
+import { splitBoards } from './scores.js'
 import { TEMPLATE_NOTICE, generateTemplate } from './template.js'
 import { specFromGame } from './ai/gamespec.js'
 import {
@@ -56,7 +58,8 @@ const FILES = new Map([
   ['/play.js', 'play.js'],
   ['/play.css', 'play.css'],
   ['/arcade-sim.js', 'arcade-sim.js'],
-  ['/arcade-view.js', 'arcade-view.js']
+  ['/arcade-view.js', 'arcade-view.js'],
+  ['/dashboard.js', 'dashboard.js']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -249,7 +252,8 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
 
   if (method === 'POST' && pathname === '/api/ai/generate') {
     const body = await readJson(req)
-    if (aiStatus(config.env).mode === 'ai') requireUser(await currentUser(req, db))
+    const user = aiStatus(config.env).mode === 'ai' ? requireUser(await currentUser(req, db)) : null
+    if (user) await consumeAiCredit(db, user.id, config.aiDailyUser, config.aiDailyGlobal)
     const result = await generateGame({ prompt: body.prompt, env: config.env, fetchImpl })
     return sendJson(res, 200, {
       mode: result.mode,
@@ -278,6 +282,12 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     return sendJson(res, 200, { games: games.map((game) => publicGame(game, { canEdit: true, includeSpec: false })) }, ctx)
   }
 
+  if (method === 'GET' && pathname === '/api/me/dashboard') {
+    const user = requireUser(await currentUser(req, db))
+    const games = await dashboardFor(db, user.id)
+    return sendJson(res, 200, { games }, ctx)
+  }
+
   if (method === 'POST' && pathname === '/api/games') {
     const user = requireUser(await currentUser(req, db))
     const body = await readJson(req)
@@ -296,7 +306,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     return sendJson(res, 201, { report }, ctx)
   }
 
-  const gameMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)(?:\/(scores|play|events|archive))?$/)
+  const gameMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)(?:\/(scores|play|events|archive|share))?$/)
   if (gameMatch) {
     const id = gameMatch[1]
     const sub = gameMatch[2]
@@ -339,11 +349,15 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
       return sendJson(res, 200, body, ctx)
     }
 
+    if (method === 'POST' && sub === 'share') {
+      const result = await incrementShares(db, id)
+      return sendJson(res, 200, result, ctx)
+    }
+
     if (method === 'GET' && sub === 'scores') {
       const game = await getGameRow(db, id)
       if (!game || game.status !== 'published') throw new HttpError(404, 'Game not found', 'not_found')
-      const scores = rankedForGame(await listScores(db, id), game.type)
-      return sendJson(res, 200, { scores, mechanic: game.type, verified: false }, ctx)
+      return sendJson(res, 200, splitBoards(await listScores(db, id), game.type), ctx)
     }
 
     if (method === 'POST' && sub === 'scores') {
@@ -354,19 +368,15 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
         throw new HttpError(400, 'Score mechanic does not match this game', 'validation_error')
       }
       const bounds = assertMechanicScore(game.type, input.points, game.duration)
-      let assurance = 'unverified'
-      if (input.roundToken) {
-        await openRound(db, game, input.roundToken, input.points)
-        assurance = 'checked'
-      }
-      await addScore(db, game, { ...input, ...bounds, assurance })
-      const scores = rankedForGame(await listScores(db, id), game.type)
-      return sendJson(res, 201, { scores, verified: false, assurance }, ctx)
+      const { assurance } = await submitScore(db, game, { ...input, ...bounds })
+      const board = splitBoards(await listScores(db, id), game.type)
+      return sendJson(res, 201, { ...board, assurance }, ctx)
     }
   }
 
-  if (method === 'GET' && (pathname === '/' || /^\/g\/[a-z0-9-]+$/.test(pathname))) {
-    const html = await readFile(path.join(PUBLIC, 'index.html'))
+  if (method === 'GET' && (pathname === '/' || pathname === '/studio/dashboard' || /^\/g\/[a-z0-9-]+$/.test(pathname))) {
+    const file = pathname === '/studio/dashboard' ? 'dashboard.html' : 'index.html'
+    const html = await readFile(path.join(PUBLIC, file))
     return sendHtml(res, 200, html, ctx, 'studio')
   }
 
@@ -382,11 +392,12 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
   if (method === 'GET' && shareMatch) {
     const game = await publishedOrNull(db, shareMatch[1])
     if (!game) return sendHtml(res, 404, renderMissing('Game not found'), ctx, 'embed')
-    const scores = rankedForGame(await listScores(db, game.id), game.type)
+    const board = splitBoards(await listScores(db, game.id), game.type)
     return sendHtml(res, 200, renderSharePage(game, {
       origin: requestOrigin(config, req),
       site: config.xSiteHandle,
-      scores
+      scores: board.scores,
+      unverified: board.unverified
     }), ctx, 'embed')
   }
 

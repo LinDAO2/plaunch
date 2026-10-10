@@ -7,11 +7,12 @@ const PATTERNS = ['rain', 'waves', 'burst', 'lanes']
 const MOVEMENTS = ['straight', 'zigzag', 'homing', 'bounce']
 const SCHEMES = ['drag', 'tap', 'keys']
 const WINS = ['survive', 'score', 'lives']
+const PRIMITIVES = ['fall', 'popup', 'chase', 'shoot', 'platform', 'maze']
 const SHAPES = ['circle', 'square', 'triangle']
 const BANNED_KEY = /^(script|code|js|javascript|html|eval|srcdoc|onclick)$/i
 const BANNED_TEXT = /<\s*\/?\s*script|javascript:/i
 const SPEC_KEYS = ['version', 'name', 'description', 'theme', 'runtime', 'duration', 'accent', 'scoring', 'difficulty', 'controls', 'entities', 'spawn', 'safety']
-const V11_KEYS = [...SPEC_KEYS, 'movement', 'rules', 'scoreRules', 'palette', 'player']
+const V11_KEYS = [...SPEC_KEYS, 'movement', 'rules', 'scoreRules', 'palette', 'player', 'primitives', 'lifetimeMs']
 
 const SCORING = {
   tap: { direction: 'higher', label: 'Score', unit: 'taps' },
@@ -79,7 +80,7 @@ export function geminiResponseSchema() {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['version', 'name', 'description', 'theme', 'runtime', 'duration', 'accent', 'scoring', 'difficulty', 'controls', 'entities', 'spawn', 'safety'],
+    required: ['version', 'name', 'description', 'theme', 'runtime', 'duration', 'accent', 'scoring', 'difficulty', 'controls', 'entities', 'spawn', 'safety', 'movement', 'rules', 'scoreRules', 'palette', 'player', 'primitives', 'lifetimeMs'],
     properties: {
       version: { type: 'string', enum: ['1', '1.1'], description: 'Use 1.1 for a new arcade game.' },
       name: { type: 'string', description: 'Short game title, 2 to 45 characters.' },
@@ -102,11 +103,11 @@ export function geminiResponseSchema() {
       controls: {
         type: 'object',
         additionalProperties: false,
-        required: ['keyboard', 'touch'],
+        required: ['keyboard', 'touch', 'scheme'],
         properties: {
           keyboard: { type: 'string' },
           touch: { type: 'string' },
-          scheme: { type: 'string', enum: SCHEMES, description: 'drag, tap, or keys.' }
+          scheme: { type: 'string', enum: SCHEMES, description: 'drag, tap, or keys. Vary this with the fantasy.' }
         }
       },
       entities: {
@@ -129,9 +130,9 @@ export function geminiResponseSchema() {
       spawn: {
         type: 'object',
         additionalProperties: false,
-        required: ['rate'],
+        required: ['rate', 'pattern'],
         properties: {
-          rate: { type: 'number', minimum: 0, maximum: 5 },
+          rate: { type: 'number', minimum: 0, maximum: 5, description: 'Entities per second. Choose a rate that fits the idea. Do not always use 2.5.' },
           pattern: { type: 'string', enum: PATTERNS, description: 'rain, waves, burst (a random burst), or lanes.' }
         }
       },
@@ -144,10 +145,11 @@ export function geminiResponseSchema() {
           notes: { type: 'string' }
         }
       },
-      movement: { type: 'string', enum: MOVEMENTS },
+      movement: { type: 'string', enum: MOVEMENTS, description: 'straight, zigzag, homing, or bounce. Use homing when something should steer toward the player.' },
       rules: {
         type: 'object',
         additionalProperties: false,
+        required: ['win', 'seconds', 'lives', 'targetScore'],
         properties: {
           win: { type: 'string', enum: WINS },
           seconds: { type: 'integer', minimum: 5, maximum: 60 },
@@ -158,24 +160,35 @@ export function geminiResponseSchema() {
       scoreRules: {
         type: 'object',
         additionalProperties: false,
+        required: ['pointsPerEntity', 'comboMultiplier'],
         properties: {
           pointsPerEntity: { type: 'integer', minimum: 1, maximum: 100 },
-          comboMultiplier: { type: 'integer', minimum: 1, maximum: 5 }
+          comboMultiplier: { type: 'integer', minimum: 1, maximum: 5, description: '1 to 5. Choose a combo that fits the idea. Do not always use 2.' }
         }
       },
       palette: {
         type: 'array',
-        maxItems: 6,
-        items: { type: 'string', description: 'Hex color like #a88bff.' }
+        minItems: 2,
+        maxItems: 4,
+        items: { type: 'string', description: 'Exactly one hex color per item, like #a88bff.' }
       },
       player: {
         type: 'object',
         additionalProperties: false,
+        required: ['sprite'],
         properties: {
           sprite: { type: 'string', description: 'One emoji for the player.' },
           scheme: { type: 'string', enum: SCHEMES }
         }
-      }
+      },
+      primitives: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 3,
+        items: { type: 'string', enum: PRIMITIVES },
+        description: 'Play style. fall drops objects. popup shows them briefly then hides them (whack-a-mole). chase pursues the player in the arena. shoot lets the player fire. platform adds gravity and jump. maze is grid movement around walls. Do not always pick fall.'
+      },
+      lifetimeMs: { type: 'integer', minimum: 0, maximum: 8000, description: 'How long a popup stays visible, in milliseconds. Use 0 when nothing hides. Otherwise 200 to 8000, chosen for the concept.' }
     }
   }
 }
@@ -245,6 +258,30 @@ function readScoreRules(input, required) {
   return { pointsPerEntity, comboMultiplier }
 }
 
+function readPrimitives(input) {
+  if (input.primitives === undefined) return ['fall']
+  if (!Array.isArray(input.primitives) || input.primitives.length < 1 || input.primitives.length > 3) {
+    throw new Error('primitives must contain 1–3 play styles')
+  }
+  const out = []
+  input.primitives.forEach((item, index) => {
+    if (!PRIMITIVES.includes(item)) throw new Error(`primitives[${index}] is invalid`)
+    if (!out.includes(item)) out.push(item)
+  })
+  if (!out.length) throw new Error('primitives must contain 1–3 play styles')
+  return out
+}
+
+function readLifetime(input, primitives) {
+  if (input.lifetimeMs === undefined) return primitives.includes('popup') ? 1000 : 0
+  const lifetime = Number(input.lifetimeMs)
+  if (lifetime === 0) return 0
+  if (!Number.isInteger(lifetime) || lifetime < 200 || lifetime > 8000) {
+    throw new Error('lifetimeMs must be 0 or 200–8000')
+  }
+  return lifetime
+}
+
 function readPalette(input, accent, required) {
   if (input.palette === undefined) {
     if (required) throw new Error('palette is required for arcade')
@@ -253,7 +290,21 @@ function readPalette(input, accent, required) {
   if (!Array.isArray(input.palette) || input.palette.length < 1 || input.palette.length > 6) {
     throw new Error('palette must contain 1–6 colors')
   }
-  return input.palette.map((color, index) => hexColor(color, `palette[${index}]`))
+  // Gemini sometimes merges entries into one string such as "#0b0d1b','#1e1b4b".
+  // Recover only exact #RRGGBB tokens; anything else still fails validation.
+  const colors = []
+  input.palette.forEach((color, index) => {
+    if (typeof color === 'string' && !/^\s*#[0-9a-fA-F]{6}\s*$/.test(color)) {
+      const found = color.match(/#[0-9a-fA-F]{6}(?![0-9a-fA-F])/g)
+      if (found && found.length >= 1) {
+        colors.push(...found)
+        return
+      }
+    }
+    colors.push(hexColor(color, `palette[${index}]`))
+  })
+  if (colors.length > 6) throw new Error('palette must contain 1–6 colors')
+  return colors.map((color) => color.toLowerCase())
 }
 
 export function validateGameSpec(input) {
@@ -339,6 +390,8 @@ export function validateGameSpec(input) {
   if (arcade && !sprite) throw new Error('player.sprite is required for arcade')
   if (player.scheme !== undefined && !SCHEMES.includes(player.scheme)) throw new Error('player.scheme is invalid')
   base.player = { sprite: sprite || '●', scheme: player.scheme || base.controls.scheme }
+  base.primitives = readPrimitives(input)
+  base.lifetimeMs = readLifetime(input, base.primitives)
   return base
 }
 
@@ -386,6 +439,8 @@ function defaultArcadeSpec(game, extras) {
     scoreRules: { pointsPerEntity: 10, comboMultiplier: 2 },
     palette: [accent, '#4adeb9', '#ffbd70'],
     player: { sprite: '🕹️', scheme: 'keys' },
+    primitives: ['fall'],
+    lifetimeMs: 0,
     safety: { audience: 'general', notes: 'No executable content.' }
   })
 }

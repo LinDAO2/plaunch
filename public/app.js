@@ -5,6 +5,8 @@ const $ = (id) => document.getElementById(id)
 let me = null
 let current = null
 let roundToken = null
+let board = { scores: [], unverified: [] }
+let boardTab = 'checked'
 let opened = null
 let games = []
 let lastSpec = null
@@ -104,8 +106,12 @@ function preview() {
   $('preview-description').textContent = game.description
   $('mechanic').textContent = typeNames[game.type] || game.type
   $('controls-hint').textContent = controlHint({ ...game, spec: lastSpec })
+  board = { scores: [], unverified: [] }
+  boardTab = 'checked'
   $('leaders').textContent = 'Publish or open a game to see scores.'
   $('leaderboard-scope').textContent = 'Preview mode'
+  $('tab-checked')?.classList.add('on')
+  $('tab-unverified')?.classList.remove('on')
   $('submit-score').disabled = true
   const share = $('share-x')
   if (share) share.hidden = true
@@ -129,15 +135,20 @@ function refreshOwnerButtons() {
   $('report-toggle').hidden = !opened
 }
 
-async function loadScores() {
-  if (!current) return
-  const { scores } = await api(`/games/${current.id}/scores`)
+function paintBoard() {
+  const rows = boardTab === 'unverified' ? board.unverified : board.scores
+  $('tab-checked').classList.toggle('on', boardTab === 'checked')
+  $('tab-unverified').classList.toggle('on', boardTab === 'unverified')
   $('leaders').replaceChildren()
-  if (!scores.length) {
-    $('leaders').textContent = 'No scores yet. Be the first!'
+  if (!current) {
+    $('leaders').textContent = 'Publish or open a game to see scores.'
     return
   }
-  for (const score of scores) {
+  if (!rows?.length) {
+    $('leaders').textContent = boardTab === 'checked' ? 'No checked scores yet.' : 'No unverified scores.'
+    return
+  }
+  for (const score of rows) {
     const row = document.createElement('div')
     row.className = 'leader-row'
     const name = document.createElement('span')
@@ -152,6 +163,17 @@ async function loadScores() {
     $('leaders').append(row)
   }
 }
+
+async function loadScores(prefer) {
+  if (!current) return
+  const listed = await api(`/games/${current.id}/scores`)
+  board = { scores: listed.scores || [], unverified: listed.unverified || [] }
+  if (prefer) boardTab = prefer
+  paintBoard()
+}
+
+$('tab-checked').addEventListener('click', () => { boardTab = 'checked'; paintBoard() })
+$('tab-unverified').addEventListener('click', () => { boardTab = 'unverified'; paintBoard() })
 
 async function showGame(summary) {
   const { game } = await api(`/games/${summary.id}`)
@@ -433,7 +455,7 @@ $('submit-score').addEventListener('click', async () => {
     roundToken = null
     $('submit-score').disabled = true
     toast(saved.assurance === 'checked' ? 'Score checked and posted.' : 'Score submitted. It is stored as unverified.')
-    await loadScores()
+    await loadScores(saved.assurance === 'checked' ? 'checked' : 'unverified')
   } catch (error) {
     toast(error.message)
   }
@@ -454,6 +476,11 @@ $('report-send').addEventListener('click', async () => {
   } catch (error) {
     toast(error.message)
   }
+})
+
+$('share-x').addEventListener('click', () => {
+  if (!$('share-x').href || $('share-x').hidden || !opened) return
+  api(`/games/${opened.id}/share`, 'POST', {}).catch(() => {})
 })
 
 $('search').addEventListener('input', render)

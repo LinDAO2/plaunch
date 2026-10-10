@@ -13,6 +13,7 @@
 <nav>
 <a href="#discover">Discover</a>
 <a href="#studio">Create</a>
+<a class="dash-link" href="/studio/dashboard">Dashboard</a>
 <span class="status">● public beta</span>
 <button id="account" class="outline account-btn" type="button">Sign in</button>
 </nav>
@@ -53,6 +54,7 @@
 <p id="status" role="status" class="hint"></p>
 <div id="mine" hidden>
 <h3>Your games</h3>
+<p class="hint"><a href="/studio/dashboard">Open the creator dashboard</a> for views, plays, completions, and shares.</p>
 <div id="mine-list" class="mine-list"></div>
 </div>
 </section>
@@ -70,9 +72,13 @@
 </div>
 <div class="leaderboard">
 <div class="leaderboard-head"><h3>🏆 Leaderboard</h3><span id="leaderboard-scope">Published games</span></div>
+<div class="board-tabs" role="tablist">
+<button id="tab-checked" class="outline on" type="button">Checked</button>
+<button id="tab-unverified" class="outline" type="button">Unverified</button>
+</div>
 <div id="leaders" class="leaders">Publish or open a game to see scores.</div>
 <div class="submit-score"><input id="player" maxlength="22" placeholder="Your player name" autocomplete="nickname"><button id="submit-score" class="outline" type="button" disabled>Submit score</button></div>
-<p class="hint">Top 20, ranked per mechanic. A score is checked when it arrives with a round token inside the allowed time and rate. Others stay unverified. Reaction games rank a faster time first.</p>
+<p class="hint">Checked scores rank by default. Unverified scores are on the other tab. A score is checked when it arrives with a round token inside the allowed time and rate. Reaction games rank a faster time first.</p>
 <button id="report-toggle" class="outline" type="button" hidden>Report</button>
 <div id="report-box" hidden>
 <label for="report-reason">Why are you reporting this game?</label>

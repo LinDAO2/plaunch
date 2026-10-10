@@ -21,7 +21,7 @@
 <p id="preview-description">__DESCRIPTION__</p>
 <p id="controls-hint" class="hint"></p>
 <p id="play-error" class="hint" hidden></p>
-<div class="game" id="game" style="border-color:__ACCENT__">
+<div class="game" id="game">
 <span class="game-label" id="game-label">READY, PLAYER ONE</span>
 <strong id="display">0</strong>
 <div id="field" class="field"></div>
@@ -31,9 +31,13 @@
 </div>
 <div class="leaderboard">
 <div class="leaderboard-head"><h3>Leaderboard</h3><span id="leaderboard-scope">Top 20</span></div>
+<div class="board-tabs" role="tablist">
+<button id="tab-checked" class="outline on" type="button">Checked</button>
+<button id="tab-unverified" class="outline" type="button">Unverified</button>
+</div>
 <div id="leaders" class="leaders">Loading scores…</div>
 <div class="submit-score"><input id="player" maxlength="22" placeholder="Your player name" autocomplete="nickname"><button id="submit-score" class="outline" type="button" disabled>Submit score</button></div>
-<p class="hint">Top 20. Checked scores passed a round token, a minimum time, and a score-rate check.</p>
+<p class="hint">Checked scores are ranked by default. Unverified scores sit on the other tab. A checked score passed a round token, a minimum time, and a score-rate check.</p>
 </div>
 <div id="report-box" hidden>
 <label for="report-reason">Report this game</label>

@@ -1,8 +1,8 @@
-# Playground — game launchpad v0.4
+# Playground — game launchpad v0.5
 
-Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas.
+Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
-This is a development build. Scores are **unverified** unless a round token passes a time and rate check, in which case they are marked **checked**. That is not a claim of human verification. Token interest is still only a checkbox: there is no wallet, minting, or chain code. Rosebud is not integrated.
+This is a development build. Leaderboards rank **checked** scores by default. Scores without a valid round token stay **unverified** and show on a separate tab. That is not a claim of human verification. Token interest is still only a checkbox: there is no wallet, minting, or chain code. Rosebud is not integrated.
 
 ## Requirements
 
@@ -47,15 +47,17 @@ npm test
 
 ## AI generation
 
-`POST /api/ai/generate` asks the model for GameSpec v1.1 with an arcade runtime: entity kinds, a spawn pattern, movement, a control scheme, win rules, scoring, a palette, and emoji sprites. The browser arcade runtime plays that spec. Version 1 specs for the original four mechanics still validate. CI and local tests use a mocked provider. A missing key stays in template mode.
+`POST /api/ai/generate` asks the model for GameSpec v1.1 with an arcade runtime: entity kinds, a spawn pattern, movement, a control scheme, win rules, scoring, a palette, emoji sprites, and a primitive set (`fall`, `popup`, `chase`, `shoot`, `platform`, `maze`). The prompt includes contrasting examples and asks the model to vary rates and combo values. The browser arcade runtime plays that spec. Version 1 specs for the original four mechanics still validate. CI and local tests use a mocked provider. A missing key stays in template mode.
 
 | Provider | Key | Default model | API |
 | --- | --- | --- | --- |
-| Gemini | `GEMINI_API_KEY` | `gemini-3.8-flash` (`GEMINI_MODEL`) | `models.generateContent` with `responseMimeType: application/json` and `responseJsonSchema` |
+| Gemini | `GEMINI_API_KEY` | `gemini-3.5-flash` (`GEMINI_MODEL`; `gemini-3.8-flash` is optional) | `models.generateContent` with `responseMimeType: application/json` and `responseJsonSchema` |
 | xAI | `XAI_API_KEY` | `grok-3` | OpenAI-compatible `POST /chat/completions` |
 | OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` | OpenAI-compatible `POST /chat/completions` |
 
-`AI_PROVIDER=auto` uses the first configured key in that order. With no key, the endpoint uses the built-in template matcher and the studio says **Template mode**. Keys stay on the server. Model output must match GameSpec v1 or v1.1. Invalid JSON is retried up to three times and is never executed.
+`AI_PROVIDER=auto` uses the first configured key in that order. With no key, the endpoint uses the built-in template matcher and the studio says **Template mode**. Keys stay on the server. Model output must match GameSpec v1 or v1.1. Invalid JSON is retried up to three times and is never executed. A provider 429 is not retried. `GEMINI_THINKING_LEVEL` defaults to `low` on Gemini 3 models, and `AI_TIMEOUT_MS` defaults to 60000.
+
+Signed-in AI generation is capped per UTC day by `AI_DAILY_LIMIT_PER_USER` (default 20) and `AI_DAILY_LIMIT_GLOBAL` (default 200). Over the cap, the route returns 429 with `ai_daily_limit`.
 
 `POST /api/generate` remains the template matcher even when a key is set.
 
@@ -64,16 +66,18 @@ Rosebud has no generation API and its terms prohibit automated use, so there is 
 ## Routes
 
 - `GET /` studio and discover
+- `GET /studio/dashboard` creator dashboard for the signed-in account
 - `GET /g/:slug` studio opened on a published game
 - `GET /play/:slug` chrome-less, mobile-first guest play page (touch and keyboard)
 - `GET /play/:slug?embed=1` 480×480 player with a Play overlay. Frame ancestors are X and Twitter only
-- `GET /r/:slug` X player card (`twitter:card=player`) plus a page that links to `/play` and lists the top 20
+- `GET /r/:slug` X player card (`twitter:card=player`) plus a page that links to `/play` and lists checked and unverified scores
+- `POST /api/games/:slug/share` counts a click on the studio Share on X button
 - `GET /api/games/:slug/poster.png` 1200×1200 poster used as `twitter:image`
 - `GET /api/health` includes database status
 
 `/play` and `/r` send `frame-ancestors 'self' https://x.com https://*.x.com https://twitter.com https://*.twitter.com` and do not send `X-Frame-Options`. `?embed=1` drops `'self'`. Set `PUBLIC_BASE_URL` to the public origin and `X_SITE_HANDLE` for `twitter:site`. The studio Share on X button opens `https://x.com/intent/post` with the `/r/:slug` URL.
 
-Anonymous visitors can play and submit scores. A `play_started` event returns a round token. Sending that token with a score marks it `checked` when the round is old enough and the score is within the mechanic's rate. Missing tokens stay `unverified`. `verified` remains false. Creating, editing, publishing, and archiving require the owning account (email, password, HttpOnly session cookie, CSRF header).
+Anonymous visitors can play and submit scores. A `play_started` event returns a round token. That token is consumed in the same transaction as the score insert. A plausible score is `checked`; a missing token stays `unverified`. Leaderboards return checked scores in `scores` and unverified scores in `unverified`. `verified` remains false. Creating, editing, publishing, and archiving require the owning account (email, password, HttpOnly session cookie, CSRF header). The dashboard lists each owned game with publish state, views, play_started, completions, shares, and the top checked score.
 
 ## Scripts
 

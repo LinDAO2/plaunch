@@ -28,6 +28,7 @@ export function mapGame(row) {
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     plays: Number(row.plays) || 0,
+    shares: Number(row.shares) || 0,
     status: row.status,
     ownerId: row.owner_id || null,
     generation: row.generation,
@@ -46,6 +47,7 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     tokenInterest: game.tokenInterest,
     createdAt: game.createdAt,
     plays: game.plays,
+    shares: game.shares || 0,
     status: game.status,
     ownerId: game.ownerId,
     generation: game.generation,
@@ -194,34 +196,132 @@ export async function recordEvent(db, { gameId, eventType, eventId }) {
   })
 }
 
-export async function openRound(db, game, token, points) {
-  const hash = hashToken(token)
+export async function submitScore(db, game, score) {
   return db.transaction(async (tx) => {
-    const found = await tx.query(
-      `select id, created_at, consumed_at from plays
-       where game_id = $1 and event_type = 'play_started' and round_token_hash = $2
-       limit 1`,
-      [game.id, hash]
+    let assurance = 'unverified'
+    if (score.roundToken) {
+      const found = await tx.query(
+        `select id, created_at, consumed_at from plays
+         where game_id = $1 and event_type = 'play_started' and round_token_hash = $2
+         for update`,
+        [game.id, hashToken(score.roundToken)]
+      )
+      const row = found.rows[0]
+      if (!row) throw new HttpError(400, 'Round token is not valid for this game', 'validation_error')
+      if (row.consumed_at) throw new HttpError(400, 'Round token was already used', 'validation_error')
+      const elapsedMs = Date.now() - new Date(row.created_at).getTime()
+      const verdict = checkPlausible(plausibilityFor(game), score.points, elapsedMs)
+      if (!verdict.ok) throw new HttpError(400, verdict.message, 'validation_error')
+      const consumed = await tx.query(
+        'update plays set consumed_at = now() where id = $1 and consumed_at is null returning id',
+        [row.id]
+      )
+      if (!consumed.rows.length) throw new HttpError(400, 'Round token was already used', 'validation_error')
+      assurance = 'checked'
+    }
+    await tx.query(
+      `insert into scores (game_id, player_name, points, mechanic, ranking, unit, verified, assurance)
+       values ($1, $2, $3, $4, $5, $6, false, $7)`,
+      [game.id, score.name, score.points, game.type, score.ranking, score.unit, assurance]
     )
-    const row = found.rows[0]
-    if (!row) throw new HttpError(400, 'Round token is not valid for this game', 'validation_error')
-    if (row.consumed_at) throw new HttpError(400, 'Round token was already used', 'validation_error')
-    const elapsedMs = Date.now() - new Date(row.created_at).getTime()
-    const verdict = checkPlausible(plausibilityFor(game), points, elapsedMs)
-    if (!verdict.ok) throw new HttpError(400, verdict.message, 'validation_error')
-    await tx.query('update plays set consumed_at = now() where id = $1', [row.id])
-    return { assurance: 'checked', elapsedMs }
+    return { assurance }
   })
 }
 
-export async function addScore(db, game, score) {
-  const assurance = score.assurance === 'checked' ? 'checked' : 'unverified'
-  const inserted = await db.query(
-    `insert into scores (game_id, player_name, points, mechanic, ranking, unit, verified, assurance)
-     values ($1, $2, $3, $4, $5, $6, false, $7)`,
-    [game.id, score.name, score.points, game.type, score.ranking, score.unit, assurance]
+export async function incrementShares(db, gameId) {
+  const updated = await db.query(
+    `update games set shares = shares + 1, updated_at = now()
+     where id = $1 and status = 'published'
+     returning shares`,
+    [gameId]
   )
-  return inserted.rowCount
+  if (!updated.rows.length) throw new HttpError(404, 'Game not found', 'not_found')
+  return { shares: Number(updated.rows[0].shares) }
+}
+
+function utcDay() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export async function consumeAiCredit(db, userId, userLimit, globalLimit) {
+  const day = utcDay()
+  return db.transaction(async (tx) => {
+    const mine = await tx.query(
+      `insert into ai_daily (scope, day, total) values ($1, $2::date, 1)
+       on conflict (scope, day) do update set total = ai_daily.total + 1
+       where ai_daily.total < $3
+       returning total`,
+      [`user:${userId}`, day, userLimit]
+    )
+    if (!mine.rows.length) {
+      throw new HttpError(429, `Daily generation limit reached for this account (${userLimit}). Try again tomorrow.`, 'ai_daily_limit')
+    }
+    const everyone = await tx.query(
+      `insert into ai_daily (scope, day, total) values ('global', $1::date, 1)
+       on conflict (scope, day) do update set total = ai_daily.total + 1
+       where ai_daily.total < $2
+       returning total`,
+      [day, globalLimit]
+    )
+    if (!everyone.rows.length) {
+      throw new HttpError(429, 'Daily generation limit reached for everyone. Try again tomorrow.', 'ai_daily_limit')
+    }
+    return { user: Number(mine.rows[0].total), global: Number(everyone.rows[0].total) }
+  })
+}
+
+export async function dashboardFor(db, userId) {
+  const games = await db.query('select * from games where owner_id = $1 order by updated_at desc, id asc', [userId])
+  if (!games.rows.length) return []
+  const events = await db.query(
+    `select p.game_id, p.event_type, count(*)::int as n
+     from plays p
+     join games g on g.id = p.game_id
+     where g.owner_id = $1
+     group by p.game_id, p.event_type`,
+    [userId]
+  )
+  const scores = await db.query(
+    `select s.game_id, s.player_name, s.points, s.ranking, s.unit, s.created_at
+     from scores s
+     join games g on g.id = s.game_id
+     where g.owner_id = $1 and s.assurance = 'checked'`,
+    [userId]
+  )
+  const counts = new Map()
+  for (const row of events.rows) {
+    const bucket = counts.get(row.game_id) || {}
+    bucket[row.event_type] = Number(row.n)
+    counts.set(row.game_id, bucket)
+  }
+  const best = new Map()
+  for (const row of scores.rows) {
+    const current = best.get(row.game_id)
+    const better = !current || (row.ranking === 'lower' ? Number(row.points) < current.points : Number(row.points) > current.points)
+    if (better) {
+      best.set(row.game_id, {
+        name: row.player_name,
+        points: Number(row.points),
+        ranking: row.ranking,
+        unit: row.unit
+      })
+    }
+  }
+  return games.rows.map((row) => {
+    const game = mapGame(row)
+    const tally = counts.get(game.id) || {}
+    return {
+      id: game.id,
+      name: game.name,
+      status: game.status,
+      type: game.type,
+      views: tally.game_viewed || 0,
+      plays: tally.play_started || 0,
+      completions: tally.play_completed || 0,
+      shares: game.shares,
+      topScore: best.get(game.id) || null
+    }
+  })
 }
 
 export async function listScores(db, gameId) {

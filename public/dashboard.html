@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c0b12">
+<title>Creator dashboard — playground</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+<a class="brand" href="/">play<span>ground</span><i>.</i></a>
+<nav>
+<a href="/#discover">Discover</a>
+<a href="/#studio">Create</a>
+<a class="dash-link" href="/studio/dashboard">Dashboard</a>
+<span class="status">● public beta</span>
+<a class="outline account-btn" href="/#studio">Studio</a>
+</nav>
+</header>
+<main class="shell">
+<section class="hero dash-hero">
+<div class="eyebrow">CREATOR DASHBOARD</div>
+<h1>Your games, <span>in the open.</span></h1>
+<p>Publish state, views, rounds started, completions, share clicks, and the best checked score for every game on this account.</p>
+</section>
+<section class="panel dash-panel">
+<p id="dash-status" class="hint">Loading your games…</p>
+<div id="dash-empty" hidden>
+<p>You have not published a game yet.</p>
+<p><a class="primary" href="/#studio">Create a game</a></p>
+</div>
+<div id="dash-error" class="hint" hidden></div>
+<div class="dash-scroll" id="dash-wrap" hidden>
+<table class="dash-table">
+<thead>
+<tr>
+<th>Game</th>
+<th>State</th>
+<th>Views</th>
+<th>Plays</th>
+<th>Completions</th>
+<th>Shares</th>
+<th>Top score</th>
+</tr>
+</thead>
+<tbody id="dash-rows"></tbody>
+</table>
+</div>
+</section>
+</main>
+<script type="module" src="/dashboard.js"></script>
+</body>
+</html>

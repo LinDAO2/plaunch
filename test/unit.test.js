@@ -16,6 +16,8 @@ import { databaseKind, openDatabase } from '../src/db.js'
 import { redact } from '../src/log.js'
 import { migrate } from '../src/migrate.js'
 import { hashPassword, verifyPassword } from '../src/passwords.js'
+import { specsAreDistinct } from '../src/ai/distinct.js'
+import { SAMPLE_SPECS } from '../src/ai/samples.js'
 import { rankScores } from '../src/scores.js'
 import { seedIfEmpty } from '../src/seed.js'
 import { generateTemplate } from '../src/template.js'
@@ -104,7 +106,7 @@ test('provider selection prefers Gemini, then xAI, then OpenAI', () => {
   assert.equal(aiStatus({}).mode, 'template')
   const gemini = resolveProvider({ GEMINI_API_KEY: 'g', XAI_API_KEY: 'x', OPENAI_API_KEY: 'o' })
   assert.equal(gemini.id, 'gemini')
-  assert.equal(gemini.model, 'gemini-3.8-flash')
+  assert.equal(gemini.model, 'gemini-3.5-flash')
   assert.equal(resolveProvider({ AI_PROVIDER: 'xai', GEMINI_API_KEY: 'g', XAI_API_KEY: 'x' }).id, 'xai')
   assert.equal(resolveProvider({ AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).model, 'gpt-4o-mini')
   assert.equal(resolveProvider({ GEMINI_MODEL: 'custom-gemini', GEMINI_API_KEY: 'g' }).model, 'custom-gemini')
@@ -354,7 +356,7 @@ test('file-backed PGlite data survives a restart', async () => {
     const first = await openDatabase(`pglite://${dir}`)
     await migrate(first)
     const seeded = await seedIfEmpty(first)
-    assert.equal(seeded, 8)
+    assert.equal(seeded, 10)
     await first.query(`update games set plays = 4 where id = 'click-frenzy'`)
     await first.close()
     const second = await openDatabase(`pglite://${dir}`)
@@ -366,4 +368,153 @@ test('file-backed PGlite data survives a restart', async () => {
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('Gemini request sets low thinking and a 60s default timeout for Gemini 3 models', () => {
+  const provider = resolveProvider({ GEMINI_API_KEY: 'g' })
+  assert.equal(provider.timeoutMs, 60000)
+  const req = geminiRequest(provider, [{ role: 'user', content: 'idea' }])
+  assert.deepEqual(req.body.generationConfig.thinkingConfig, { thinkingLevel: 'low' })
+  const off = geminiRequest(resolveProvider({ GEMINI_API_KEY: 'g', GEMINI_THINKING_LEVEL: 'off' }), [{ role: 'user', content: 'idea' }])
+  assert.equal(off.body.generationConfig.thinkingConfig, undefined)
+  const old = geminiRequest(resolveProvider({ GEMINI_API_KEY: 'g', GEMINI_MODEL: 'gemini-2.5-flash' }), [{ role: 'user', content: 'idea' }])
+  assert.equal(old.body.generationConfig.thinkingConfig, undefined)
+  assert.equal(resolveProvider({ GEMINI_API_KEY: 'g', AI_TIMEOUT_MS: '45000' }).timeoutMs, 45000)
+})
+
+test('palette salvages exact hex colors that Gemini merged into one string', () => {
+  const spec = {
+    version: '1.1', name: 'Meteor Drift', description: 'Dodge meteors.', theme: 'space', runtime: 'arcade', duration: 30,
+    accent: '#f97316', scoring: { direction: 'higher', label: 'Stardust', unit: 'pts' }, difficulty: 'normal',
+    controls: { keyboard: 'Arrows', touch: 'Drag', scheme: 'drag' },
+    entities: [{ kind: 'hazard', label: 'Meteor', sprite: '☄️', points: 0, speed: 1.8, shape: 'circle' }],
+    spawn: { rate: 2.8, pattern: 'rain' }, safety: { audience: 'general', notes: '' }, movement: 'straight',
+    rules: { win: 'survive', seconds: 30, lives: 3, targetScore: 300 }, scoreRules: { pointsPerEntity: 15, comboMultiplier: 2 },
+    palette: ["#0b0d1b','#1e1b4b','#f97316','#38bdf8"], player: { sprite: '🚀', scheme: 'drag' }
+  }
+  assert.deepEqual(validateGameSpec(spec).palette, ['#0b0d1b', '#1e1b4b', '#f97316', '#38bdf8'])
+  assert.deepEqual(validateGameSpec({ ...spec, palette: ["#0b0d1b'", ' #1e1b4b'] }).palette, ['#0b0d1b', '#1e1b4b'])
+  assert.throws(() => validateGameSpec({ ...spec, palette: ['red'] }), /palette\[0\]/)
+  assert.throws(() => validateGameSpec({ ...spec, palette: ['#12345'] }), /palette\[0\]/)
+})
+
+test('Gemini 429 quota errors are not retried', async () => {
+  const { generateGame } = await import('../src/ai/generate.js')
+  let calls = 0
+  const fetchImpl = async () => { calls++; return new Response('{"error":{"code":429}}', { status: 429 }) }
+  await assert.rejects(
+    generateGame({ prompt: 'dodge falling meteors', env: { GEMINI_API_KEY: 'g' }, fetchImpl }),
+    (err) => err.code === 'ai_quota_exceeded' && /quota/.test(err.message)
+  )
+  assert.equal(calls, 1)
+})
+
+test('mocked provider samples differ on at least three play axes', async () => {
+  assert.equal(SAMPLE_SPECS.length, 4)
+  const specs = []
+  for (const sample of SAMPLE_SPECS) {
+    const result = await generateGame({
+      prompt: 'make something that plays differently please',
+      env: { GEMINI_API_KEY: 'g' },
+      fetchImpl: async () => new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(sample) }] } }]
+      }), { status: 200 })
+    })
+    specs.push(result.spec)
+  }
+  assert.equal(specsAreDistinct(specs, 3), true)
+  assert.ok(new Set(specs.map((spec) => spec.spawn.rate)).size >= 3)
+  assert.ok(new Set(specs.map((spec) => spec.scoreRules.comboMultiplier)).size >= 3)
+  assert.ok(specs.some((spec) => spec.primitives.includes('popup')))
+  assert.ok(specs.some((spec) => spec.primitives.includes('chase')))
+  assert.ok(specs.some((spec) => spec.primitives.includes('shoot')))
+  assert.ok(specs.some((spec) => spec.primitives.includes('platform')))
+  assert.match(SYSTEM_PROMPT, /popup/)
+  assert.match(SYSTEM_PROMPT, /Vary spawn\.rate/)
+  assert.match(SYSTEM_PROMPT, /Mole Garden/)
+})
+
+test('arcade primitives change how a round plays', () => {
+  const rain = EXAMPLE_GAMES.find((game) => game.id === 'meteor-rain').spec
+  const mole = validateGameSpec({
+    ...rain,
+    primitives: ['popup'],
+    lifetimeMs: 400,
+    controls: { ...rain.controls, scheme: 'tap' },
+    spawn: { rate: 0.4, pattern: 'lanes' },
+    entities: [rain.entities[0]]
+  })
+  const garden = createSimulation(mole, 3)
+  let seen = null
+  let hidden = false
+  for (let i = 0; i < 80; i++) {
+    const snap = garden.tick(50, {})
+    const entity = snap.entities[0]
+    if (entity && !seen) {
+      seen = entity
+      assert.ok(entity.y > 10 && entity.y < 90, `popup y ${entity.y}`)
+    }
+    if (seen && snap.spawned === 1 && !snap.entities.length && snap.time > 400) hidden = true
+  }
+  assert.equal(hidden, true)
+
+  const hunter = createSimulation(validateGameSpec({
+    ...rain,
+    primitives: ['chase'],
+    lifetimeMs: 0,
+    movement: 'homing',
+    spawn: { rate: 4, pattern: 'lanes' },
+    entities: [rain.entities[0]]
+  }), 2)
+  hunter.setPlayer(90, 8)
+  let start = null
+  let chased = false
+  for (let i = 0; i < 50; i++) {
+    const snap = hunter.tick(50, {})
+    const entity = snap.entities[0]
+    if (!entity) continue
+    if (!start) start = { x: entity.x, y: entity.y }
+    else if (entity.y < start.y - 2 && entity.x > start.x + 2) chased = true
+  }
+  assert.equal(chased, true)
+
+  const shooter = createSimulation(validateGameSpec({
+    ...rain,
+    primitives: ['fall', 'shoot'],
+    lifetimeMs: 0,
+    spawn: { rate: 3, pattern: 'lanes' },
+    entities: [rain.entities[0]],
+    scoreRules: { pointsPerEntity: 10, comboMultiplier: 1 }
+  }), 1)
+  shooter.setPlayerX(18)
+  let shot = shooter.snapshot()
+  for (let i = 0; i < 40; i++) shot = shooter.tick(50, { fire: true })
+  assert.ok(shot.score >= 10, `shot score ${shot.score}`)
+  assert.equal(shot.lives, 3)
+
+  const hopper = createSimulation(validateGameSpec({
+    ...rain,
+    primitives: ['fall', 'platform'],
+    lifetimeMs: 0,
+    controls: { ...rain.controls, scheme: 'keys' }
+  }), 1)
+  const ground = hopper.snapshot().playerY
+  const jumped = hopper.tick(50, { jump: true })
+  assert.ok(jumped.playerY < ground - 1, `jump y ${jumped.playerY}`)
+
+  const mazeSpec = validateGameSpec({
+    ...rain,
+    primitives: ['maze'],
+    lifetimeMs: 0,
+    movement: 'straight',
+    spawn: { rate: 0.2, pattern: 'lanes' }
+  })
+  const grid = createSimulation(mazeSpec, 5)
+  const origin = grid.snapshot()
+  assert.ok(origin.walls.length > 8)
+  const blocked = grid.tick(200, { left: true })
+  assert.equal(blocked.playerX, origin.playerX)
+  const stepped = createSimulation(mazeSpec, 5)
+  const moved = stepped.tick(200, { right: true })
+  assert.ok(moved.playerX > origin.playerX + 10)
 })

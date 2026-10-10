@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.4.0')
+    assert.equal(res.data.version, '0.5.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -43,7 +43,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/games')
     assert.equal(res.status, 200)
     const ids = res.data.games.map((item) => item.id)
-    assert.deepEqual(ids.sort(), ['click-frenzy', 'homing-gems', 'lane-harvest', 'lightning-reflex', 'lucky-seven', 'meteor-dodge', 'meteor-rain', 'zigzag-orbs'])
+    assert.deepEqual(ids.sort(), ['click-frenzy', 'homing-gems', 'lane-harvest', 'lightning-reflex', 'lucky-seven', 'meteor-dodge', 'meteor-rain', 'mole-garden', 'shadow-chase', 'zigzag-orbs'])
     assert.equal(res.data.games.every((item) => item.plays === 0), true)
   })
 
@@ -187,9 +187,12 @@ describe('http api', { concurrency: false }, () => {
     })
     assert.equal(saved.status, 201)
     assert.equal(saved.data.verified, false)
-    assert.equal(saved.data.scores[0].verified, false)
-    assert.equal(saved.data.scores[0].ranking, 'higher')
-    assert.equal(saved.data.scores[0].unit, 'taps')
+    assert.equal(saved.data.assurance, 'unverified')
+    assert.equal(saved.data.scores.length, 0)
+    assert.equal(saved.data.unverified[0].verified, false)
+    assert.equal(saved.data.unverified[0].name, 'Ada')
+    assert.equal(saved.data.unverified[0].ranking, 'higher')
+    assert.equal(saved.data.unverified[0].unit, 'taps')
     const mismatch = await client.request('POST', `/api/games/${game.id}/scores`, { name: 'Ada', points: 10, mechanic: 'dodge' })
     assert.equal(mismatch.status, 400)
     const reaction = await client.request('POST', '/api/games', {
@@ -197,10 +200,12 @@ describe('http api', { concurrency: false }, () => {
     })
     await client.request('POST', `/api/games/${reaction.data.game.id}/scores`, { name: 'Slow', points: 800 })
     const board = await client.request('POST', `/api/games/${reaction.data.game.id}/scores`, { name: 'Fast', points: 180 })
-    assert.deepEqual(board.data.scores.map((score) => score.name), ['Fast', 'Slow'])
-    assert.equal(board.data.scores[0].ranking, 'lower')
+    assert.deepEqual(board.data.scores, [])
+    assert.deepEqual(board.data.unverified.map((score) => score.name), ['Fast', 'Slow'])
+    assert.equal(board.data.unverified[0].ranking, 'lower')
     const listed = await client.request('GET', `/api/games/${reaction.data.game.id}/scores`)
-    assert.equal(listed.data.scores[0].name, 'Fast')
+    assert.equal(listed.data.scores.length, 0)
+    assert.equal(listed.data.unverified[0].name, 'Fast')
     assert.equal(listed.data.verified, false)
   })
 
@@ -248,6 +253,7 @@ describe('http api', { concurrency: false }, () => {
     assert.equal(page.headers.get('x-frame-options'), null)
     assert.match(page.text, /Meteor Dodge/)
     assert.match(page.text, /play\.js/)
+    assert.equal(page.text.includes('style='), false)
     const nasty = await client.request('POST', '/api/games', {
       name: 'A <b>bee</b>',
       description: 'Tap <b>fast</b>',
@@ -357,6 +363,50 @@ describe('http api', { concurrency: false }, () => {
     assert.match(board.text, /checked/)
   })
 
+  test('creator dashboard counts views, plays, completions, shares, and the top checked score', async () => {
+    const anon = createClient(server.base)
+    await anon.prime()
+    assert.equal((await anon.request('GET', '/api/me/dashboard')).status, 401)
+    const page = await client.request('GET', '/studio/dashboard')
+    assert.equal(page.status, 200)
+    assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/)
+    assert.match(page.text, /dashboard\.js/)
+    assert.match(page.text, /Loading your games/)
+    const created = await client.request('POST', '/api/games', {
+      name: 'Dash Orchard', description: 'Count the plays', type: 'tap', duration: 10, accent: '#4adeb9'
+    })
+    const id = created.data.game.id
+    await client.request('POST', `/api/games/${id}/events`, { type: 'game_viewed', eventId: 'dash-view-0001' })
+    await client.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'dash-play-0001' })
+    await client.request('POST', `/api/games/${id}/events`, { type: 'play_completed', eventId: 'dash-done-0001' })
+    const share = await client.request('POST', `/api/games/${id}/share`, {})
+    assert.equal(share.status, 200)
+    assert.equal(share.data.shares, 1)
+    await client.request('POST', `/api/games/${id}/share`, {})
+    await client.request('POST', `/api/games/${id}/scores`, { name: 'Zoe', points: 20 })
+    const started = await client.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'dash-play-0002' })
+    await server.db.query(
+      `update plays set created_at = now() - interval '2 seconds' where game_id = $1 and consumed_at is null`,
+      [id]
+    )
+    const checked = await client.request('POST', `/api/games/${id}/scores`, {
+      name: 'Ada', points: 8, roundToken: started.data.roundToken
+    })
+    assert.equal(checked.data.assurance, 'checked')
+    const dash = await client.request('GET', '/api/me/dashboard')
+    assert.equal(dash.status, 200)
+    const row = dash.data.games.find((item) => item.id === id)
+    assert.equal(row.status, 'published')
+    assert.equal(row.views, 1)
+    assert.equal(row.plays, 2)
+    assert.equal(row.completions, 1)
+    assert.equal(row.shares, 2)
+    assert.equal(row.topScore.name, 'Ada')
+    assert.equal(row.topScore.points, 8)
+    const missing = await client.request('POST', '/api/games/missing-game/share', {})
+    assert.equal(missing.status, 404)
+  })
+
   test('POST /api/abuse-reports', async () => {
     const bad = await client.request('POST', '/api/abuse-reports', { gameId: 'missing-game', reason: 'spam', details: 'nope' })
     assert.equal(bad.status, 404)
@@ -449,6 +499,67 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       assert.equal(res.data.game.name, 'Grok Dash')
     } finally {
       await server.close()
+    }
+  })
+
+  test('daily generation caps return 429', async () => {
+    let calls = 0
+    const fetchImpl = async () => {
+      calls += 1
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(validSpec) }] } }] }), { status: 200 })
+    }
+    const server = await startServer({
+      env: {
+        AI_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'cap-key',
+        AI_DAILY_LIMIT_PER_USER: '1',
+        AI_DAILY_LIMIT_GLOBAL: '5'
+      },
+      fetchImpl
+    })
+    try {
+      const client = createClient(server.base)
+      await client.prime()
+      await client.request('POST', '/api/auth/register', { email: 'cap@example.com', password: 'test-password-123', displayName: 'Cap' })
+      const first = await client.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })
+      assert.equal(first.status, 200)
+      assert.equal(calls, 1)
+      const second = await client.request('POST', '/api/ai/generate', { prompt: 'a different garden game please' })
+      assert.equal(second.status, 429)
+      assert.equal(second.data.code, 'ai_daily_limit')
+      assert.match(second.data.error, /this account/)
+      assert.equal(calls, 1)
+    } finally {
+      await server.close()
+    }
+
+    let globalCalls = 0
+    const globalServer = await startServer({
+      env: {
+        AI_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'cap-key',
+        AI_DAILY_LIMIT_PER_USER: '20',
+        AI_DAILY_LIMIT_GLOBAL: '1'
+      },
+      fetchImpl: async () => {
+        globalCalls += 1
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(validSpec) }] } }] }), { status: 200 })
+      }
+    })
+    try {
+      const first = createClient(globalServer.base)
+      const second = createClient(globalServer.base)
+      await first.prime()
+      await second.prime()
+      await first.request('POST', '/api/auth/register', { email: 'one@example.com', password: 'test-password-123' })
+      await second.request('POST', '/api/auth/register', { email: 'two@example.com', password: 'test-password-123' })
+      assert.equal((await first.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })).status, 200)
+      const blocked = await second.request('POST', '/api/ai/generate', { prompt: 'a garden tap game please' })
+      assert.equal(blocked.status, 429)
+      assert.match(blocked.data.error, /everyone/)
+      assert.equal(globalCalls, 1)
+    } finally {
+      await globalServer.close()
     }
   })
 

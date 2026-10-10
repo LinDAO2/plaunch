@@ -124,5 +124,65 @@ export const EXAMPLE_GAMES = [
       palette: ['#ffbd70', '#3a2a14', '#fff1d6'],
       player: { sprite: '🧲', scheme: 'keys' }
     }
+  }),
+  example({
+    id: 'mole-garden',
+    name: 'Mole Garden',
+    description: 'Moles pop out of three lanes. Tap them before they hide.',
+    type: 'arcade',
+    duration: 20,
+    accent: '#4adeb9',
+    spec: {
+      ...shared,
+      name: 'Mole Garden',
+      description: 'Moles pop out of three lanes. Tap them before they hide.',
+      theme: 'vegetable patch',
+      runtime: 'arcade',
+      duration: 20,
+      accent: '#4adeb9',
+      controls: { keyboard: 'Click a mole', touch: 'Tap a mole before it hides', scheme: 'tap' },
+      entities: [
+        { kind: 'collectible', label: 'Mole', sprite: '🐹', points: 8, speed: 0.2, shape: 'circle' },
+        { kind: 'hazard', label: 'Weed', sprite: '🌿', points: 0, speed: 0.2, shape: 'circle' }
+      ],
+      spawn: { rate: 1.1, pattern: 'lanes' },
+      movement: 'straight',
+      rules: { win: 'score', seconds: 20, lives: 3, targetScore: 48 },
+      scoreRules: { pointsPerEntity: 8, comboMultiplier: 1 },
+      palette: ['#4adeb9', '#163028', '#d9ffe8'],
+      player: { sprite: '🔨', scheme: 'tap' },
+      primitives: ['popup'],
+      lifetimeMs: 900
+    }
+  }),
+  example({
+    id: 'shadow-chase',
+    name: 'Shadow Chase',
+    description: 'A shadow peels off the wall and hunts you through the vault.',
+    type: 'arcade',
+    duration: 18,
+    accent: '#c084fc',
+    spec: {
+      ...shared,
+      name: 'Shadow Chase',
+      description: 'A shadow peels off the wall and hunts you through the vault.',
+      theme: 'candlelit vault',
+      runtime: 'arcade',
+      duration: 18,
+      accent: '#c084fc',
+      controls: { keyboard: 'Arrow keys or A and D to flee', touch: 'Drag away from the shadow', scheme: 'keys' },
+      entities: [
+        { kind: 'hazard', label: 'Shadow', sprite: '👻', points: 0, speed: 0.7, shape: 'circle' },
+        { kind: 'collectible', label: 'Coin', sprite: '🪙', points: 14, speed: 0.45, shape: 'circle' }
+      ],
+      spawn: { rate: 0.45, pattern: 'burst' },
+      movement: 'homing',
+      rules: { win: 'lives', seconds: 18, lives: 2, targetScore: 40 },
+      scoreRules: { pointsPerEntity: 14, comboMultiplier: 1 },
+      palette: ['#c084fc', '#1a1028', '#f3e8ff'],
+      player: { sprite: '🏃', scheme: 'keys' },
+      primitives: ['chase'],
+      lifetimeMs: 0
+    }
   })
 ]

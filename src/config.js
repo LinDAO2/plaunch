@@ -57,6 +57,8 @@ export function loadConfig(env = process.env) {
     rateLimitMax: intEnv(env.RATE_LIMIT_MAX, 90),
     authRateLimitMax: intEnv(env.AUTH_RATE_LIMIT_MAX, 10),
     aiRateLimitMax: intEnv(env.AI_RATE_LIMIT_MAX, 20),
+    aiDailyUser: intEnv(env.AI_DAILY_LIMIT_PER_USER, 20),
+    aiDailyGlobal: intEnv(env.AI_DAILY_LIMIT_GLOBAL, 200),
     rateWindowMs: 60_000,
     passwordScryptN: intEnv(env.PASSWORD_SCRYPT_N, 16384),
     publicBaseUrl: cleanOrigin(env.PUBLIC_BASE_URL),

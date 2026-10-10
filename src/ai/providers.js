@@ -2,25 +2,37 @@ import { geminiResponseSchema } from './gamespec.js'
 
 // Rosebud is intentionally not a provider. It has no generation API and its terms prohibit automated use.
 
+// Live Gemini 3.x Flash latency on the standard tier ranged from 7s to 60s, so 20s timed out often.
+export const DEFAULT_AI_TIMEOUT_MS = 60_000
+
+function timeoutEnv(value) {
+  const n = Number(value)
+  return Number.isInteger(n) && n >= 1000 && n <= 120_000 ? n : DEFAULT_AI_TIMEOUT_MS
+}
+
 export function resolveProvider(env = {}) {
   const choice = String(env.AI_PROVIDER || 'auto').toLowerCase()
   const gemini = env.GEMINI_API_KEY ? {
     id: 'gemini',
-    model: env.GEMINI_MODEL || 'gemini-3.8-flash',
+    model: env.GEMINI_MODEL || 'gemini-3.5-flash',
     apiKey: env.GEMINI_API_KEY,
-    base: env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta'
+    base: env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta',
+    thinkingLevel: String(env.GEMINI_THINKING_LEVEL ?? 'low').toLowerCase(),
+    timeoutMs: timeoutEnv(env.AI_TIMEOUT_MS)
   } : null
   const xai = env.XAI_API_KEY ? {
     id: 'xai',
     model: env.XAI_MODEL || 'grok-3',
     apiKey: env.XAI_API_KEY,
-    base: env.XAI_BASE_URL || 'https://api.x.ai/v1'
+    base: env.XAI_BASE_URL || 'https://api.x.ai/v1',
+    timeoutMs: timeoutEnv(env.AI_TIMEOUT_MS)
   } : null
   const openai = env.OPENAI_API_KEY ? {
     id: 'openai',
     model: env.OPENAI_MODEL || 'gpt-4o-mini',
     apiKey: env.OPENAI_API_KEY,
-    base: env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+    base: env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    timeoutMs: timeoutEnv(env.AI_TIMEOUT_MS)
   } : null
   if (choice === 'gemini') return gemini
   if (choice === 'xai') return xai
@@ -58,6 +70,17 @@ export function geminiRequest(provider, messages) {
     role: message.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: message.content }]
   }))
+  const generationConfig = {
+    temperature: 0.4,
+    maxOutputTokens: 2048,
+    responseMimeType: 'application/json',
+    responseJsonSchema: geminiResponseSchema()
+  }
+  // Gemini 3 models think by default; ~1k thought tokens per spec added cost and latency.
+  // Set GEMINI_THINKING_LEVEL=off (or default) to omit the setting.
+  if (/^gemini-3/.test(provider.model) && provider.thinkingLevel && !['off', 'default', ''].includes(provider.thinkingLevel)) {
+    generationConfig.thinkingConfig = { thinkingLevel: provider.thinkingLevel }
+  }
   return {
     url: `${trimBase(provider.base)}/models/${provider.model}:generateContent`,
     headers: {
@@ -67,12 +90,7 @@ export function geminiRequest(provider, messages) {
     body: {
       systemInstruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 2048,
-        responseMimeType: 'application/json',
-        responseJsonSchema: geminiResponseSchema()
-      }
+      generationConfig
     }
   }
 }

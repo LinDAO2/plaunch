@@ -1,3 +1,13 @@
+export function splitBoards(scores, mechanic) {
+  const list = Array.isArray(scores) ? scores : []
+  return {
+    scores: rankScores(list.filter((score) => score.assurance === 'checked'), mechanic),
+    unverified: rankScores(list.filter((score) => score.assurance !== 'checked'), mechanic),
+    mechanic,
+    verified: false
+  }
+}
+
 export function rankScores(scores, mechanic) {
   const ranking = mechanic === 'reaction' ? 'lower' : 'higher'
   return scores.slice().sort((a, b) => {

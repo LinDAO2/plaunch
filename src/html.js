@@ -33,7 +33,16 @@ function safeOrigin(origin) {
   }
 }
 
-export function renderSharePage(game, { origin, site = '', scores = [] } = {}) {
+function leaderRows(scores) {
+  if (!scores.length) return '<p class="hint">None yet.</p>'
+  return scores.map((score) => {
+    const assurance = score.assurance === 'checked' ? 'checked' : 'unverified'
+    const value = score.mechanic === 'reaction' ? `${score.points} ms` : String(score.points)
+    return `<div class="leader-row"><span>#${score.rank} ${escapeHtml(score.name)}</span><b>${escapeHtml(value)}</b><span class="${assurance}">${assurance}</span></div>`
+  }).join('')
+}
+
+export function renderSharePage(game, { origin, site = '', scores = [], unverified = [] } = {}) {
   const name = escapeHtml(game.name)
   const description = escapeHtml(game.description || 'A playable mini-game on Playground.')
   const slug = escapeHtml(game.id)
@@ -44,13 +53,8 @@ export function renderSharePage(game, { origin, site = '', scores = [] } = {}) {
   const playPath = `/play/${slug}`
   const studioPath = `/g/${slug}`
   const siteTag = site ? `<meta name="twitter:site" content="${escapeHtml(site)}">` : ''
-  const rows = scores.length
-    ? scores.map((score) => {
-      const assurance = score.assurance === 'checked' ? 'checked' : 'unverified'
-      const value = score.mechanic === 'reaction' ? `${score.points} ms` : String(score.points)
-      return `<div class="leader-row"><span>#${score.rank} ${escapeHtml(score.name)}</span><b>${escapeHtml(value)}</b><span class="${assurance}">${assurance}</span></div>`
-    }).join('')
-    : '<p class="hint">No scores yet. Play a round and claim one.</p>'
+  const checkedRows = scores.length ? leaderRows(scores) : '<p class="hint">No checked scores yet. Play a round and claim one.</p>'
+  const unverifiedRows = leaderRows(unverified)
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -82,7 +86,10 @@ ${siteTag}
 <p class="play-links"><a href="${playPath}">Play</a><a href="${studioPath}">Open studio page</a></p>
 <section class="leaderboard">
 <div class="leaderboard-head"><h3>Leaderboard</h3><span>Top 20</span></div>
-<div class="leaders">${rows}</div>
+<h3>Checked</h3>
+<div class="leaders">${checkedRows}</div>
+<h3>Unverified</h3>
+<div class="leaders">${unverifiedRows}</div>
 </section>
 </main>
 </body>

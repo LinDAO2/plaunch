@@ -6,6 +6,8 @@ const slug = (location.pathname.match(/^\/play\/([a-z0-9-]+)$/) || [])[1]
 const embed = new URLSearchParams(location.search).get('embed') === '1'
 let current = null
 let roundToken = null
+let board = { scores: [], unverified: [] }
+let boardTab = 'checked'
 
 function toast(msg) {
   const el = $('toast')
@@ -45,15 +47,16 @@ function showError(message) {
   $('play-error').textContent = message
 }
 
-async function loadScores() {
-  const { scores, mechanic } = await api(`/games/${current.id}/scores`)
-  $('leaderboard-scope').textContent = mechanic === 'reaction' ? 'Fastest reaction · top 20' : 'Top 20 scores'
+function paintBoard() {
+  const rows = boardTab === 'unverified' ? board.unverified : board.scores
+  $('tab-checked').classList.toggle('on', boardTab === 'checked')
+  $('tab-unverified').classList.toggle('on', boardTab === 'unverified')
   $('leaders').replaceChildren()
-  if (!scores.length) {
-    $('leaders').textContent = 'No scores yet. Be the first!'
+  if (!rows?.length) {
+    $('leaders').textContent = boardTab === 'checked' ? 'No checked scores yet.' : 'No unverified scores.'
     return
   }
-  for (const score of scores) {
+  for (const score of rows) {
     const row = document.createElement('div')
     row.className = 'leader-row'
     const name = document.createElement('span')
@@ -69,6 +72,17 @@ async function loadScores() {
   }
 }
 
+async function loadScores(prefer) {
+  const listed = await api(`/games/${current.id}/scores`)
+  board = { scores: listed.scores || [], unverified: listed.unverified || [] }
+  if (prefer) boardTab = prefer
+  $('leaderboard-scope').textContent = listed.mechanic === 'reaction' ? 'Fastest reaction · top 20' : 'Top 20 scores'
+  paintBoard()
+}
+
+$('tab-checked').addEventListener('click', () => { boardTab = 'checked'; paintBoard() })
+$('tab-unverified').addEventListener('click', () => { boardTab = 'unverified'; paintBoard() })
+
 $('submit-score').addEventListener('click', async () => {
   const points = runtime.getLastScore()
   if (!current || points === null) return
@@ -83,7 +97,7 @@ $('submit-score').addEventListener('click', async () => {
     roundToken = null
     $('submit-score').disabled = true
     toast(saved.assurance === 'checked' ? 'Score checked and posted.' : 'Score submitted. It is stored as unverified.')
-    await loadScores()
+    await loadScores(saved.assurance === 'checked' ? 'checked' : 'unverified')
   } catch (error) {
     toast(error.message)
   }

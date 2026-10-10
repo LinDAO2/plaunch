@@ -1,10 +1,13 @@
 import { HttpError } from '../errors.js'
 import { cleanText } from '../validate.js'
 import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
-import { aiStatus, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
+import { DEFAULT_AI_TIMEOUT_MS, aiStatus, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
+import { SAMPLE_SPECS } from './samples.js'
 
 export { aiStatus }
+
+const FEW_SHOTS = SAMPLE_SPECS.map((spec, index) => `Example ${index + 1}: ${JSON.stringify(spec)}`).join('\n')
 
 export const SYSTEM_PROMPT = `You design one tiny browser game and return GameSpecV1 JSON only.
 Rules:
@@ -16,13 +19,21 @@ Rules:
 - safety.audience is "general"
 - entities use kind target, hazard, or collectible, plus an emoji sprite, points, and speed
 - spawn.pattern is rain, waves, burst, or lanes. burst means a random cluster
-- movement is straight, zigzag, homing, or bounce
+- movement is straight, zigzag, homing, or bounce. Use homing when the idea is pursuit
 - controls.scheme is drag, tap, or keys
+- primitives is 1 to 3 of fall, popup, chase, shoot, platform, maze
+- popup entities appear and hide after lifetimeMs (whack-a-mole). chase pursues the player. shoot fires upward. platform is gravity plus jump. maze is grid steps around walls. fall drops objects
+- Do not always choose fall. Pick the primitive that changes how the game is played
+- lifetimeMs is 0, or 200 to 8000 when something should hide
 - rules.win is survive, score, or lives, with seconds, lives, and targetScore
 - scoreRules includes pointsPerEntity and comboMultiplier
-- palette is 2 to 4 hex colors
+- palette is 2 to 4 separate strings, each exactly one #RRGGBB color
 - player.sprite is an emoji
-- Make the theme, sprites, pattern, movement, and win rule specific to the prompt
+- Vary spawn.rate, entity speed, pointsPerEntity, comboMultiplier, lifetimeMs, lives, and targetScore so they fit this concept
+- Do not reuse spawn.rate 2.5 or comboMultiplier 2 unless the idea truly needs those exact numbers
+- Make the theme, sprites, pattern, movement, controls, win rule, and primitives specific to the prompt
+- The examples below contrast on purpose. Do not copy one. Invent a different mix for the player's idea
+${FEW_SHOTS}
 - Do not include JavaScript, HTML, URLs, or executable code
 - Do not wrap the JSON in markdown`
 
@@ -54,7 +65,7 @@ async function callProvider(provider, messages, fetchImpl) {
       method: 'POST',
       headers: request.headers,
       body: JSON.stringify(request.body),
-      signal: AbortSignal.timeout(20_000)
+      signal: AbortSignal.timeout(provider.timeoutMs || DEFAULT_AI_TIMEOUT_MS)
     })
   } catch (err) {
     const error = new HttpError(502, err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
@@ -69,8 +80,11 @@ async function callProvider(provider, messages, fetchImpl) {
   }
   if (!response.ok) {
     const rejected = response.status === 401 || response.status === 403
-    const error = new HttpError(502, rejected ? 'AI provider rejected the API key' : 'AI provider request failed', 'ai_provider_error')
-    error.retry = !rejected && response.status !== 400
+    const quota = response.status === 429
+    const message = rejected ? 'AI provider rejected the API key' : quota ? 'AI provider quota exceeded. Try again later.' : 'AI provider request failed'
+    const error = new HttpError(502, message, quota ? 'ai_quota_exceeded' : 'ai_provider_error')
+    // Retrying a 429 immediately only burns more quota.
+    error.retry = !rejected && !quota && response.status !== 400
     throw error
   }
   let payload
