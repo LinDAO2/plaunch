@@ -8,6 +8,11 @@ import { databaseKind, openDatabase } from './src/db.js'
 import { log } from './src/log.js'
 import { migrate } from './src/migrate.js'
 import { seedIfEmpty } from './src/seed.js'
+import { createUsercontentApp } from './src/usercontent.js'
+
+function unique(values) {
+  return values.filter((value, index) => value && values.indexOf(value) === index)
+}
 
 export async function start() {
   const config = loadConfig()
@@ -17,9 +22,17 @@ export async function start() {
   const seeded = config.seedOnEmpty ? await seedIfEmpty(db) : 0
   const app = createApp({ db, config })
   const server = http.createServer(app)
+  const usercontent = http.createServer(createUsercontentApp({ db, config }))
   await new Promise((resolve) => server.listen(config.port, '0.0.0.0', resolve))
+  config.mainOrigins = unique([
+    config.publicBaseUrl,
+    `http://127.0.0.1:${config.port}`,
+    `http://localhost:${config.port}`
+  ])
+  await new Promise((resolve) => usercontent.listen(config.usercontentPort, '0.0.0.0', resolve))
   log('info', 'listening', {
     port: config.port,
+    usercontent: config.usercontentOrigin,
     database: databaseKind(config.databaseUrl),
     migrated: applied,
     seeded,
@@ -27,7 +40,9 @@ export async function start() {
   })
   const shutdown = () => {
     server.close(() => {
-      db.close().finally(() => process.exit(0))
+      usercontent.close(() => {
+        db.close().finally(() => process.exit(0))
+      })
     })
   }
   process.on('SIGTERM', shutdown)

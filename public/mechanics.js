@@ -3,6 +3,7 @@ import { mountArcade } from '/arcade-view.js'
 export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE', arcade: 'ARCADE' }
 
 export function controlHint(game) {
+  if (game?.tier === 'freeform') return 'Sandboxed canvas. The score comes back to this page. The game cannot read this page or the network.'
   if (game?.spec?.controls?.keyboard && game?.spec?.controls?.touch) {
     return `${game.spec.controls.keyboard} · ${game.spec.controls.touch}`
   }

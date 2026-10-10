@@ -64,7 +64,7 @@ function trimBase(base) {
   return String(base || '').replace(/\/$/, '')
 }
 
-export function geminiRequest(provider, messages) {
+export function geminiRequest(provider, messages, options = {}) {
   const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n')
   const contents = messages.filter((message) => message.role !== 'system').map((message) => ({
     role: message.role === 'assistant' ? 'model' : 'user',
@@ -72,9 +72,9 @@ export function geminiRequest(provider, messages) {
   }))
   const generationConfig = {
     temperature: 0.4,
-    maxOutputTokens: 2048,
+    maxOutputTokens: options.maxOutputTokens || 2048,
     responseMimeType: 'application/json',
-    responseJsonSchema: geminiResponseSchema()
+    responseJsonSchema: options.schema || geminiResponseSchema()
   }
   // Gemini 3 models think by default; ~1k thought tokens per spec added cost and latency.
   // Set GEMINI_THINKING_LEVEL=off (or default) to omit the setting.
@@ -95,19 +95,21 @@ export function geminiRequest(provider, messages) {
   }
 }
 
-export function openAiRequest(provider, messages) {
+export function openAiRequest(provider, messages, options = {}) {
+  const body = {
+    model: provider.model,
+    temperature: 0.4,
+    messages,
+    response_format: { type: 'json_object' }
+  }
+  if (options.maxOutputTokens) body.max_tokens = options.maxOutputTokens
   return {
     url: `${trimBase(provider.base)}/chat/completions`,
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${provider.apiKey}`
     },
-    body: {
-      model: provider.model,
-      temperature: 0.4,
-      messages,
-      response_format: { type: 'json_object' }
-    }
+    body
   }
 }
 

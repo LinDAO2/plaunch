@@ -32,7 +32,9 @@ export function mapGame(row) {
     status: row.status,
     ownerId: row.owner_id || null,
     generation: row.generation,
-    spec: parseJson(row.spec)
+    spec: parseJson(row.spec),
+    tier: row.tier === 'freeform' ? 'freeform' : 'spec',
+    freeformHtml: row.freeform_html || null
   }
 }
 
@@ -126,11 +128,12 @@ export async function createGame(db, fields, spec, userId) {
   return db.transaction(async (tx) => {
     const id = await uniqueSlug(tx, fields.name)
     const now = new Date().toISOString()
+    const tier = fields.tier === 'freeform' ? 'freeform' : 'spec'
     const inserted = await tx.query(
-      `insert into games (id, owner_id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, 'published', 0, $9, $10::jsonb, $11, $11, $11)
+      `insert into games (id, owner_id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tier, freeform_html)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'published', 0, $9, $10::jsonb, $11, $11, $11, $12, $13)
        returning *`,
-      [id, userId, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || 'manual', JSON.stringify(spec), now]
+      [id, userId, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || 'manual', spec == null ? null : JSON.stringify(spec), now, tier, tier === 'freeform' ? fields.freeformHtml : null]
     )
     const game = mapGame(inserted.rows[0])
     const version = await insertVersion(tx, game, userId)
@@ -145,10 +148,11 @@ export async function updateGame(db, id, fields, spec, userId) {
     const current = mapGame(existing.rows[0])
     if (!current) throw new HttpError(404, 'Game not found', 'not_found')
     if (!current.ownerId || current.ownerId !== userId) throw new HttpError(403, 'You can only edit your own games', 'forbidden')
+    const tier = fields.tier === 'freeform' ? 'freeform' : 'spec'
     const updated = await tx.query(
-      `update games set name = $2, description = $3, mechanic = $4, duration = $5, accent = $6, token_interest = $7, generation = $8, spec = $9::jsonb, updated_at = now()
+      `update games set name = $2, description = $3, mechanic = $4, duration = $5, accent = $6, token_interest = $7, generation = $8, spec = $9::jsonb, tier = $10, freeform_html = $11, updated_at = now()
        where id = $1 returning *`,
-      [id, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || current.generation, JSON.stringify(spec)]
+      [id, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || current.generation, spec == null ? null : JSON.stringify(spec), tier, tier === 'freeform' ? (fields.freeformHtml || current.freeformHtml) : null]
     )
     const game = mapGame(updated.rows[0])
     const version = await insertVersion(tx, game, userId)
@@ -398,6 +402,25 @@ export async function findUserBySession(db, token) {
   const row = result.rows[0]
   if (!row) return null
   return { id: row.id, email: row.email, displayName: row.display_name }
+}
+
+export async function savePreview(db, html, ownerId) {
+  await db.query('delete from freeform_previews where expires_at <= now()')
+  const token = randomBytes(24).toString('base64url')
+  const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+  await db.query(
+    'insert into freeform_previews (token, html, owner_id, expires_at) values ($1, $2, $3, $4)',
+    [token, html, ownerId || null, expires]
+  )
+  return token
+}
+
+export async function takePreview(db, token) {
+  const result = await db.query(
+    'select html from freeform_previews where token = $1 and expires_at > now()',
+    [token]
+  )
+  return result.rows[0]?.html || ''
 }
 
 export function specForSave(fields, requestedSpec, previous) {

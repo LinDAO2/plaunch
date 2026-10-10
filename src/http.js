@@ -7,20 +7,21 @@ const BASE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-s
 const EMBED_ANCESTORS = "frame-ancestors 'self' https://x.com https://*.x.com https://twitter.com https://*.twitter.com"
 const PLAYER_ANCESTORS = "frame-ancestors https://x.com https://*.x.com https://twitter.com https://*.twitter.com"
 
-export function contentSecurityPolicy(kind) {
-  if (kind === 'player') return `${BASE_CSP}; ${PLAYER_ANCESTORS}`
-  if (kind === 'embed') return `${BASE_CSP}; ${EMBED_ANCESTORS}`
-  return `${BASE_CSP}; frame-ancestors 'none'`
+export function contentSecurityPolicy(kind, config) {
+  const frameSrc = config?.usercontentOrigin ? `; frame-src ${config.usercontentOrigin}` : ''
+  if (kind === 'player') return `${BASE_CSP}${frameSrc}; ${PLAYER_ANCESTORS}`
+  if (kind === 'embed') return `${BASE_CSP}${frameSrc}; ${EMBED_ANCESTORS}`
+  return `${BASE_CSP}${frameSrc}; frame-ancestors 'none'`
 }
 
-export function documentHeaders(kind) {
+export function documentHeaders(kind, config) {
   const headers = {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'strict-origin-when-cross-origin',
     'permissions-policy': 'camera=(), microphone=(), geolocation=()',
-    'content-security-policy': contentSecurityPolicy(kind)
+    'content-security-policy': contentSecurityPolicy(kind, config)
   }
   if (kind !== 'embed' && kind !== 'player') {
     headers['x-frame-options'] = 'DENY'
@@ -99,7 +100,7 @@ export function assertCsrf(req) {
   }
 }
 
-export async function readJson(req) {
+export async function readJson(req, max = 16_000) {
   const type = String(req.headers['content-type'] || '')
   if (type && !type.includes('application/json')) {
     throw new HttpError(415, 'Content-Type must be application/json')
@@ -108,7 +109,7 @@ export async function readJson(req) {
   let size = 0
   for await (const chunk of req) {
     size += chunk.length
-    if (size > 16_000) throw new HttpError(413, 'Request too large')
+    if (size > max) throw new HttpError(413, 'Request too large')
     chunks.push(chunk)
   }
   if (!size) return {}
@@ -139,6 +140,6 @@ export function sendJson(res, status, data, ctx, extra = {}) {
 }
 
 export function sendHtml(res, status, html, ctx, kind) {
-  send(res, status, html, ctx, documentHeaders(kind))
+  send(res, status, html, ctx, documentHeaders(kind, ctx?.config))
   return status
 }

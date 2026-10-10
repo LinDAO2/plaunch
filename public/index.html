@@ -22,7 +22,7 @@
 <section class="hero">
 <div class="eyebrow">THE LAUNCHPAD FOR PLAYABLE IDEAS</div>
 <h1>Think it. <span>Play it.</span><br>Launch it.</h1>
-<p>Turn a game idea into a playable mini-game, publish a real link, and compete on the leaderboard. Tokens can come later. Fun starts now.</p>
+<p>Type any game idea. Arcade ideas become a spec the built-in runtime can play. Everything else becomes a self-contained game in a sandbox that cannot see this page or the network.</p>
 <div class="actions"><a class="primary" href="#studio">Create a game ↗</a><a class="outline" href="#discover">Explore launches →</a></div>
 <div class="metrics"><span><b>4</b> game engines</span><span><b>∞</b> ideas</span><span><b>1</b> click to publish</span></div>
 </section>
@@ -32,6 +32,13 @@
 <label for="prompt">Describe the game you want to make</label>
 <textarea id="prompt" placeholder="A space game where you dodge falling meteors..."></textarea>
 <button id="generate" class="prompt-btn" type="button">✦ Generate game from idea</button>
+<label for="tier">Generator</label>
+<select id="tier">
+<option value="auto">Auto — arcade spec when it fits</option>
+<option value="spec">Arcade spec</option>
+<option value="freeform">Freeform sandbox</option>
+</select>
+<p id="tier-note" class="hint">Auto uses an arcade spec when the idea fits, and a sandbox game otherwise.</p>
 <p id="gen-mode" class="hint mode-label">Checking generator…</p>
 <div class="separator"><span>MAKE IT YOURS</span></div>
 <label for="name">Game name</label>

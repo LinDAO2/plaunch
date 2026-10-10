@@ -57,8 +57,8 @@ export function parseModelJson(raw) {
   return value
 }
 
-async function callProvider(provider, messages, fetchImpl) {
-  const request = provider.id === 'gemini' ? geminiRequest(provider, messages) : openAiRequest(provider, messages)
+async function callProvider(provider, messages, fetchImpl, options = {}) {
+  const request = provider.id === 'gemini' ? geminiRequest(provider, messages, options) : openAiRequest(provider, messages, options)
   let response
   try {
     response = await fetchImpl(request.url, {
@@ -73,7 +73,7 @@ async function callProvider(provider, messages, fetchImpl) {
     throw error
   }
   const text = await response.text()
-  if (text.length > 20_000) {
+  if (text.length > (options.maxResponseChars || 20_000)) {
     const error = new HttpError(502, 'AI response too large', 'ai_provider_error')
     error.retry = false
     throw error
@@ -102,6 +102,10 @@ async function callProvider(provider, messages, fetchImpl) {
     throw error
   }
   return content
+}
+
+export function requestModelText(provider, messages, fetchImpl, options = {}) {
+  return callProvider(provider, messages, fetchImpl, { maxResponseChars: 262144, ...options })
 }
 
 function templateResult(prompt) {

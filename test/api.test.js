@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.5.0')
+    assert.equal(res.data.version, '0.6.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -68,6 +68,8 @@ describe('http api', { concurrency: false }, () => {
     assert.equal(res.data.mode, 'template')
     assert.equal(res.data.provider, null)
     assert.equal(res.data.game.type, 'guess')
+    assert.equal(res.data.tier, 'spec')
+    assert.equal(res.data.html, null)
   })
 
   test('write routes reject missing auth and missing CSRF', async () => {
@@ -435,6 +437,85 @@ describe('http api', { concurrency: false }, () => {
       body: '{}'
     })
     assert.equal(typed.status, 415)
+  })
+
+  test('freeform games publish to the sandbox and the player card', async () => {
+    const generated = await client.request('POST', '/api/ai/generate', { prompt: 'a chess game on a board' })
+    assert.equal(generated.status, 200)
+    assert.equal(generated.data.tier, 'freeform')
+    assert.equal(generated.data.spec, null)
+    assert.match(generated.data.html, /<canvas/i)
+    assert.match(generated.data.tierReason, /freeform/i)
+    const forced = await client.request('POST', '/api/ai/generate', { prompt: 'a chess game on a board', tier: 'spec' })
+    assert.equal(forced.status, 200)
+    assert.equal(forced.data.tier, 'spec')
+    assert.equal(forced.data.html, null)
+    assert.equal(typeof forced.data.spec, 'object')
+
+    const rejected = await client.request('POST', '/api/games', {
+      name: 'Bad Sandbox',
+      description: 'nope',
+      type: 'arcade',
+      duration: 30,
+      accent: '#112233',
+      tier: 'freeform',
+      html: '<html><body><canvas></canvas><script>fetch("https://example.com/nope")</script>playground-score</body></html>'
+    })
+    assert.equal(rejected.status, 400)
+    assert.match(rejected.data.error, /fetch|External URL/)
+
+    const preview = await client.request('POST', '/api/freeform/preview', { html: generated.data.html })
+    assert.equal(preview.status, 200)
+    const previewDoc = await fetch(preview.data.url)
+    assert.equal(previewDoc.status, 200)
+    assert.match(await previewDoc.text(), /<canvas/i)
+
+    const published = await client.request('POST', '/api/games', {
+      name: 'Chess Sandbox',
+      description: 'A tiny chess idea',
+      type: 'tap',
+      duration: 30,
+      accent: '#7c6bf2',
+      tier: 'freeform',
+      generation: 'rule-based-template',
+      html: generated.data.html
+    })
+    assert.equal(published.status, 201)
+    assert.equal(published.data.game.tier, 'freeform')
+    assert.equal(published.data.game.type, 'arcade')
+    assert.equal(published.data.game.spec, null)
+    assert.match(published.data.game.html, /<canvas/i)
+    assert.equal(published.data.game.sandboxUrl, `${server.usercontentBase}/g/${published.data.game.id}`)
+
+    const listed = await client.request('GET', '/api/games')
+    const card = listed.data.games.find((item) => item.id === published.data.game.id)
+    assert.equal(card.tier, 'freeform')
+    assert.equal(card.html, undefined)
+
+    const sandbox = await fetch(published.data.game.sandboxUrl)
+    assert.equal(sandbox.status, 200)
+    const csp = sandbox.headers.get('content-security-policy')
+    assert.match(csp, /default-src 'none'/)
+    assert.match(csp, /script-src 'unsafe-inline'/)
+    assert.match(csp, /style-src 'unsafe-inline'/)
+    assert.match(csp, /img-src data: blob:/)
+    assert.match(csp, /connect-src 'none'/)
+    assert.match(csp, /frame-ancestors/)
+    assert.match(csp, /https:\/\/x\.com/)
+    assert.match(csp, /https:\/\/twitter\.com/)
+    assert.equal(sandbox.headers.get('set-cookie'), null)
+
+    const id = published.data.game.id
+    const embed = await client.request('GET', `/play/${id}?embed=1`)
+    assert.equal(embed.status, 200)
+    assert.match(embed.text, /embed-gate/)
+    assert.match(embed.headers.get('content-security-policy'), /frame-src /)
+    const share = await client.request('GET', `/r/${id}`)
+    assert.equal(share.status, 200)
+    assert.match(share.text, /twitter:player"/)
+    assert.match(share.text, /twitter:player:width" content="480"/)
+    assert.match(share.text, /twitter:player:height" content="480"/)
+    assert.match(share.text, new RegExp(`/play/${id}\\?embed=1`))
   })
 })
 

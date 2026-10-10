@@ -1,6 +1,8 @@
-# Playground — game launchpad v0.5
+# Playground — game launchpad v0.6
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
+
+Ideas that do not fit that arcade spec use the freeform tier: one self-contained HTML document, served from `USERCONTENT_ORIGIN`, inside an iframe with `sandbox="allow-scripts"`. The studio picks the tier automatically and the creator can override it.
 
 This is a development build. Leaderboards rank **checked** scores by default. Scores without a valid round token stay **unverified** and show on a separate tab. That is not a claim of human verification. Token interest is still only a checkbox: there is no wallet, minting, or chain code. Rosebud is not integrated.
 
@@ -60,6 +62,14 @@ npm test
 Signed-in AI generation is capped per UTC day by `AI_DAILY_LIMIT_PER_USER` (default 20) and `AI_DAILY_LIMIT_GLOBAL` (default 200). Over the cap, the route returns 429 with `ai_daily_limit`.
 
 `POST /api/generate` remains the template matcher even when a key is set.
+
+### Freeform sandbox
+
+`POST /api/ai/generate` accepts `tier`: `auto` (default), `spec`, or `freeform`. Auto keeps tap, dodge, reaction, guess, and the arcade primitives on GameSpec. Other ideas return `{ tier: "freeform", html }` and `spec: null`. The model must return one HTML document with a canvas, inline CSS and JavaScript, and no network. Static checks reject external URLs, `fetch`, XHR, WebSocket, `eval`, the Function constructor, and `document.cookie` / `localStorage`. A rejection is shown to the model once. The document is never executed on the server.
+
+Freeform HTML is stored on the game and served only by the usercontent listener (`GET /g/:slug` and short-lived `GET /preview/:token`). Its CSP is `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'`, with `frame-ancestors` for the app origin, x.com, and twitter.com. Scores come back only as `postMessage` `{ type: "playground-score", points }`. The parent accepts that shape from the iframe, and only when `event.origin` is `"null"`.
+
+Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production refuses to boot without it. `/play/:slug?embed=1` and `/r/:slug` use the same 480×480 player for freeform games.
 
 Rosebud has no generation API and its terms prohibit automated use, so there is no Rosebud adapter.
 

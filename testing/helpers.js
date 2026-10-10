@@ -5,6 +5,7 @@ import { loadConfig } from '../src/config.js'
 import { openDatabase } from '../src/db.js'
 import { migrate } from '../src/migrate.js'
 import { seedIfEmpty } from '../src/seed.js'
+import { createUsercontentApp } from '../src/usercontent.js'
 
 export function testConfig(overrides = {}) {
   return loadConfig({
@@ -28,14 +29,25 @@ export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
   if (seed) await seedIfEmpty(db)
   const app = createApp({ db, config, fetchImpl })
   const server = http.createServer(app)
+  const usercontent = http.createServer(createUsercontentApp({ db, config }))
+  const serverListening = once(server, 'listening')
+  const userListening = once(usercontent, 'listening')
   server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
+  usercontent.listen(0, '127.0.0.1')
+  await serverListening
+  await userListening
   const { port } = server.address()
+  const ucPort = usercontent.address().port
+  const base = `http://127.0.0.1:${port}`
+  config.usercontentOrigin = `http://127.0.0.1:${ucPort}`
+  config.mainOrigins = [base, config.publicBaseUrl].filter(Boolean)
   return {
     db,
     config,
-    base: `http://127.0.0.1:${port}`,
+    base,
+    usercontentBase: config.usercontentOrigin,
     async close() {
+      await new Promise((resolve, reject) => usercontent.close((err) => err ? reject(err) : resolve()))
       await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()))
       await db.close()
     }

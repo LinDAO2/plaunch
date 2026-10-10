@@ -1,11 +1,14 @@
 import { api, ensureCsrf } from '/client-api.js'
 import { controlHint, createRuntime, typeNames } from '/mechanics.js'
+import { readSandboxScore } from '/sandbox-score.js'
 
 const $ = (id) => document.getElementById(id)
 const slug = (location.pathname.match(/^\/play\/([a-z0-9-]+)$/) || [])[1]
 const embed = new URLSearchParams(location.search).get('embed') === '1'
 let current = null
 let roundToken = null
+let freeformFrame = null
+let freeformPoints = null
 let board = { scores: [], unverified: [] }
 let boardTab = 'checked'
 
@@ -83,8 +86,54 @@ async function loadScores(prefer) {
 $('tab-checked').addEventListener('click', () => { boardTab = 'checked'; paintBoard() })
 $('tab-unverified').addEventListener('click', () => { boardTab = 'unverified'; paintBoard() })
 
+function beginRound() {
+  if (!current) return
+  roundToken = null
+  api(`/games/${current.id}/events`, 'POST', { type: 'play_started', eventId: crypto.randomUUID() })
+    .then((result) => { roundToken = result.roundToken || null })
+    .catch(() => {})
+}
+
+function mountFreeform(src) {
+  const field = $('field')
+  field.classList.add('freeform-on')
+  field.replaceChildren()
+  const frame = document.createElement('iframe')
+  frame.className = 'freeform-frame'
+  frame.setAttribute('sandbox', 'allow-scripts')
+  frame.referrerPolicy = 'no-referrer'
+  frame.title = current?.name || 'Game'
+  frame.dataset.src = src
+  freeformFrame = frame
+  field.append(frame)
+  $('display').hidden = true
+  $('game-label').hidden = true
+}
+
+$('play').addEventListener('click', (event) => {
+  if (current?.tier !== 'freeform' || !freeformFrame?.dataset.src) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  if (!freeformFrame.getAttribute('src')) freeformFrame.src = freeformFrame.dataset.src
+  $('play').hidden = true
+  $('display').hidden = true
+  $('game-label').hidden = true
+  if (freeformPoints === null) freeformPoints = 0
+  $('score').textContent = `Score: ${freeformPoints}`
+  $('submit-score').disabled = false
+  beginRound()
+}, true)
+
+window.addEventListener('message', (event) => {
+  const points = readSandboxScore(event, freeformFrame)
+  if (points === null) return
+  freeformPoints = points
+  $('score').textContent = `Score: ${points}`
+  $('submit-score').disabled = false
+})
+
 $('submit-score').addEventListener('click', async () => {
-  const points = runtime.getLastScore()
+  const points = current?.tier === 'freeform' ? freeformPoints : runtime.getLastScore()
   if (!current || points === null) return
   try {
     const body = {
@@ -140,6 +189,7 @@ async function boot() {
     $('controls-hint').textContent = controlHint(game)
     $('studio-link').href = `/g/${game.id}`
     runtime.setGame(game)
+    if (game.tier === 'freeform' && game.sandboxUrl) mountFreeform(game.sandboxUrl)
     await loadScores()
     api(`/games/${game.id}/events`, 'POST', { type: 'game_viewed', eventId: crypto.randomUUID() }).catch(() => {})
   } catch (error) {

@@ -16,12 +16,14 @@ export function loadConfig(env = process.env) {
   const databaseFromEnv = typeof env.DATABASE_URL === 'string' ? env.DATABASE_URL : ''
   const warnings = []
 
+  const usercontentOrigin = cleanOrigin(env.USERCONTENT_ORIGIN)
   if (nodeEnv === 'production') {
     if (!sessionFromEnv) throw new Error('SESSION_SECRET is required in production')
     if (!databaseFromEnv) throw new Error('DATABASE_URL is required in production')
     if (databaseFromEnv.startsWith('pglite')) {
       throw new Error('Production DATABASE_URL must be a postgres:// or postgresql:// connection string')
     }
+    if (!usercontentOrigin) throw new Error('USERCONTENT_ORIGIN is required in production')
   }
 
   let databaseUrl = databaseFromEnv
@@ -38,6 +40,11 @@ export function loadConfig(env = process.env) {
     if (nodeEnv !== 'test') {
       warnings.push('SESSION_SECRET is not set. Using a development-only secret.')
     }
+  }
+
+  const sandboxOrigin = usercontentOrigin || `http://127.0.0.1:${intEnv(env.USERCONTENT_PORT, 43921)}`
+  if (!usercontentOrigin && nodeEnv === 'development') {
+    warnings.push(`USERCONTENT_ORIGIN is not set. Freeform games are served at ${sandboxOrigin}.`)
   }
 
   const seedDefault = nodeEnv === 'development'
@@ -63,8 +70,20 @@ export function loadConfig(env = process.env) {
     passwordScryptN: intEnv(env.PASSWORD_SCRYPT_N, 16384),
     publicBaseUrl: cleanOrigin(env.PUBLIC_BASE_URL),
     xSiteHandle: cleanHandle(env.X_SITE_HANDLE),
+    usercontentOrigin: sandboxOrigin,
+    usercontentPort: intEnv(env.USERCONTENT_PORT, portOf(sandboxOrigin, 43921)),
+    mainOrigins: [],
     warnings,
     env
+  }
+}
+
+function portOf(origin, fallback) {
+  try {
+    const port = new URL(origin).port
+    return port ? Number(port) : fallback
+  } catch {
+    return fallback
   }
 }
 

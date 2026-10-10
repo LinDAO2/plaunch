@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { aiStatus, generateGame } from './ai/generate.js'
+import { aiStatus } from './ai/generate.js'
+import { assertFreeform } from './ai/freeform-check.js'
 import { validateGameSpec } from './ai/gamespec.js'
+import { generateIdea } from './ai/idea.js'
 import { HttpError } from './errors.js'
 import { renderPlayPage, renderSharePage } from './html.js'
 import { posterPng } from './poster.js'
@@ -31,6 +33,7 @@ import {
   listScores,
   publicGame,
   recordEvent,
+  savePreview,
   specForSave,
   submitScore,
   updateGame
@@ -59,7 +62,8 @@ const FILES = new Map([
   ['/play.css', 'play.css'],
   ['/arcade-sim.js', 'arcade-sim.js'],
   ['/arcade-view.js', 'arcade-view.js'],
-  ['/dashboard.js', 'dashboard.js']
+  ['/dashboard.js', 'dashboard.js'],
+  ['/sandbox-score.js', 'sandbox-score.js']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -89,6 +93,36 @@ function requireUser(user) {
 
 function generationOf(value, fallback = 'manual') {
   return GENERATIONS.has(value) ? value : fallback
+}
+
+const HTML_LIMIT = 256_000
+
+function present(config, game, options = {}) {
+  const out = publicGame(game, options)
+  out.tier = game.tier === 'freeform' ? 'freeform' : 'spec'
+  if (out.tier === 'freeform') {
+    out.sandboxUrl = `${config.usercontentOrigin}/g/${game.id}`
+    if (options.canEdit) out.html = game.freeformHtml || ''
+  }
+  return out
+}
+
+function fieldsForSave(body, previous) {
+  if (body.tier === 'freeform') {
+    const html = typeof body.html === 'string' ? body.html : (previous?.freeformHtml || '')
+    const checked = assertFreeform(html)
+    if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
+    const fields = validateGameInput({ ...body, type: 'arcade' })
+    fields.generation = generationOf(body.generation, previous?.generation || 'manual')
+    fields.tier = 'freeform'
+    fields.freeformHtml = checked.html
+    return { fields, spec: null }
+  }
+  const fields = validateGameInput(body)
+  fields.generation = generationOf(body.generation, previous?.generation || 'manual')
+  fields.tier = 'spec'
+  fields.freeformHtml = null
+  return { fields, spec: savedSpec(fields, body, previous) }
 }
 
 function savedSpec(fields, body, previous) {
@@ -254,15 +288,27 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const body = await readJson(req)
     const user = aiStatus(config.env).mode === 'ai' ? requireUser(await currentUser(req, db)) : null
     if (user) await consumeAiCredit(db, user.id, config.aiDailyUser, config.aiDailyGlobal)
-    const result = await generateGame({ prompt: body.prompt, env: config.env, fetchImpl })
+    const result = await generateIdea({ prompt: body.prompt, tier: body.tier, env: config.env, fetchImpl })
     return sendJson(res, 200, {
       mode: result.mode,
       provider: result.provider,
       model: result.model,
       game: result.game,
       spec: result.spec,
-      notice: result.notice
+      notice: result.notice,
+      tier: result.tier,
+      html: result.html || null,
+      tierReason: result.tierReason || ''
     }, ctx)
+  }
+
+  if (method === 'POST' && pathname === '/api/freeform/preview') {
+    const body = await readJson(req, HTML_LIMIT)
+    const checked = assertFreeform(body.html)
+    if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
+    const user = await currentUser(req, db)
+    const token = await savePreview(db, checked.html, user?.id || null)
+    return sendJson(res, 200, { token, url: `${config.usercontentOrigin}/preview/${token}` }, ctx)
   }
 
   if (method === 'POST' && pathname === '/api/generate') {
@@ -273,13 +319,13 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
 
   if (method === 'GET' && pathname === '/api/games') {
     const games = await listPublishedGames(db)
-    return sendJson(res, 200, { games: games.map((game) => publicGame(game, { includeSpec: false })) }, ctx)
+    return sendJson(res, 200, { games: games.map((game) => present(config, game, { includeSpec: false })) }, ctx)
   }
 
   if (method === 'GET' && pathname === '/api/me/games') {
     const user = requireUser(await currentUser(req, db))
     const games = await listOwnedGames(db, user.id)
-    return sendJson(res, 200, { games: games.map((game) => publicGame(game, { canEdit: true, includeSpec: false })) }, ctx)
+    return sendJson(res, 200, { games: games.map((game) => present(config, game, { canEdit: true, includeSpec: false })) }, ctx)
   }
 
   if (method === 'GET' && pathname === '/api/me/dashboard') {
@@ -290,13 +336,11 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
 
   if (method === 'POST' && pathname === '/api/games') {
     const user = requireUser(await currentUser(req, db))
-    const body = await readJson(req)
-    const fields = validateGameInput(body)
-    fields.generation = generationOf(body.generation)
-    const spec = savedSpec(fields, body, null)
+    const body = await readJson(req, HTML_LIMIT)
+    const { fields, spec } = fieldsForSave(body, null)
     const { game, version } = await createGame(db, fields, spec, user.id)
     const assets = await listAssets(db, game.id)
-    return sendJson(res, 201, { game: publicGame(game, { canEdit: true, assets }), url: `/g/${game.id}`, version }, ctx)
+    return sendJson(res, 201, { game: present(config, game, { canEdit: true, assets }), url: `/g/${game.id}`, version }, ctx)
   }
 
   if (method === 'POST' && pathname === '/api/abuse-reports') {
@@ -319,26 +363,24 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
       const owner = user?.id === game.ownerId
       if (game.status !== 'published' && !owner) throw new HttpError(404, 'Game not found', 'not_found')
       const assets = await listAssets(db, id)
-      return sendJson(res, 200, { game: publicGame(game, { canEdit: owner, assets }) }, ctx)
+      return sendJson(res, 200, { game: present(config, game, { canEdit: owner, assets }) }, ctx)
     }
 
     if (method === 'PATCH' && !sub) {
       const user = requireUser(await currentUser(req, db))
       const existing = await getGameRow(db, id)
       if (!existing) throw new HttpError(404, 'Game not found', 'not_found')
-      const body = await readJson(req)
-      const fields = validateGameInput(body)
-      fields.generation = generationOf(body.generation, existing.generation)
-      const spec = savedSpec(fields, body, existing)
+      const body = await readJson(req, HTML_LIMIT)
+      const { fields, spec } = fieldsForSave(body, existing)
       const { game, version } = await updateGame(db, id, fields, spec, user.id)
       const assets = await listAssets(db, id)
-      return sendJson(res, 200, { game: publicGame(game, { canEdit: true, assets }), version }, ctx)
+      return sendJson(res, 200, { game: present(config, game, { canEdit: true, assets }), version }, ctx)
     }
 
     if (method === 'POST' && sub === 'archive') {
       const user = requireUser(await currentUser(req, db))
       const { game } = await archiveGame(db, id, user.id)
-      return sendJson(res, 200, { game: publicGame(game, { canEdit: true }) }, ctx)
+      return sendJson(res, 200, { game: present(config, game, { canEdit: true }) }, ctx)
     }
 
     if (method === 'POST' && (sub === 'play' || sub === 'events')) {

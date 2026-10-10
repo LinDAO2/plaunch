@@ -5,7 +5,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { EXAMPLE_GAMES } from '../src/arcade/examples.js'
+import { classifyTier, normalizeTier } from '../src/ai/classify.js'
+import { generateFreeform, templateFreeform } from '../src/ai/freeform.js'
+import { inspectFreeform } from '../src/ai/freeform-check.js'
 import { generateGame, parseModelJson, SYSTEM_PROMPT } from '../src/ai/generate.js'
+import { sandboxCsp } from '../src/usercontent.js'
 import { geminiResponseSchema, validateGameSpec } from '../src/ai/gamespec.js'
 import { createSimulation } from '../public/arcade-sim.js'
 import { checkPlausible, plausibilityFor } from '../src/plausibility.js'
@@ -60,11 +64,18 @@ test('config refuses a production boot without Postgres and a session secret', (
     SESSION_SECRET: 'prod-secret',
     DATABASE_URL: 'pglite:memory'
   }), /postgres/)
-  const prod = loadConfig({
+  assert.throws(() => loadConfig({
     NODE_ENV: 'production',
     SESSION_SECRET: 'prod-secret',
     DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground'
+  }), /USERCONTENT_ORIGIN/)
+  const prod = loadConfig({
+    NODE_ENV: 'production',
+    SESSION_SECRET: 'prod-secret',
+    DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground',
+    USERCONTENT_ORIGIN: 'https://usercontent.example'
   })
+  assert.equal(prod.usercontentOrigin, 'https://usercontent.example')
   assert.equal(prod.cookieSecure, true)
   assert.equal(prod.seedOnEmpty, false)
   assert.equal(databaseKind(prod.databaseUrl), 'postgres')
@@ -517,4 +528,75 @@ test('arcade primitives change how a round plays', () => {
   const stepped = createSimulation(mazeSpec, 5)
   const moved = stepped.tick(200, { right: true })
   assert.ok(moved.playerX > origin.playerX + 10)
+})
+
+test('freeform checker accepts the template and rejects network and storage access', () => {
+  assert.deepEqual(inspectFreeform(templateFreeform('a chess board')), [])
+  const hostile = '<html><head></head><body><canvas></canvas><script src="https://cdn.example/app.js"></script><script>fetch("https://example.com"); new Function("return 1"); document.cookie; localStorage.getItem("x");</script>playground-score</body></html>'
+  const errors = inspectFreeform(hostile)
+  assert.ok(errors.some((error) => /script/i.test(error)))
+  assert.ok(errors.some((error) => /URL/i.test(error)))
+  assert.ok(errors.some((error) => /fetch/i.test(error)))
+  assert.ok(errors.some((error) => /Function/i.test(error)))
+  assert.ok(errors.some((error) => /cookie/i.test(error)))
+  assert.ok(errors.some((error) => /localStorage/i.test(error)))
+})
+
+test('tier classification keeps arcade ideas on the spec and sends the rest to freeform', () => {
+  assert.equal(classifyTier('a chess game'), 'freeform')
+  assert.equal(classifyTier('tetris'), 'freeform')
+  assert.equal(classifyTier('a platformer with keys and coins'), 'freeform')
+  assert.equal(classifyTier('dodge the meteors'), 'spec')
+  assert.equal(classifyTier('cute cat tap challenge'), 'spec')
+  assert.equal(classifyTier('guess the mystery number'), 'spec')
+  assert.equal(normalizeTier('nope', 'chess'), null)
+  assert.equal(normalizeTier('freeform', 'dodge meteors'), 'freeform')
+  assert.equal(normalizeTier('auto', 'dodge meteors'), 'spec')
+})
+
+test('sandbox CSP allows only inline code and frames the parent plus X', () => {
+  const csp = sandboxCsp({ mainOrigins: ['http://127.0.0.1:9'], publicBaseUrl: 'https://play.example' })
+  assert.equal(csp.startsWith("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; frame-ancestors "), true)
+  assert.match(csp, /http:\/\/127\.0\.0\.1:9/)
+  assert.match(csp, /https:\/\/play\.example/)
+  assert.match(csp, /https:\/\/x\.com/)
+  assert.match(csp, /https:\/\/\*\.x\.com/)
+  assert.match(csp, /https:\/\/twitter\.com/)
+  assert.match(csp, /https:\/\/\*\.twitter\.com/)
+})
+
+test('freeform generation retries once with the checker errors, then accepts', async () => {
+  let calls = 0
+  const good = templateFreeform('a chess match')
+  const fetchImpl = async () => {
+    calls += 1
+    const html = calls === 1
+      ? '<html><body><canvas></canvas><script>fetch("https://example.com/x")</script></body></html>'
+      : good
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ html }) }] } }] }), { status: 200 })
+  }
+  const result = await generateFreeform({
+    prompt: 'a chess match please',
+    env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    fetchImpl
+  })
+  assert.equal(calls, 2)
+  assert.equal(result.tier, 'freeform')
+  assert.equal(result.spec, null)
+  assert.match(result.html, /<canvas/i)
+})
+
+test('freeform generation stops after one failed retry', async () => {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    const html = '<html><body><canvas></canvas><script>eval("1")</script></body></html>'
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ html }) }] } }] }), { status: 200 })
+  }
+  await assert.rejects(() => generateFreeform({
+    prompt: 'a chess match please',
+    env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    fetchImpl
+  }), /Freeform game was rejected/)
+  assert.equal(calls, 2)
 })

@@ -1,5 +1,6 @@
 import { api, ensureCsrf, setCsrf } from '/client-api.js'
 import { controlHint, createRuntime, typeNames } from '/mechanics.js'
+import { readSandboxScore } from '/sandbox-score.js'
 
 const $ = (id) => document.getElementById(id)
 let me = null
@@ -10,6 +11,11 @@ let boardTab = 'checked'
 let opened = null
 let games = []
 let lastSpec = null
+let lastTier = 'spec'
+let lastHtml = null
+let previewUrl = ''
+let freeformFrame = null
+let freeformPoints = null
 let lastGeneration = 'manual'
 let authMode = 'login'
 
@@ -92,14 +98,71 @@ function syncSpec(spec, game) {
 
 function payload() {
   const game = editor()
+  if (lastTier === 'freeform' && lastHtml) {
+    return {
+      name: game.name,
+      description: game.description,
+      type: 'arcade',
+      duration: game.duration,
+      accent: game.accent,
+      tokenInterest: game.tokenInterest,
+      generation: lastGeneration || 'rule-based-template',
+      tier: 'freeform',
+      html: lastHtml
+    }
+  }
   const spec = syncSpec(lastSpec, game)
-  const body = { ...game, generation: lastGeneration || 'manual' }
+  const body = { ...game, generation: lastGeneration || 'manual', tier: 'spec' }
   if (spec) body.spec = spec
   return body
 }
 
+function showSandbox(url) {
+  const field = $('field')
+  field.classList.add('freeform-on')
+  let frame = field.querySelector('iframe.freeform-frame')
+  if (!frame) {
+    field.replaceChildren()
+    frame = document.createElement('iframe')
+    frame.className = 'freeform-frame'
+    frame.setAttribute('sandbox', 'allow-scripts')
+    frame.referrerPolicy = 'no-referrer'
+    frame.title = 'Freeform game'
+    field.append(frame)
+  }
+  if (frame.getAttribute('src') !== url) frame.src = url
+  freeformFrame = frame
+  $('display').hidden = true
+  $('game-label').hidden = true
+  $('play').hidden = true
+  $('mechanic').textContent = 'FREEFORM'
+  $('controls-hint').textContent = controlHint({ tier: 'freeform' })
+}
+
 function preview() {
   const game = editor()
+  if (lastTier === 'freeform' && previewUrl) {
+    current = null
+    $('preview-name').textContent = game.name || 'Untitled Game'
+    $('preview-description').textContent = game.description
+    $('mechanic').textContent = 'FREEFORM'
+    $('controls-hint').textContent = controlHint({ tier: 'freeform' })
+    board = { scores: [], unverified: [] }
+    boardTab = 'checked'
+    $('leaders').textContent = 'Publish or open a game to see scores.'
+    $('leaderboard-scope').textContent = 'Preview mode'
+    $('tab-checked')?.classList.add('on')
+    $('tab-unverified')?.classList.remove('on')
+    $('submit-score').disabled = true
+    const share = $('share-x')
+    if (share) share.hidden = true
+    showSandbox(previewUrl)
+    return
+  }
+  $('field').classList.remove('freeform-on')
+  $('display').hidden = false
+  $('game-label').hidden = false
+  freeformFrame = null
   runtime.setGame({ ...game, spec: lastSpec })
   current = null
   $('preview-name').textContent = game.name || 'Untitled Game'
@@ -124,7 +187,7 @@ function fill(game) {
   ensureDuration(game.duration)
   $('accent').value = game.accent
   $('token').checked = !!game.tokenInterest
-  lastSpec = game.spec || lastSpec
+  if (game.spec !== undefined) lastSpec = game.spec
   preview()
 }
 
@@ -178,6 +241,10 @@ $('tab-unverified').addEventListener('click', () => { boardTab = 'unverified'; p
 async function showGame(summary) {
   const { game } = await api(`/games/${summary.id}`)
   opened = game
+  lastTier = game.tier === 'freeform' ? 'freeform' : 'spec'
+  lastHtml = game.html || null
+  previewUrl = game.sandboxUrl || ''
+  freeformPoints = null
   lastSpec = game.spec || null
   lastGeneration = game.generation || 'manual'
   fill(game)
@@ -353,8 +420,18 @@ for (const id of ['name', 'description', 'type', 'duration', 'accent', 'token'])
 $('generate').addEventListener('click', async () => {
   try {
     $('generate').disabled = true
-    const result = await api('/ai/generate', 'POST', { prompt: $('prompt').value })
+    const result = await api('/ai/generate', 'POST', { prompt: $('prompt').value, tier: $('tier').value })
+    lastTier = result.tier === 'freeform' ? 'freeform' : 'spec'
+    lastHtml = result.html || null
     lastSpec = result.spec || null
+    previewUrl = ''
+    freeformPoints = null
+    if (lastTier === 'freeform') {
+      const previewed = await api('/freeform/preview', 'POST', { html: result.html })
+      previewUrl = previewed.url
+      result.game.type = 'arcade'
+    }
+    $('tier-note').textContent = result.tierReason || ''
     lastGeneration = result.game?.generation || 'manual'
     opened = null
     fill({ ...result.game, spec: result.spec, tokenInterest: false })
@@ -434,6 +511,11 @@ $('new-game').addEventListener('click', () => {
   opened = null
   current = null
   lastSpec = null
+  lastTier = 'spec'
+  lastHtml = null
+  previewUrl = ''
+  freeformFrame = null
+  freeformPoints = null
   lastGeneration = 'manual'
   history.pushState({}, '', '/')
   preview()
@@ -441,8 +523,31 @@ $('new-game').addEventListener('click', () => {
   setStatus('')
 })
 
+$('play').addEventListener('click', (event) => {
+  if (lastTier !== 'freeform') return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+}, true)
+
+window.addEventListener('message', (event) => {
+  const points = readSandboxScore(event, freeformFrame)
+  if (points === null) return
+  freeformPoints = points
+  $('score').textContent = `Score: ${points}`
+  $('submit-score').disabled = !current
+})
+
+$('tier').addEventListener('change', () => {
+  const choice = $('tier').value
+  $('tier-note').textContent = choice === 'freeform'
+    ? 'The next generation will be a sandboxed HTML game.'
+    : choice === 'spec'
+      ? 'The next generation will be an arcade spec.'
+      : 'Auto uses an arcade spec when the idea fits, and a sandbox game otherwise.'
+})
+
 $('submit-score').addEventListener('click', async () => {
-  const points = runtime.getLastScore()
+  const points = lastTier === 'freeform' ? freeformPoints : runtime.getLastScore()
   if (!current || points === null) return
   try {
     const body = {
