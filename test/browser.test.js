@@ -76,3 +76,39 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await server.close()
   }
 })
+
+test('freeform games on /play receive pointer and keyboard input and fit the frame', { timeout: 120000 }, async () => {
+  const { chromium } = await import('playwright')
+  const { createClient } = await import('../testing/helpers.js')
+  const server = await startServer()
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+  try {
+    const client = createClient(server.base)
+    await client.prime()
+    const reg = await client.request('POST', '/api/auth/register', { email: `ff-${Date.now()}@example.com`, password: 'test-password-123', displayName: 'Ff' })
+    assert.equal(reg.status, 201)
+    // An 800x600 canvas, like live Gemini output, that scores on pointer and key input.
+    const html = '<!DOCTYPE html><html><head><style>body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}</style></head><body><canvas id="c" width="800" height="600"></canvas><script>let s=0;const send=()=>parent.postMessage({type:"playground-score",points:s},"*");const c=document.getElementById("c");c.addEventListener("pointerdown",()=>{s+=1;send()});addEventListener("keydown",()=>{s+=100;send()});</script></body></html>'
+    const published = await client.request('POST', '/api/games', { name: 'Input Probe', description: 'probe', type: 'arcade', duration: 30, accent: '#7c6bf2', tier: 'freeform', generation: 'manual', html })
+    assert.equal(published.status, 201)
+    const page = await browser.newPage({ viewport: { width: 1100, height: 1000 } })
+    await page.goto(`${server.base}/play/${published.data.game.id}`, { waitUntil: 'networkidle' })
+    await page.click('#play')
+    await page.waitForFunction(() => /scale\(/.test(document.querySelector('iframe.freeform-frame')?.style.transform || ''))
+    const hit = await page.evaluate(() => {
+      const r = document.querySelector('iframe.freeform-frame').getBoundingClientRect()
+      return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.tagName
+    })
+    assert.equal(hit, 'IFRAME')
+    await page.keyboard.press('KeyA')
+    await page.waitForFunction(() => document.querySelector('#score')?.textContent === 'Score: 100')
+    const box = await (await page.$('iframe.freeform-frame')).boundingBox()
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await page.waitForFunction(() => document.querySelector('#score')?.textContent === 'Score: 101')
+    const top = await fetch(`${server.usercontentBase}/g/${published.data.game.id}`, { headers: { 'sec-fetch-dest': 'document' } })
+    assert.equal(top.status, 403)
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+})

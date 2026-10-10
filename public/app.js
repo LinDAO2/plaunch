@@ -1,6 +1,6 @@
 import { api, ensureCsrf, setCsrf } from '/client-api.js'
 import { controlHint, createRuntime, typeNames } from '/mechanics.js'
-import { readSandboxScore } from '/sandbox-score.js'
+import { fitSandboxFrame, readSandboxScore, readSandboxSize } from '/sandbox-score.js'
 
 const $ = (id) => document.getElementById(id)
 let me = null
@@ -16,6 +16,7 @@ let lastHtml = null
 let previewUrl = ''
 let freeformFrame = null
 let freeformPoints = null
+let freeformBest = 0
 let lastGeneration = 'manual'
 let authMode = 'login'
 
@@ -132,16 +133,19 @@ function showSandbox(url) {
   }
   if (frame.getAttribute('src') !== url) frame.src = url
   freeformFrame = frame
+  $('game').classList.add('freeform-on')
   $('display').hidden = true
   $('game-label').hidden = true
+  $('timer').hidden = true
   $('play').hidden = true
+  $('score').textContent = `Score: ${freeformBest}`
   $('mechanic').textContent = 'FREEFORM'
   $('controls-hint').textContent = controlHint({ tier: 'freeform' })
 }
 
 function preview() {
   const game = editor()
-  if (lastTier === 'freeform' && previewUrl) {
+  if (lastTier === 'freeform') {
     current = null
     $('preview-name').textContent = game.name || 'Untitled Game'
     $('preview-description').textContent = game.description
@@ -156,13 +160,28 @@ function preview() {
     $('submit-score').disabled = true
     const share = $('share-x')
     if (share) share.hidden = true
-    showSandbox(previewUrl)
+    if (previewUrl) {
+      showSandbox(previewUrl)
+      return
+    }
+    $('game').classList.add('freeform-on')
+    $('field').classList.add('freeform-on')
+    $('field').replaceChildren()
+    $('display').hidden = true
+    $('game-label').hidden = true
+    $('timer').hidden = true
+    $('play').hidden = true
+    $('score').textContent = `Score: ${freeformBest}`
+    freeformFrame = null
     return
   }
   $('field').classList.remove('freeform-on')
+  $('game').classList.remove('freeform-on')
   $('display').hidden = false
   $('game-label').hidden = false
+  $('timer').hidden = false
   freeformFrame = null
+  freeformBest = 0
   runtime.setGame({ ...game, spec: lastSpec })
   current = null
   $('preview-name').textContent = game.name || 'Untitled Game'
@@ -404,6 +423,11 @@ $('auth-form').addEventListener('submit', async (event) => {
     $('auth-dialog').hidden = true
     $('auth-password').value = ''
     await refreshAccount()
+    if (lastTier === 'freeform' && lastHtml && !previewUrl) {
+      const previewed = await api('/freeform/preview', 'POST', { html: lastHtml })
+      previewUrl = previewed.url
+      preview()
+    }
     toast(authMode === 'register' ? 'Account created' : 'Signed in')
   } catch (error) {
     $('auth-error').textContent = error.message
@@ -426,17 +450,24 @@ $('generate').addEventListener('click', async () => {
     lastSpec = result.spec || null
     previewUrl = ''
     freeformPoints = null
+    let previewNote = ''
     if (lastTier === 'freeform') {
-      const previewed = await api('/freeform/preview', 'POST', { html: result.html })
-      previewUrl = previewed.url
       result.game.type = 'arcade'
+      try {
+        const previewed = await api('/freeform/preview', 'POST', { html: result.html })
+        previewUrl = previewed.url
+      } catch (error) {
+        if (error.status !== 401) throw error
+        previewNote = 'Sign in to preview this sandbox game.'
+        openAuth('login')
+      }
     }
     $('tier-note').textContent = result.tierReason || ''
     lastGeneration = result.game?.generation || 'manual'
     opened = null
     fill({ ...result.game, spec: result.spec, tokenInterest: false })
     $('gen-mode').textContent = result.notice
-    toast(result.notice)
+    toast(previewNote || result.notice)
     refreshOwnerButtons()
   } catch (error) {
     if (error.status === 401) openAuth('login')
@@ -530,10 +561,16 @@ $('play').addEventListener('click', (event) => {
 }, true)
 
 window.addEventListener('message', (event) => {
+  const size = readSandboxSize(event, freeformFrame)
+  if (size) {
+    fitSandboxFrame(freeformFrame, size)
+    return
+  }
   const points = readSandboxScore(event, freeformFrame)
   if (points === null) return
-  freeformPoints = points
-  $('score').textContent = `Score: ${points}`
+  freeformBest = Math.max(freeformBest, points)
+  freeformPoints = freeformBest
+  $('score').textContent = `Score: ${freeformBest}`
   $('submit-score').disabled = !current
 })
 

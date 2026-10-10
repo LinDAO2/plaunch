@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.6.0')
+    assert.equal(res.data.version, '0.7.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -464,6 +464,11 @@ describe('http api', { concurrency: false }, () => {
     assert.equal(rejected.status, 400)
     assert.match(rejected.data.error, /fetch|External URL/)
 
+    const anon = createClient(server.base)
+    await anon.prime()
+    const denied = await anon.request('POST', '/api/freeform/preview', { html: generated.data.html })
+    assert.equal(denied.status, 401)
+
     const preview = await client.request('POST', '/api/freeform/preview', { html: generated.data.html })
     assert.equal(preview.status, 200)
     const previewDoc = await fetch(preview.data.url)
@@ -641,6 +646,31 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       assert.equal(globalCalls, 1)
     } finally {
       await globalServer.close()
+    }
+  })
+
+  test('freeform preview requires a signed-in creator and shares the AI rate limit', async () => {
+    // The anonymous 401 still counts toward the per-IP AI bucket.
+    const limited = await startServer({ env: { AI_RATE_LIMIT_MAX: '3' }, seed: false })
+    try {
+      const html = '<!DOCTYPE html><html><body><canvas id="c"></canvas><script>parent.postMessage({type:"playground-score",points:1},"*")</script></body></html>'
+      const anon = createClient(limited.base)
+      await anon.prime()
+      assert.equal((await anon.request('POST', '/api/freeform/preview', { html })).status, 401)
+      const user = createClient(limited.base)
+      await user.prime()
+      assert.equal((await user.request('POST', '/api/auth/register', {
+        email: 'preview@example.com',
+        password: 'test-password-123',
+        displayName: 'Preview'
+      })).status, 201)
+      assert.equal((await user.request('POST', '/api/freeform/preview', { html })).status, 200)
+      assert.equal((await user.request('POST', '/api/freeform/preview', { html })).status, 200)
+      const blocked = await user.request('POST', '/api/freeform/preview', { html })
+      assert.equal(blocked.status, 429)
+      assert.equal(blocked.data.code, 'rate_limited')
+    } finally {
+      await limited.close()
     }
   })
 

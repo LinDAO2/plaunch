@@ -1,0 +1,7 @@
+{$APP_DOMAIN} {
+	reverse_proxy app:3000
+}
+
+{$USERCONTENT_DOMAIN} {
+	reverse_proxy app:43921
+}

@@ -5,8 +5,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { EXAMPLE_GAMES } from '../src/arcade/examples.js'
-import { classifyTier, normalizeTier } from '../src/ai/classify.js'
-import { generateFreeform, templateFreeform } from '../src/ai/freeform.js'
+import { classifyTier, heuristicTier, normalizeTier } from '../src/ai/classify.js'
+import { generateIdea } from '../src/ai/idea.js'
+import { FREEFORM_PROMPT, generateFreeform, templateFreeform } from '../src/ai/freeform.js'
 import { inspectFreeform } from '../src/ai/freeform-check.js'
 import { generateGame, parseModelJson, SYSTEM_PROMPT } from '../src/ai/generate.js'
 import { sandboxCsp } from '../src/usercontent.js'
@@ -405,8 +406,24 @@ test('palette salvages exact hex colors that Gemini merged into one string', () 
   }
   assert.deepEqual(validateGameSpec(spec).palette, ['#0b0d1b', '#1e1b4b', '#f97316', '#38bdf8'])
   assert.deepEqual(validateGameSpec({ ...spec, palette: ["#0b0d1b'", ' #1e1b4b'] }).palette, ['#0b0d1b', '#1e1b4b'])
-  assert.throws(() => validateGameSpec({ ...spec, palette: ['red'] }), /palette\[0\]/)
-  assert.throws(() => validateGameSpec({ ...spec, palette: ['#12345'] }), /palette\[0\]/)
+  // Live gemini-3.5-flash output: bare hex and trailing names. The palette is cosmetic, so no retry.
+  assert.deepEqual(validateGameSpec({ ...spec, palette: ['#06b6d4 Rhine Cyan', '06b6d4', '111827', '67e8f9'] }).palette, ['#06b6d4', '#111827', '#67e8f9'])
+  assert.deepEqual(validateGameSpec({ ...spec, palette: ['red'] }).palette, ['#f97316'])
+  assert.deepEqual(validateGameSpec({ ...spec, palette: ['#12345', 42] }).palette, ['#f97316'])
+  assert.throws(() => validateGameSpec({ ...spec, palette: [] }), /palette/)
+})
+
+test('a Gemini 503 is retried once after a delay, not three times', async () => {
+  const { generateGame } = await import('../src/ai/generate.js')
+  process.env.AI_RETRY_DELAY_MS = '1'
+  let calls = 0
+  const fetchImpl = async () => { calls++; return new Response('{"error":{"code":503,"status":"UNAVAILABLE"}}', { status: 503 }) }
+  await assert.rejects(
+    generateGame({ prompt: 'dodge falling meteors', env: { GEMINI_API_KEY: 'g' }, fetchImpl }),
+    (err) => err.code === 'ai_provider_busy' && /overloaded/.test(err.message)
+  )
+  delete process.env.AI_RETRY_DELAY_MS
+  assert.equal(calls, 2)
 })
 
 test('Gemini 429 quota errors are not retried', async () => {
@@ -549,6 +566,9 @@ test('tier classification keeps arcade ideas on the spec and sends the rest to f
   assert.equal(classifyTier('dodge the meteors'), 'spec')
   assert.equal(classifyTier('cute cat tap challenge'), 'spec')
   assert.equal(classifyTier('guess the mystery number'), 'spec')
+  assert.equal(classifyTier('endless runner where you jump over cacti'), 'freeform')
+  assert.equal(heuristicTier('a quiet night picnic'), 'uncertain')
+  assert.equal(classifyTier('a quiet night picnic'), 'freeform')
   assert.equal(normalizeTier('nope', 'chess'), null)
   assert.equal(normalizeTier('freeform', 'dodge meteors'), 'freeform')
   assert.equal(normalizeTier('auto', 'dodge meteors'), 'spec')
@@ -556,7 +576,10 @@ test('tier classification keeps arcade ideas on the spec and sends the rest to f
 
 test('sandbox CSP allows only inline code and frames the parent plus X', () => {
   const csp = sandboxCsp({ mainOrigins: ['http://127.0.0.1:9'], publicBaseUrl: 'https://play.example' })
-  assert.equal(csp.startsWith("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; frame-ancestors "), true)
+  assert.equal(csp.startsWith("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; "), true)
+  assert.match(csp, /; sandbox allow-scripts;/)
+  assert.match(csp, /form-action 'none'/)
+  assert.match(csp, /frame-src 'none'/)
   assert.match(csp, /http:\/\/127\.0\.0\.1:9/)
   assert.match(csp, /https:\/\/play\.example/)
   assert.match(csp, /https:\/\/x\.com/)
@@ -567,12 +590,13 @@ test('sandbox CSP allows only inline code and frames the parent plus X', () => {
 
 test('freeform generation retries once with the checker errors, then accepts', async () => {
   let calls = 0
+  const bodies = []
   const good = templateFreeform('a chess match')
-  const fetchImpl = async () => {
+  const bad = '<html><body><canvas></canvas><script>fetch("https://example.com/x")</script></body></html>'
+  const fetchImpl = async (_url, options) => {
     calls += 1
-    const html = calls === 1
-      ? '<html><body><canvas></canvas><script>fetch("https://example.com/x")</script></body></html>'
-      : good
+    bodies.push(JSON.parse(options.body))
+    const html = calls === 1 ? bad : good
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ html }) }] } }] }), { status: 200 })
   }
   const result = await generateFreeform({
@@ -584,6 +608,10 @@ test('freeform generation retries once with the checker errors, then accepts', a
   assert.equal(result.tier, 'freeform')
   assert.equal(result.spec, null)
   assert.match(result.html, /<canvas/i)
+  const retry = JSON.stringify(bodies[1])
+  assert.match(retry, /example\.com\/x/)
+  assert.match(retry, /fetch is not allowed/)
+  assert.match(retry, /Previous attempt/)
 })
 
 test('freeform generation stops after one failed retry', async () => {
@@ -599,4 +627,37 @@ test('freeform generation stops after one failed retry', async () => {
     fetchImpl
   }), /Freeform game was rejected/)
   assert.equal(calls, 2)
+})
+
+test('freeform prompt asks for touch, visuals, and a best score', () => {
+  assert.match(FREEFORM_PROMPT, /tap and drag/)
+  assert.match(FREEFORM_PROMPT, /gradients/)
+  assert.match(FREEFORM_PROMPT, /best score/i)
+  assert.match(FREEFORM_PROMPT, /playground-score/)
+})
+
+test('an unsure idea asks the model which tier to use', async () => {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    const text = calls === 1 ? '{"tier":"spec"}' : JSON.stringify(validSpec)
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 })
+  }
+  const result = await generateIdea({
+    prompt: 'a quiet night picnic',
+    tier: 'auto',
+    env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    fetchImpl
+  })
+  assert.equal(calls, 2)
+  assert.equal(result.tier, 'spec')
+  assert.match(result.tierReason, /model/)
+})
+
+test('usercontent injects the WebRTC prelude before game code', async () => {
+  const { withPrelude, SANDBOX_PRELUDE } = await import('../src/usercontent.js')
+  const out = withPrelude('<!DOCTYPE html><html><head><title>x</title></head><body><canvas></canvas><script>go()</script></body></html>')
+  assert.equal(out.indexOf(SANDBOX_PRELUDE) > out.indexOf('<head>'), true)
+  assert.equal(out.indexOf(SANDBOX_PRELUDE) < out.indexOf('<title>'), true)
+  assert.equal(withPrelude('<canvas></canvas>').startsWith(SANDBOX_PRELUDE), true)
 })

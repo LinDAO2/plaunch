@@ -20,15 +20,20 @@ export const FREEFORM_PROMPT = `You build one self-contained browser game and re
 The html value is one document the player can run offline.
 Rules:
 - Include a <canvas> and draw the whole game on it
+- The game runs in a frame about 450x520 CSS pixels. Size the canvas to window.innerWidth and window.innerHeight, handle resize, and keep every control and the in-game HUD inside the canvas
+- The parent page shows best score only. Draw the current score, the best score, and any timer yourself
+- Support touch (tap and drag), mouse, and keyboard. Pointer events cover a finger and a mouse. Do not rely on keyboard focus alone
+- Draw with shapes and gradients. Emoji are allowed. No external images
+- Track the best score in a variable across in-page restarts. Do not use storage APIs
 - Put CSS and JavaScript inline. No external scripts, stylesheets, fonts, or images
 - No external URLs of any kind. No protocol-relative URLs
 - Do not call fetch, XMLHttpRequest, WebSocket, eval, the Function constructor, import, or Worker
 - Do not read document.cookie, localStorage, or sessionStorage
 - Keep the document under 150KB
-- When the score changes, call parent.postMessage({ type: "playground-score", points: score }, "*")
-- points is an integer from 0 to 100000
+- When the score or the best score changes, call parent.postMessage({ type: "playground-score", points: best }, "*")
+- points is the best score, an integer from 0 to 100000
 - The message object has only the keys type and points
-- Make the game actually playable with a pointer or the keyboard, and match the player's idea
+- Make the game actually playable and match the player's idea
 - Do not wrap the JSON in markdown`
 
 function jsString(value) {
@@ -50,54 +55,81 @@ export function templateFreeform(prompt) {
 <meta charset="utf-8">
 <title>Freeform</title>
 <style>
-html,body{margin:0;height:100%;background:#120f1c}
+html,body{margin:0;height:100%;background:#120f1c;overflow:hidden}
 canvas{width:100%;height:100%;display:block;touch-action:none}
 </style>
 </head>
 <body>
-<canvas id="c" width="480" height="480"></canvas>
+<canvas id="c"></canvas>
 <script>
 const canvas = document.getElementById('c')
 const ctx = canvas.getContext('2d')
 const title = ${title}
 let score = 0
+let best = 0
 const dots = []
+function resize() {
+  canvas.width = Math.max(320, window.innerWidth)
+  canvas.height = Math.max(320, window.innerHeight)
+  draw()
+}
 function spawn() {
-  dots.push({ x: 40 + Math.random() * 400, y: 40 + Math.random() * 400, r: 18 })
+  dots.push({ x: 36 + Math.random() * Math.max(40, canvas.width - 72), y: 80 + Math.random() * Math.max(40, canvas.height - 120), r: 18 })
   if (dots.length > 6) dots.shift()
 }
 function draw() {
-  ctx.fillStyle = '#1b1430'
-  ctx.fillRect(0, 0, 480, 480)
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height)
+  sky.addColorStop(0, '#2a2158')
+  sky.addColorStop(1, '#120f1c')
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = '#f4efe6'
   ctx.font = '22px sans-serif'
-  ctx.fillText(title, 20, 36)
-  ctx.fillText(String(score), 20, 68)
-  ctx.fillStyle = '#4adeb9'
+  ctx.fillText(title + '  \u2728', 20, 36)
+  ctx.fillText('Score ' + score + '   Best ' + best, 20, 68)
   for (const dot of dots) {
+    const glow = ctx.createRadialGradient(dot.x, dot.y, 2, dot.x, dot.y, dot.r)
+    glow.addColorStop(0, '#d9fff4')
+    glow.addColorStop(1, '#4adeb9')
+    ctx.fillStyle = glow
     ctx.beginPath()
     ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2)
     ctx.fill()
   }
 }
 function report() {
-  parent.postMessage({ type: 'playground-score', points: score }, '*')
+  if (score > best) best = score
+  parent.postMessage({ type: 'playground-score', points: best }, '*')
+}
+function pointerAt(event) {
+  const rect = canvas.getBoundingClientRect()
+  return {
+    x: ((event.clientX - rect.left) / Math.max(rect.width, 1)) * canvas.width,
+    y: ((event.clientY - rect.top) / Math.max(rect.height, 1)) * canvas.height
+  }
+}
+function hitAt(x, y) {
+  const hit = dots.findIndex((dot) => Math.hypot(dot.x - x, dot.y - y) <= dot.r + 8)
+  if (hit < 0) return
+  dots.splice(hit, 1)
+  score += 1
+  report()
+  draw()
 }
 canvas.addEventListener('pointerdown', (event) => {
-  const rect = canvas.getBoundingClientRect()
-  const x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 480
-  const y = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * 480
-  const hit = dots.findIndex((dot) => Math.hypot(dot.x - x, dot.y - y) <= dot.r + 4)
-  if (hit >= 0) {
-    dots.splice(hit, 1)
-    score += 1
-    report()
-  }
-  draw()
+  const point = pointerAt(event)
+  hitAt(point.x, point.y)
 })
+canvas.addEventListener('pointermove', (event) => {
+  if (event.buttons !== 1) return
+  const point = pointerAt(event)
+  hitAt(point.x, point.y)
+})
+addEventListener('keydown', () => { score += 1; report(); draw() })
+addEventListener('resize', resize)
+resize()
 spawn()
 setInterval(spawn, 900)
-draw()
 report()
 </script>
 </body>
@@ -180,9 +212,11 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
         tierReason: 'Auto picked the freeform sandbox. The idea does not fit the arcade spec.'
       }
     }
+    const previous = (html || raw || '').slice(0, 150 * 1024)
+    messages.push({ role: 'assistant', content: previous })
     messages.push({
       role: 'user',
-      content: `Rejected:\n- ${errors.join('\n- ')}\nReturn one JSON object with an html string. No external URLs, fetch, XMLHttpRequest, WebSocket, eval, Function, document.cookie, or localStorage.`
+      content: `The previous attempt was rejected.\nErrors:\n- ${errors.join('\n- ')}\nPrevious attempt:\n${previous}\nFix every error and return one JSON object with an html string. No external URLs, fetch, XMLHttpRequest, WebSocket, eval, Function, document.cookie, or localStorage.`
     })
   }
   throw new HttpError(502, `Freeform game was rejected: ${errors.join('; ')}`, 'ai_invalid_output')

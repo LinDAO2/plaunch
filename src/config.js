@@ -72,10 +72,17 @@ export function loadConfig(env = process.env) {
     xSiteHandle: cleanHandle(env.X_SITE_HANDLE),
     usercontentOrigin: sandboxOrigin,
     usercontentPort: intEnv(env.USERCONTENT_PORT, portOf(sandboxOrigin, 43921)),
+    serverRole: serverRole(env.SERVER_ROLE),
     mainOrigins: [],
     warnings,
     env
   }
+}
+
+function serverRole(value) {
+  const role = String(value || 'all').toLowerCase()
+  if (role === 'all' || role === 'app' || role === 'usercontent') return role
+  throw new Error('SERVER_ROLE must be all, app, or usercontent')
 }
 
 function portOf(origin, fallback) {

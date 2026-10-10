@@ -22,7 +22,7 @@ export function createRateLimiter(config) {
       if (req.method === 'POST' && pathname.startsWith('/api/auth/')) {
         if (!hit(authHits, ip, config.authRateLimitMax, now, config.rateWindowMs)) return false
       }
-      if (req.method === 'POST' && (pathname === '/api/ai/generate' || pathname === '/api/generate')) {
+      if (req.method === 'POST' && (pathname === '/api/ai/generate' || pathname === '/api/generate' || pathname === '/api/freeform/preview')) {
         if (!hit(aiHits, ip, config.aiRateLimitMax, now, config.rateWindowMs)) return false
       }
       return true

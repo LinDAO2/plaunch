@@ -57,6 +57,13 @@ export function parseModelJson(raw) {
   return value
 }
 
+function retryDelay() {
+  const n = Number(process.env.AI_RETRY_DELAY_MS)
+  return Number.isFinite(n) && n >= 0 && n <= 30_000 ? n : 2_000
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 async function callProvider(provider, messages, fetchImpl, options = {}) {
   const request = provider.id === 'gemini' ? geminiRequest(provider, messages, options) : openAiRequest(provider, messages, options)
   let response
@@ -81,10 +88,15 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
   if (!response.ok) {
     const rejected = response.status === 401 || response.status === 403
     const quota = response.status === 429
-    const message = rejected ? 'AI provider rejected the API key' : quota ? 'AI provider quota exceeded. Try again later.' : 'AI provider request failed'
-    const error = new HttpError(502, message, quota ? 'ai_quota_exceeded' : 'ai_provider_error')
-    // Retrying a 429 immediately only burns more quota.
+    const busy = response.status === 503 || response.status === 500
+    const message = rejected ? 'AI provider rejected the API key'
+      : quota ? 'AI provider quota exceeded. Try again later.'
+        : busy ? 'AI provider is overloaded right now. Try again in a minute.'
+          : 'AI provider request failed'
+    const error = new HttpError(502, message, quota ? 'ai_quota_exceeded' : busy ? 'ai_provider_busy' : 'ai_provider_error')
+    // Retrying a 429 immediately only burns more quota. A 503 gets one delayed retry.
     error.retry = !rejected && !quota && response.status !== 400
+    if (busy) error.retryDelayMs = retryDelay()
     throw error
   }
   let payload
@@ -132,6 +144,7 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
   ]
   let lastError = 'AI provider failed'
   let code = 'ai_invalid_output'
+  let providerFailures = 0
   for (let attempt = 1; attempt <= 3; attempt++) {
     let raw
     try {
@@ -139,7 +152,10 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
     } catch (err) {
       lastError = err.message
       code = err.code || 'ai_provider_error'
-      if (err.retry === false || attempt === 3) throw new HttpError(502, lastError, code)
+      providerFailures += 1
+      // Transport and 5xx failures get one retry; three 503s in a row burned free-tier quota live.
+      if (err.retry === false || attempt === 3 || providerFailures >= 2) throw new HttpError(502, lastError, code)
+      if (err.retryDelayMs) await sleep(err.retryDelayMs)
       continue
     }
     try {

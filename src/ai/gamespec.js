@@ -290,21 +290,19 @@ function readPalette(input, accent, required) {
   if (!Array.isArray(input.palette) || input.palette.length < 1 || input.palette.length > 6) {
     throw new Error('palette must contain 1–6 colors')
   }
-  // Gemini sometimes merges entries into one string such as "#0b0d1b','#1e1b4b".
-  // Recover only exact #RRGGBB tokens; anything else still fails validation.
+  // Gemini returns palettes like "#0b0d1b','#1e1b4b", "06b6d4", or "#06b6d4 Rhine Cyan".
+  // The palette is cosmetic: keep exact 6-digit hex tokens (with or without #), drop the rest,
+  // and fall back to the accent rather than failing the whole generation.
   const colors = []
-  input.palette.forEach((color, index) => {
-    if (typeof color === 'string' && !/^\s*#[0-9a-fA-F]{6}\s*$/.test(color)) {
-      const found = color.match(/#[0-9a-fA-F]{6}(?![0-9a-fA-F])/g)
-      if (found && found.length >= 1) {
-        colors.push(...found)
-        return
-      }
+  for (const color of input.palette) {
+    if (typeof color !== 'string') continue
+    for (const match of color.matchAll(/(?:^|[^0-9a-fA-F#])#?([0-9a-fA-F]{6})(?![0-9a-fA-F])/g)) {
+      const hex = `#${match[1].toLowerCase()}`
+      if (!colors.includes(hex)) colors.push(hex)
     }
-    colors.push(hexColor(color, `palette[${index}]`))
-  })
-  if (colors.length > 6) throw new Error('palette must contain 1–6 colors')
-  return colors.map((color) => color.toLowerCase())
+  }
+  if (!colors.length) colors.push(accent)
+  return colors.slice(0, 6)
 }
 
 export function validateGameSpec(input) {

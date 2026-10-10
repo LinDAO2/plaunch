@@ -1,0 +1,66 @@
+# Render blueprint: Postgres, the app, and the sandbox on a second service.
+# Fill the secret env vars in the dashboard. Custom domains are in DEPLOY.md.
+databases:
+  - name: playground-db
+    plan: basic-256mb
+    databaseName: playground
+    user: playground
+
+services:
+  - type: web
+    name: playground
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVER_ROLE
+        value: app
+      - key: DATABASE_URL
+        fromDatabase:
+          name: playground-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: USERCONTENT_ORIGIN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+      - key: SEED_ON_EMPTY
+        value: "true"
+
+  - type: web
+    name: playground-usercontent
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVER_ROLE
+        value: usercontent
+      - key: DATABASE_URL
+        fromDatabase:
+          name: playground-db
+          property: connectionString
+      - key: SESSION_SECRET
+        fromService:
+          name: playground
+          type: web
+          envVarKey: SESSION_SECRET
+      - key: PUBLIC_BASE_URL
+        fromService:
+          name: playground
+          type: web
+          envVarKey: PUBLIC_BASE_URL
+      - key: USERCONTENT_ORIGIN
+        sync: false
+      - key: SEED_ON_EMPTY
+        value: "false"

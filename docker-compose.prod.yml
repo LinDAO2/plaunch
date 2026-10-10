@@ -1,0 +1,73 @@
+# Two public origins, one app process, Postgres. Migrations run when the app boots.
+# Copy .env.example to .env and set the values in DEPLOY.md before starting.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: playground
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: playground
+    volumes:
+      - playground_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U playground -d playground"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      NODE_ENV: production
+      SERVER_ROLE: all
+      PORT: "3000"
+      USERCONTENT_PORT: "43921"
+      DATABASE_URL: postgres://playground:${POSTGRES_PASSWORD}@postgres:5432/playground
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      COOKIE_SECURE: "true"
+      PUBLIC_BASE_URL: https://${APP_DOMAIN:?set APP_DOMAIN}
+      USERCONTENT_ORIGIN: https://${USERCONTENT_DOMAIN:?set USERCONTENT_DOMAIN}
+      X_SITE_HANDLE: ${X_SITE_HANDLE:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      GEMINI_THINKING_LEVEL: ${GEMINI_THINKING_LEVEL:-low}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-60000}
+      AI_RETRY_DELAY_MS: ${AI_RETRY_DELAY_MS:-2000}
+      AI_DAILY_LIMIT_PER_USER: ${AI_DAILY_LIMIT_PER_USER:-20}
+      AI_DAILY_LIMIT_GLOBAL: ${AI_DAILY_LIMIT_GLOBAL:-200}
+      SEED_ON_EMPTY: ${SEED_ON_EMPTY:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3000"
+      - "43921"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN}
+      USERCONTENT_DOMAIN: ${USERCONTENT_DOMAIN:?set USERCONTENT_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  playground_pg:
+  caddy_data:
+  caddy_config:

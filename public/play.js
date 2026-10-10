@@ -1,6 +1,6 @@
 import { api, ensureCsrf } from '/client-api.js'
 import { controlHint, createRuntime, typeNames } from '/mechanics.js'
-import { readSandboxScore } from '/sandbox-score.js'
+import { fitSandboxFrame, readSandboxScore, readSandboxSize } from '/sandbox-score.js'
 
 const $ = (id) => document.getElementById(id)
 const slug = (location.pathname.match(/^\/play\/([a-z0-9-]+)$/) || [])[1]
@@ -9,6 +9,7 @@ let current = null
 let roundToken = null
 let freeformFrame = null
 let freeformPoints = null
+let freeformBest = 0
 let board = { scores: [], unverified: [] }
 let boardTab = 'checked'
 
@@ -106,29 +107,42 @@ function mountFreeform(src) {
   frame.dataset.src = src
   freeformFrame = frame
   field.append(frame)
+  $('game').classList.add('freeform-on')
   $('display').hidden = true
   $('game-label').hidden = true
+  $('timer').hidden = true
+  $('score').textContent = 'Score: 0'
 }
 
 $('play').addEventListener('click', (event) => {
   if (current?.tier !== 'freeform' || !freeformFrame?.dataset.src) return
   event.preventDefault()
   event.stopImmediatePropagation()
-  if (!freeformFrame.getAttribute('src')) freeformFrame.src = freeformFrame.dataset.src
+  if (!freeformFrame.getAttribute('src')) {
+    freeformFrame.addEventListener('load', () => freeformFrame.focus(), { once: true })
+    freeformFrame.src = freeformFrame.dataset.src
+  }
+  freeformFrame.focus()
   $('play').hidden = true
   $('display').hidden = true
   $('game-label').hidden = true
   if (freeformPoints === null) freeformPoints = 0
-  $('score').textContent = `Score: ${freeformPoints}`
+  $('score').textContent = `Score: ${freeformBest}`
   $('submit-score').disabled = false
   beginRound()
 }, true)
 
 window.addEventListener('message', (event) => {
+  const size = readSandboxSize(event, freeformFrame)
+  if (size) {
+    fitSandboxFrame(freeformFrame, size)
+    return
+  }
   const points = readSandboxScore(event, freeformFrame)
   if (points === null) return
-  freeformPoints = points
-  $('score').textContent = `Score: ${points}`
+  freeformBest = Math.max(freeformBest, points)
+  freeformPoints = freeformBest
+  $('score').textContent = `Score: ${freeformBest}`
   $('submit-score').disabled = false
 })
 

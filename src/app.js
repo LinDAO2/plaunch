@@ -303,11 +303,11 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
   }
 
   if (method === 'POST' && pathname === '/api/freeform/preview') {
+    const user = requireUser(await currentUser(req, db))
     const body = await readJson(req, HTML_LIMIT)
     const checked = assertFreeform(body.html)
     if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
-    const user = await currentUser(req, db)
-    const token = await savePreview(db, checked.html, user?.id || null)
+    const token = await savePreview(db, checked.html, user.id)
     return sendJson(res, 200, { token, url: `${config.usercontentOrigin}/preview/${token}` }, ctx)
   }
 
