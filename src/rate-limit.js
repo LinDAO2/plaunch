@@ -31,7 +31,7 @@ export function createRateLimiter(config) {
           return blocked('rate_limited', 'Too many requests')
         }
       }
-      if (req.method === 'POST' && (pathname === '/api/ai/generate' || pathname === '/api/generate' || pathname === '/api/freeform/preview')) {
+      if (req.method === 'POST' && (pathname === '/api/ai/generate' || pathname === '/api/generate' || pathname === '/api/ai/restyle' || pathname === '/api/freeform/preview')) {
         if (!hit(aiHits, ip, config.aiRateLimitMax, now, config.rateWindowMs)) {
           return blocked('rate_limited', 'Too many requests')
         }

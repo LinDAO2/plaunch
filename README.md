@@ -1,4 +1,4 @@
-# Playground — game launchpad v0.9.1
+# Playground — game launchpad v1.0.0
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
@@ -67,11 +67,21 @@ AI generation is capped per UTC day. Accounts use `AI_DAILY_LIMIT_PER_USER` (def
 
 `POST /api/generate` remains the template matcher even when a key is set.
 
+### Template library
+
+Ideas that match a known game are assembled from `templates/`, not written from scratch. Each file is one Kaplay game with `CONFIG` (numbers), `THEME` (palette, pixel-grid sprites, names), and `RULES` (small functions). The twelve templates are Word Guess, Block Drop, Snake, Merge Tiles, Flap, Breakout, Platformer, Endless Runner, Space Shooter, Maze Chomper, Jump Up, and Match-3. Names stay generic. Sources and licenses are in [CREDITS.md](CREDITS.md).
+
+Auto generation picks a template by keyword. A medium match can ask Gemini which template to use, then ask once for replacements of those three blocks. The server splices the JSON, rejects anything outside the editable fields, and syntax-checks the script. If the model is missing, busy, or returns a bad edit, the unmodified template is themed from the prompt and still plays. A prompt that does not match a template with reasonable confidence is the only path that writes a freeform game from scratch. That path is at most two Gemini calls for a template (picker plus edit) and skips the picker when the keyword is already confident.
+
+The studio shows `Built on: <template>` and `Try another style`, which re-rolls `THEME` only.
+
+Kaplay 3001.0.19 and ZzFX are pinned under `vendor/` and served as `/kaplay.js` and `/zzfx.js` from the usercontent origin.
+
 ### Freeform sandbox
 
 `POST /api/ai/generate` accepts `tier`: `auto` (default), `spec`, or `freeform`. Auto keeps tap, dodge, reaction, guess, and the arcade primitives on GameSpec. Other ideas return `{ tier: "freeform", html }` and `spec: null`. The model must return one HTML document with a canvas, inline CSS and JavaScript, and no network. Static checks reject external URLs, `fetch`, XHR, WebSocket, `eval`, the Function constructor, and `document.cookie` / `localStorage`. A rejection is shown to the model once. The document is never executed on the server.
 
-Freeform HTML is stored on the game and served only by the usercontent listener (`GET /g/:slug` and short-lived `GET /preview/:token`). Its CSP is `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'`, with `frame-ancestors` for the app origin, x.com, and twitter.com. Scores come back only as `postMessage` `{ type: "playground-score", points }`. The parent accepts that shape from the iframe, and only when `event.origin` is `"null"`.
+Freeform HTML is stored on the game and served only by the usercontent listener (`GET /g/:slug` and short-lived `GET /preview/:token`). Its CSP is `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'`, plus `frame-src 'none'`, `worker-src 'none'`, and no `unsafe-eval` or `wasm-unsafe-eval`. `script-src 'self'` is only so the page can load the pinned Kaplay and ZzFX files on that same origin. `frame-ancestors` allows the app origin, x.com, and twitter.com. The iframe `sandbox` attribute stays `allow-scripts`. Scores come back only as `postMessage` `{ type: "playground-score", points }`. The parent accepts that shape from the iframe, and only when `event.origin` is `"null"`.
 
 Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production requires `PUBLIC_BASE_URL` and `USERCONTENT_ORIGIN`, and it refuses to boot when those hosts match or share a registrable domain. A separate domain such as `playgroundusercontent.com` is the layout to use. `ALLOW_SAME_SITE_USERCONTENT=true` is the explicit opt-in for a subdomain. Auto tier prefers a freeform game when the idea needs its own rules, physics, or levels, and keeps the arcade spec for a simple tap, dodge, reaction, guess, or arcade game. An idea the keyword check cannot place is sent to the model when a key is set. `POST /api/freeform/preview` requires a creator (the guest cookie or an account) and counts toward the AI rate limit. `/play/:slug?embed=1` and `/r/:slug` use the same 480×480 player for freeform games. The parent hides its timer and shows the best score; the game draws its own HUD.
 

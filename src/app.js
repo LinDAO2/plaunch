@@ -6,6 +6,7 @@ import { aiStatus } from './ai/generate.js'
 import { assertFreeform } from './ai/freeform-check.js'
 import { validateGameSpec } from './ai/gamespec.js'
 import { generateIdea } from './ai/idea.js'
+import { restyleTemplate } from './templates/generate.js'
 import { TAGS, tagsFor } from './ai/tags.js'
 import { blocklistReason, classifySafety } from './safety.js'
 import { HttpError } from './errors.js'
@@ -481,13 +482,13 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
       })
     }
     const result = await generateIdea({ prompt: body.prompt, tier: body.tier, env: config.env, fetchImpl })
-    const tags = tagsFor({
+    const tags = [...new Set([...(result.tags || []), ...tagsFor({
       prompt: body.prompt,
       name: result.game?.name,
       description: result.game?.description,
       mechanic: result.game?.type,
       tier: result.tier
-    })
+    })])]
     const blocked = blocklistReason([body.prompt, result.game?.name, result.game?.description, result.html].filter(Boolean).join('\n'))
     return sendJson(res, 200, {
       mode: result.mode,
@@ -499,9 +500,37 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
       tier: result.tier,
       html: result.html || null,
       tierReason: result.tierReason || '',
+      templateId: result.templateId || null,
+      templateName: result.templateName || null,
+      fallback: Boolean(result.fallback),
       tags,
       safety: { flagged: Boolean(blocked), reason: blocked }
     }, ctx)
+  }
+
+  if (method === 'POST' && pathname === '/api/ai/restyle') {
+    const body = await readJson(req, HTML_LIMIT)
+    const ai = aiStatus(config.env).mode === 'ai'
+    const user = ai ? await requireCreator(req, ctx, db) : null
+    if (user) {
+      await consumeAiCredit(db, {
+        userId: user.id,
+        guest: user.kind === 'guest',
+        ipHash: hashIp(req, config),
+        userLimit: config.aiDailyUser,
+        guestLimit: config.aiDailyGuest,
+        globalLimit: config.aiDailyGlobal
+      })
+    }
+    const result = await restyleTemplate({
+      templateId: body.templateId,
+      html: body.html,
+      prompt: body.prompt,
+      turn: Number(body.turn) || 1,
+      env: config.env,
+      fetchImpl
+    })
+    return sendJson(res, 200, result, ctx)
   }
 
   if (method === 'POST' && pathname === '/api/freeform/preview') {

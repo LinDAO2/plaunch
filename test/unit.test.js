@@ -702,7 +702,9 @@ test('tier classification keeps arcade ideas on the spec and sends the rest to f
 
 test('sandbox CSP allows only inline code and frames the parent plus X', () => {
   const csp = sandboxCsp({ mainOrigins: ['http://127.0.0.1:9'], publicBaseUrl: 'https://play.example' })
-  assert.equal(csp.startsWith("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; "), true)
+  assert.equal(csp.startsWith("default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'; "), true)
+  assert.equal(csp.includes('unsafe-eval'), false)
+  assert.equal(csp.includes('wasm-unsafe-eval'), false)
   assert.match(csp, /; sandbox allow-scripts;/)
   assert.match(csp, /form-action 'none'/)
   assert.match(csp, /frame-src 'none'/)

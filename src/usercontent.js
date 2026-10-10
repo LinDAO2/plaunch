@@ -1,5 +1,18 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { getGameRow } from './repo.js'
 import { takePreview } from './repo.js'
+
+const VENDOR = {
+  '/kaplay.js': {
+    body: readFileSync(fileURLToPath(new URL('../vendor/kaplay/kaplay-3001.0.19.js', import.meta.url))),
+    version: '3001.0.19'
+  },
+  '/zzfx.js': {
+    body: readFileSync(fileURLToPath(new URL('../vendor/zzfx/zzfx.js', import.meta.url))),
+    version: '1.4.0'
+  }
+}
 
 export function sandboxCsp(config) {
   const ancestors = []
@@ -9,9 +22,9 @@ export function sandboxCsp(config) {
   for (const origin of ['https://x.com', 'https://*.x.com', 'https://twitter.com', 'https://*.twitter.com']) {
     ancestors.push(origin)
   }
-  // sandbox in the header keeps the document opaque even when someone opens the URL top-level
-  // (no cookies, storage, popups, forms, or top navigation). frame-ancestors still applies.
-  return `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; frame-src 'none'; child-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts; frame-ancestors ${ancestors.join(' ')}`
+  // script-src 'self' loads the pinned Kaplay and ZzFX files from this origin.
+  // No 'unsafe-eval' and no 'wasm-unsafe-eval'. The sandbox token keeps the document opaque.
+  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts; frame-ancestors ${ancestors.join(' ')}`
 }
 
 // CSP connect-src does not cover WebRTC, and a live probe sent STUN packets from the sandbox.
@@ -53,6 +66,18 @@ export function createUsercontentApp({ db, config }) {
   return async function usercontent(req, res) {
     try {
       const url = new URL(req.url || '/', 'http://localhost')
+      const vendor = VENDOR[url.pathname]
+      if (vendor && (req.method || 'GET') === 'GET') {
+        res.writeHead(200, {
+          'content-type': 'text/javascript; charset=utf-8',
+          'content-length': String(vendor.body.length),
+          'cache-control': 'public, max-age=86400',
+          'x-content-type-options': 'nosniff',
+          'x-vendor-version': vendor.version
+        })
+        res.end(vendor.body)
+        return
+      }
       if ((req.method || 'GET') === 'GET' && url.pathname === '/health') {
         res.writeHead(200, {
           'content-type': 'text/plain; charset=utf-8',

@@ -478,3 +478,6 @@ input[type="color"] { padding: 4px; height: 40px; }
 /* Shown when the server has no AI provider key: Generate returns template games. */
 .ai-off{margin:12px 0;padding:12px 14px;border:1px solid var(--brand);color:var(--text);background:#1a1d00;font-size:14px;line-height:1.45}
 .ai-off[hidden]{display:none}
+#built-on{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#built-on[hidden]{display:none}
+#restyle{border:0;background:transparent;color:var(--brand);font:inherit;font-size:13px;cursor:pointer;padding:0;min-height:0}

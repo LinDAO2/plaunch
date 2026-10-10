@@ -1,8 +1,9 @@
 export const FREEFORM_MAX_BYTES = 150 * 1024
 
+const VENDOR_SCRIPTS = new Set(['/kaplay.js', '/zzfx.js'])
+
 const RULES = [
   [/<(?:script|link|iframe|object|embed)\b[^>]*\b(?:src|href)\s*=\s*['"]?\s*(?:https?:|\/\/)/i, 'External scripts and stylesheets are not allowed'],
-  [/<script\b[^>]*\bsrc\s*=/i, 'External scripts are not allowed'],
   [/<iframe\b/i, 'Nested frames are not allowed'],
   [/<base\b/i, 'A base URL is not allowed'],
   [/https?:\/\//i, 'External URLs are not allowed'],
@@ -31,6 +32,11 @@ export function inspectFreeform(html) {
   if (!/<canvas\b/i.test(html)) errors.push('Document must include a canvas')
   if (!/<html[\s>]/i.test(html)) errors.push('Document must be one self-contained HTML page')
   if (!/playground-score/.test(html)) errors.push('Score must be sent with postMessage type playground-score')
+  for (const match of html.matchAll(/<script\b[^>]*\bsrc\s*=\s*['"]([^'"]+)['"]/gi)) {
+    if (!VENDOR_SCRIPTS.has(match[1]) && !errors.includes('External scripts are not allowed')) {
+      errors.push('External scripts are not allowed')
+    }
+  }
   for (const [pattern, message] of RULES) {
     if (pattern.test(html) && !errors.includes(message)) errors.push(message)
   }

@@ -18,6 +18,8 @@ let worldView = null
 let worldKey = ''
 let lastTier = 'spec'
 let lastHtml = null
+let lastTemplate = null
+let styleTurn = 0
 let previewUrl = ''
 let freeformFrame = null
 let freeformPoints = null
@@ -264,16 +266,37 @@ function fill(game) {
   preview()
 }
 
+function readTemplate(html) {
+  const match = String(html || '').match(/playground-template:\s*([a-z0-9-]+)\s*\|\s*([^<]+?)\s*-->/)
+  if (!match) return null
+  return { id: match[1], name: match[2].trim() }
+}
+
+function paintBuiltOn() {
+  const node = $('built-on')
+  if (!node) return
+  if (!lastTemplate) {
+    node.hidden = true
+    return
+  }
+  node.hidden = false
+  $('built-on-name').textContent = lastTemplate.name
+}
+
 function showEditor() {
   $('ask').hidden = true
   $('discover').hidden = true
   $('editor').hidden = false
+  paintBuiltOn()
 }
 
 function showAsk() {
   $('editor').hidden = true
   $('ask').hidden = false
   $('discover').hidden = false
+  lastTemplate = null
+  styleTurn = 0
+  paintBuiltOn()
 }
 
 function clearWorld() {
@@ -352,6 +375,8 @@ async function showGame(summary) {
   opened = game
   lastTier = game.tier === 'freeform' ? 'freeform' : 'spec'
   lastHtml = game.html || null
+  lastTemplate = readTemplate(game.html)
+  styleTurn = 0
   previewUrl = game.sandboxUrl || ''
   freeformPoints = null
   lastSpec = game.spec || null
@@ -559,6 +584,31 @@ for (const chip of document.querySelectorAll('.idea')) {
   })
 }
 
+$('restyle')?.addEventListener('click', async () => {
+  if (!lastTemplate || !lastHtml) return
+  try {
+    $('restyle').disabled = true
+    styleTurn += 1
+    const result = await api('/ai/restyle', 'POST', {
+      templateId: lastTemplate.id,
+      html: lastHtml,
+      prompt: $('prompt').value,
+      turn: styleTurn
+    })
+    lastHtml = result.html
+    lastTemplate = { id: result.templateId, name: result.templateName }
+    paintBuiltOn()
+    const previewed = await api('/freeform/preview', 'POST', { html: lastHtml })
+    previewUrl = previewed.url
+    showSandbox(previewUrl)
+    toast('New style ready.')
+  } catch (error) {
+    setStatus(error.message, true)
+  } finally {
+    $('restyle').disabled = false
+  }
+})
+
 $('generate').addEventListener('click', async () => {
   try {
     $('generate').disabled = true
@@ -566,6 +616,8 @@ $('generate').addEventListener('click', async () => {
     if (result.mode === 'template' && $('ai-off')) $('ai-off').hidden = false
     lastTier = result.tier === 'freeform' ? 'freeform' : 'spec'
     lastHtml = result.html || null
+    lastTemplate = result.templateId ? { id: result.templateId, name: result.templateName || result.templateId } : readTemplate(result.html)
+    styleTurn = 0
     lastSpec = result.spec || null
     previewUrl = ''
     freeformPoints = null

@@ -1,0 +1,516 @@
+[
+  {
+    "id": "word-guess",
+    "name": "Word Guess",
+    "tags": [
+      "puzzle",
+      "word"
+    ],
+    "keywords": [
+      "word",
+      "guess",
+      "letters"
+    ],
+    "description": "Guess a hidden five-letter word. Right place and wrong place are marked on the tile.",
+    "editable": {
+      "CONFIG": {
+        "letters": {
+          "min": 4,
+          "max": 6
+        },
+        "maxGuesses": {
+          "min": 3,
+          "max": 8
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.tile": "grid"
+      },
+      "RULES": {
+        "scoreGuess": "function"
+      }
+    }
+  },
+  {
+    "id": "block-drop",
+    "name": "Block Drop",
+    "tags": [
+      "puzzle",
+      "arcade"
+    ],
+    "keywords": [
+      "blocks",
+      "drop",
+      "stack",
+      "lines"
+    ],
+    "description": "Drop and rotate blocks. Complete a line to clear it.",
+    "editable": {
+      "CONFIG": {
+        "cols": {
+          "min": 8,
+          "max": 12
+        },
+        "rows": {
+          "min": 12,
+          "max": 20
+        },
+        "dropMs": {
+          "min": 80,
+          "max": 800
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.block": "grid"
+      },
+      "RULES": {
+        "scoreLines": "function"
+      }
+    }
+  },
+  {
+    "id": "snake",
+    "name": "Snake",
+    "tags": [
+      "arcade",
+      "action"
+    ],
+    "keywords": [
+      "snake",
+      "grow",
+      "apple"
+    ],
+    "description": "Steer the snake into the fruit. Do not hit a wall or yourself.",
+    "editable": {
+      "CONFIG": {
+        "cols": {
+          "min": 10,
+          "max": 20
+        },
+        "rows": {
+          "min": 10,
+          "max": 20
+        },
+        "stepMs": {
+          "min": 80,
+          "max": 400
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.fruit": "grid"
+      },
+      "RULES": {
+        "scoreFood": "function"
+      }
+    }
+  },
+  {
+    "id": "merge-tiles",
+    "name": "Merge Tiles",
+    "tags": [
+      "puzzle"
+    ],
+    "keywords": [
+      "merge",
+      "tiles",
+      "slide"
+    ],
+    "description": "Slide the board so equal tiles combine into the next value.",
+    "editable": {
+      "CONFIG": {
+        "size": {
+          "min": 3,
+          "max": 5
+        },
+        "goal": {
+          "min": 32,
+          "max": 512
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.tile": "grid"
+      },
+      "RULES": {
+        "scoreMerge": "function"
+      }
+    }
+  },
+  {
+    "id": "flap",
+    "name": "Flap",
+    "tags": [
+      "arcade",
+      "action"
+    ],
+    "keywords": [
+      "flap",
+      "fly",
+      "pipes"
+    ],
+    "description": "Tap to flap through gaps. Touch the ground or a pipe and the run ends.",
+    "editable": {
+      "CONFIG": {
+        "gravity": {
+          "min": 400,
+          "max": 1600
+        },
+        "flap": {
+          "min": -520,
+          "max": -160
+        },
+        "gap": {
+          "min": 110,
+          "max": 220
+        },
+        "speed": {
+          "min": 80,
+          "max": 280
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.bird": "grid",
+        "sprites.hero": "grid"
+      },
+      "RULES": {
+        "scoreGate": "function"
+      }
+    }
+  },
+  {
+    "id": "breakout",
+    "name": "Breakout",
+    "tags": [
+      "arcade",
+      "action"
+    ],
+    "keywords": [
+      "breakout",
+      "bricks",
+      "paddle"
+    ],
+    "description": "Bounce a ball off the paddle and clear the bricks.",
+    "editable": {
+      "CONFIG": {
+        "cols": {
+          "min": 6,
+          "max": 10
+        },
+        "rows": {
+          "min": 2,
+          "max": 6
+        },
+        "ballSpeed": {
+          "min": 140,
+          "max": 420
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.ball": "grid",
+        "sprites.hero": "grid"
+      },
+      "RULES": {
+        "scoreBrick": "function"
+      }
+    }
+  },
+  {
+    "id": "platformer",
+    "name": "Platformer",
+    "tags": [
+      "action",
+      "platform"
+    ],
+    "keywords": [
+      "platform",
+      "jump",
+      "coins"
+    ],
+    "description": "Run and jump across ledges. Pick up the coin. Do not fall in the pit.",
+    "editable": {
+      "CONFIG": {
+        "speed": {
+          "min": 80,
+          "max": 280
+        },
+        "jump": {
+          "min": 220,
+          "max": 480
+        },
+        "gravity": {
+          "min": 500,
+          "max": 1400
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.coin": "grid"
+      },
+      "RULES": {
+        "scoreCoin": "function"
+      }
+    }
+  },
+  {
+    "id": "endless-runner",
+    "name": "Endless Runner",
+    "tags": [
+      "action",
+      "runner"
+    ],
+    "keywords": [
+      "runner",
+      "endless",
+      "hurdle"
+    ],
+    "description": "The lane keeps moving. Jump the hurdles.",
+    "editable": {
+      "CONFIG": {
+        "speed": {
+          "min": 120,
+          "max": 360
+        },
+        "gravity": {
+          "min": 600,
+          "max": 1600
+        },
+        "jump": {
+          "min": 240,
+          "max": 520
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.hurdle": "grid"
+      },
+      "RULES": {
+        "scoreHurdle": "function"
+      }
+    }
+  },
+  {
+    "id": "space-shooter",
+    "name": "Space Shooter",
+    "tags": [
+      "action",
+      "shooter"
+    ],
+    "keywords": [
+      "shooter",
+      "space",
+      "ships"
+    ],
+    "description": "Slide the ship and fire. Clear the craft coming down the lane.",
+    "editable": {
+      "CONFIG": {
+        "speed": {
+          "min": 100,
+          "max": 360
+        },
+        "bullet": {
+          "min": 180,
+          "max": 520
+        },
+        "enemy": {
+          "min": 20,
+          "max": 160
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.ship": "grid",
+        "sprites.hero": "grid"
+      },
+      "RULES": {
+        "scoreHit": "function"
+      }
+    }
+  },
+  {
+    "id": "maze-chomper",
+    "name": "Maze Chomper",
+    "tags": [
+      "arcade",
+      "maze"
+    ],
+    "keywords": [
+      "maze",
+      "chomper",
+      "dots"
+    ],
+    "description": "Eat the dots in the maze. The chaser follows. Getting caught ends the run.",
+    "editable": {
+      "CONFIG": {
+        "cell": {
+          "min": 20,
+          "max": 36
+        },
+        "ghostMs": {
+          "min": 120,
+          "max": 500
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid",
+        "sprites.chaser": "grid"
+      },
+      "RULES": {
+        "scorePellet": "function"
+      }
+    }
+  },
+  {
+    "id": "jump-up",
+    "name": "Jump Up",
+    "tags": [
+      "arcade",
+      "action"
+    ],
+    "keywords": [
+      "jump",
+      "platforms",
+      "up"
+    ],
+    "description": "Bounce up a stack of platforms. Missing one ends the climb.",
+    "editable": {
+      "CONFIG": {
+        "gravity": {
+          "min": 400,
+          "max": 1200
+        },
+        "jump": {
+          "min": 280,
+          "max": 620
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.hero": "grid"
+      },
+      "RULES": {
+        "scorePlatform": "function"
+      }
+    }
+  },
+  {
+    "id": "match-3",
+    "name": "Match-3",
+    "tags": [
+      "puzzle"
+    ],
+    "keywords": [
+      "match",
+      "swap",
+      "gems"
+    ],
+    "description": "Swap neighboring gems to line up three of a kind.",
+    "editable": {
+      "CONFIG": {
+        "cols": {
+          "min": 5,
+          "max": 8
+        },
+        "rows": {
+          "min": 5,
+          "max": 8
+        },
+        "kinds": {
+          "min": 3,
+          "max": 5
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "sprites.gem": "grid",
+        "sprites.hero": "grid"
+      },
+      "RULES": {
+        "scoreGroup": "function"
+      }
+    }
+  }
+]
