@@ -479,6 +479,8 @@ async function refreshMode() {
   const status = await api('/ai/status')
   const names = { gemini: 'Gemini', openai: 'OpenAI', xai: 'xAI' }
   $('gen-mode').textContent = names[status.provider] || 'Template'
+  const off = $('ai-off')
+  if (off) off.hidden = status.mode === 'ai'
 }
 
 function openAuth(mode) {
@@ -561,6 +563,7 @@ $('generate').addEventListener('click', async () => {
   try {
     $('generate').disabled = true
     const result = await api('/ai/generate', 'POST', { prompt: $('prompt').value, tier: $('tier').value })
+    if (result.mode === 'template' && $('ai-off')) $('ai-off').hidden = false
     lastTier = result.tier === 'freeform' ? 'freeform' : 'spec'
     lastHtml = result.html || null
     lastSpec = result.spec || null
@@ -581,7 +584,9 @@ $('generate').addEventListener('click', async () => {
     toast('Ready to play.')
     refreshOwnerButtons()
   } catch (error) {
-    setStatus(error.message, true)
+    const up = error.upstream
+    const where = up ? ` [${up.provider || 'ai'} ${up.model || ''} · HTTP ${up.status}${up.code ? ' ' + up.code : ''}]` : ''
+    setStatus(error.message + (where && !error.message.includes('HTTP ') ? where : ''), true)
     toast(error.message)
   } finally {
     $('generate').disabled = false

@@ -122,3 +122,62 @@ export function openAiText(payload) {
   const content = payload?.choices?.[0]?.message?.content
   return typeof content === 'string' ? content : ''
 }
+
+const PROVIDER_LABELS = { gemini: 'Gemini', xai: 'xAI', openai: 'OpenAI' }
+
+function redactSecrets(text, provider) {
+  let out = String(text || '')
+  if (provider?.apiKey) out = out.split(provider.apiKey).join('[redacted]')
+  // Google keys start with AIza; OpenAI and xAI keys start with sk- or xai-.
+  return out.replace(/AIza[0-9A-Za-z_-]{20,}/g, '[redacted]').replace(/\b(sk|xai)-[0-9A-Za-z_-]{16,}/g, '[redacted]')
+}
+
+// Turn an upstream error response into an honest category. Only a real 503 or
+// UNAVAILABLE counts as "busy"; everything else keeps its own status and message.
+export function describeUpstreamError(provider, status, bodyText) {
+  let parsed = null
+  try {
+    parsed = JSON.parse(bodyText)
+  } catch {
+    parsed = null
+  }
+  const err = Array.isArray(parsed) ? parsed[0]?.error : parsed?.error
+  const upstreamCode = typeof err?.status === 'string' ? err.status
+    : typeof err?.code === 'string' ? err.code
+      : typeof err?.type === 'string' ? err.type : ''
+  const rawMessage = typeof err?.message === 'string' ? err.message
+    : typeof err === 'string' ? err
+      : parsed ? '' : String(bodyText || '')
+  const upstreamMessage = redactSecrets(rawMessage, provider).replace(/\s+/g, ' ').trim().slice(0, 300)
+  const label = PROVIDER_LABELS[provider?.id] || 'AI provider'
+  const tag = `${label} HTTP ${status}${upstreamCode ? ` ${upstreamCode}` : ''}`
+  const code = String(upstreamCode).toUpperCase()
+  let category
+  if (status === 503 || code === 'UNAVAILABLE') category = 'busy'
+  else if (status === 429 || code === 'RESOURCE_EXHAUSTED') category = 'quota'
+  else if (status === 401 || status === 403 || code === 'PERMISSION_DENIED' || code === 'UNAUTHENTICATED') category = 'auth'
+  else if (status === 404 || code === 'NOT_FOUND') category = 'model_not_found'
+  else if (status === 504 || code === 'DEADLINE_EXCEEDED') category = 'timeout'
+  else if (status >= 500) category = 'internal'
+  else if (status >= 400) category = 'rejected'
+  else category = 'error'
+  const detail = upstreamMessage ? `: ${upstreamMessage}` : ''
+  const table = {
+    busy: { code: 'ai_provider_busy', retry: true, delay: true, text: `${label} is overloaded right now (${tag}${detail}). Try again in a minute.` },
+    quota: { code: 'ai_quota_exceeded', retry: false, text: `${label} quota exceeded (${tag}${detail}).` },
+    auth: { code: 'ai_provider_auth', retry: false, text: `${label} rejected the API key or project (${tag}${detail}).` },
+    model_not_found: { code: 'ai_model_not_found', retry: false, text: `${label} model ${provider?.model || ''} was not found (${tag}${detail}).` },
+    timeout: { code: 'ai_provider_timeout', retry: true, delay: true, text: `${label} timed out upstream (${tag}${detail}).` },
+    internal: { code: 'ai_provider_internal', retry: true, delay: true, text: `${label} had an internal error (${tag}${detail}).` },
+    rejected: { code: 'ai_request_rejected', retry: false, text: `${label} rejected the request (${tag}${detail}).` },
+    error: { code: 'ai_provider_error', retry: false, text: `${label} request failed (${tag}${detail}).` }
+  }[category]
+  return {
+    category,
+    code: table.code,
+    message: table.text,
+    retry: table.retry,
+    delay: Boolean(table.delay),
+    upstream: { provider: provider?.id || null, model: provider?.model || null, status, code: upstreamCode || null, message: upstreamMessage || null }
+  }
+}

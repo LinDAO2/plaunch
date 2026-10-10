@@ -264,7 +264,7 @@ test('a rejected provider key is not retried', async () => {
     prompt: 'a space game about dodging meteors',
     env: { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'super-secret-key' },
     fetchImpl
-  }), (err) => err.code === 'ai_provider_error' && err.status === 502)
+  }), (err) => err.code === 'ai_provider_auth' && err.status === 502 && err.upstream?.status === 401)
   assert.equal(calls, 1)
 })
 
@@ -864,4 +864,45 @@ test('usercontent injects the WebRTC prelude before game code', async () => {
   assert.equal(out.indexOf(SANDBOX_PRELUDE) > out.indexOf('<head>'), true)
   assert.equal(out.indexOf(SANDBOX_PRELUDE) < out.indexOf('<title>'), true)
   assert.equal(withPrelude('<canvas></canvas>').startsWith(SANDBOX_PRELUDE), true)
+})
+
+test('Gemini errors keep their real status; only 503 is labeled busy', async () => {
+  const { describeUpstreamError } = await import('../src/ai/providers.js')
+  const provider = { id: 'gemini', model: 'gemini-3.5-flash', apiKey: 'AIzaSyTESTKEY000000000000000000000' }
+  const internal = describeUpstreamError(provider, 500, '{"error":{"code":500,"message":"Internal error encountered.","status":"INTERNAL"}}')
+  assert.equal(internal.code, 'ai_provider_internal')
+  assert.doesNotMatch(internal.message, /overloaded/)
+  assert.match(internal.message, /HTTP 500 INTERNAL: Internal error encountered/)
+  const busy = describeUpstreamError(provider, 503, '{"error":{"code":503,"message":"The model is overloaded.","status":"UNAVAILABLE"}}')
+  assert.equal(busy.code, 'ai_provider_busy')
+  const bad = describeUpstreamError(provider, 400, '{"error":{"code":400,"message":"Unknown name \\"thinkingLevel\\" for key AIzaSyTESTKEY000000000000000000000","status":"INVALID_ARGUMENT"}}')
+  assert.equal(bad.code, 'ai_request_rejected')
+  assert.equal(bad.retry, false)
+  assert.match(bad.upstream.message, /thinkingLevel/)
+  assert.doesNotMatch(JSON.stringify(bad), /AIzaSyTESTKEY/)
+  assert.equal(describeUpstreamError(provider, 404, '{"error":{"status":"NOT_FOUND","message":"models/x is not found"}}').code, 'ai_model_not_found')
+  assert.equal(describeUpstreamError(provider, 429, '{"error":{"status":"RESOURCE_EXHAUSTED","message":"quota"}}').code, 'ai_quota_exceeded')
+  assert.equal(describeUpstreamError(provider, 403, '{"error":{"status":"PERMISSION_DENIED","message":"denied"}}').code, 'ai_provider_auth')
+})
+
+test('freeform generation retries a transient 500 once and surfaces a 400 without retrying', async () => {
+  process.env.AI_RETRY_DELAY_MS = '1'
+  let calls = 0
+  const ok = { candidates: [{ content: { parts: [{ text: JSON.stringify({ html: templateFreeform('a wordle game') }) }] } }] }
+  const flaky = async () => {
+    calls += 1
+    if (calls === 1) return new Response('{"error":{"code":500,"status":"INTERNAL","message":"Internal error encountered."}}', { status: 500 })
+    return new Response(JSON.stringify(ok), { status: 200 })
+  }
+  const result = await generateFreeform({ prompt: 'a wordle game', env: { GEMINI_API_KEY: 'g', AI_PROVIDER: 'gemini' }, fetchImpl: flaky })
+  assert.equal(result.mode, 'ai')
+  assert.equal(calls, 2)
+  calls = 0
+  const rejecting = async () => { calls += 1; return new Response('{"error":{"code":400,"status":"INVALID_ARGUMENT","message":"Invalid JSON payload received."}}', { status: 400 }) }
+  await assert.rejects(
+    generateFreeform({ prompt: 'a wordle game', env: { GEMINI_API_KEY: 'g', AI_PROVIDER: 'gemini' }, fetchImpl: rejecting }),
+    (err) => err.code === 'ai_request_rejected' && err.upstream.status === 400 && /Invalid JSON payload/.test(err.message)
+  )
+  assert.equal(calls, 1)
+  delete process.env.AI_RETRY_DELAY_MS
 })

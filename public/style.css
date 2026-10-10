@@ -474,3 +474,7 @@ input[type="color"] { padding: 4px; height: 40px; }
   .data td { border: 0; padding: 4px 0; }
   .data td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 13px; }
 }
+
+/* Shown when the server has no AI provider key: Generate returns template games. */
+.ai-off{margin:12px 0;padding:12px 14px;border:1px solid var(--brand);color:var(--text);background:#1a1d00;font-size:14px;line-height:1.45}
+.ai-off[hidden]{display:none}

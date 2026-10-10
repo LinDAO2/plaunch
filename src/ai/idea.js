@@ -24,7 +24,7 @@ async function classifyWithModel(prompt, env, fetchImpl) {
   const raw = await requestModelText(provider, [
     { role: 'system', content: TIER_PROMPT },
     { role: 'user', content: `Player idea:\n${prompt}` }
-  ], fetchImpl, { schema: TIER_SCHEMA, maxOutputTokens: 64 })
+  ], fetchImpl, { schema: TIER_SCHEMA, maxOutputTokens: 64, noRetry: true })
   let tier = ''
   try {
     tier = JSON.parse(String(raw).trim()).tier

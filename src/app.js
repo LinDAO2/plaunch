@@ -374,7 +374,10 @@ export function createApp({ db, config, fetchImpl, hub = null } = {}) {
       status = err.status || 500
       if (!res.headersSent) {
         if (!err.status) log('error', 'request failed', { requestId, message: err.message })
-        sendJson(res, status, { error: err.status ? err.message : 'Server error', code: err.code }, ctx)
+        const out = { error: err.status ? err.message : 'Server error', code: err.code }
+        // Upstream AI failures carry the provider's real status and message (secrets redacted).
+        if (err.status && err.upstream) out.upstream = err.upstream
+        sendJson(res, status, out, ctx)
       }
     } finally {
       log('info', 'request', {

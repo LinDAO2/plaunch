@@ -30,6 +30,7 @@ export async function api(path, method = 'GET', payload) {
     const error = new Error(data.error || 'Request failed')
     error.status = res.status
     error.code = data.code
+    error.upstream = data.upstream || null
     throw error
   }
   return data

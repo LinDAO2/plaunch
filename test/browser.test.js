@@ -183,6 +183,8 @@ test('redesign pages fit a desktop', { timeout: 180000 }, async () => {
     await desktop.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
     await desktop.waitForFunction(() => document.body.innerText.includes('Make a game from one sentence') && document.body.innerText.includes('Click Frenzy'))
     assert.equal(await desktop.evaluate(() => getComputedStyle(document.body).backgroundImage), 'none')
+    await desktop.waitForFunction(() => !document.querySelector('#ai-off')?.hidden)
+    assert.match(await desktop.locator('#ai-off').innerText(), /AI is off/)
     assert.equal(await desktop.evaluate(() => /arcade spec|provider key|token interest/i.test(document.body.innerText)), false)
     assert.equal(await desktop.evaluate(() => /sign in/i.test(document.querySelector('header').innerText)), false)
     assert.match(await desktop.locator('#account').innerText(), /Save your games/)

@@ -2,7 +2,8 @@ import { HttpError } from '../errors.js'
 import { cleanText } from '../validate.js'
 import { generateWorldIdea, wantsWorld } from '../blocks/spec.js'
 import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
-import { DEFAULT_AI_TIMEOUT_MS, aiStatus, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
+import { log } from '../log.js'
+import { DEFAULT_AI_TIMEOUT_MS, aiStatus, describeUpstreamError, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
 import { SAMPLE_SPECS } from './samples.js'
 
@@ -87,17 +88,13 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     throw error
   }
   if (!response.ok) {
-    const rejected = response.status === 401 || response.status === 403
-    const quota = response.status === 429
-    const busy = response.status === 503 || response.status === 500
-    const message = rejected ? 'AI provider rejected the API key'
-      : quota ? 'AI provider quota exceeded. Try again later.'
-        : busy ? 'AI provider is overloaded right now. Try again in a minute.'
-          : 'AI provider request failed'
-    const error = new HttpError(502, message, quota ? 'ai_quota_exceeded' : busy ? 'ai_provider_busy' : 'ai_provider_error')
-    // Retrying a 429 immediately only burns more quota. A 503 gets one delayed retry.
-    error.retry = !rejected && !quota && response.status !== 400
-    if (busy) error.retryDelayMs = retryDelay()
+    const info = describeUpstreamError(provider, response.status, text)
+    log('warn', 'ai provider error', info.upstream)
+    const error = new HttpError(502, info.message, info.code)
+    error.upstream = info.upstream
+    // Retrying a 429 or a rejected request only burns quota. A 503, 500, or 504 gets one delayed retry.
+    error.retry = info.retry
+    if (info.delay) error.retryDelayMs = retryDelay()
     throw error
   }
   let payload
@@ -117,8 +114,21 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
   return content
 }
 
-export function requestModelText(provider, messages, fetchImpl, options = {}) {
-  return callProvider(provider, messages, fetchImpl, { maxResponseChars: 262144, ...options })
+function withUpstream(error, source) {
+  if (source?.upstream) error.upstream = source.upstream
+  return error
+}
+
+// One delayed retry for transient upstream failures (503, 500, 504, transport). Never for 4xx.
+export async function requestModelText(provider, messages, fetchImpl, options = {}) {
+  const opts = { maxResponseChars: 262144, ...options }
+  try {
+    return await callProvider(provider, messages, fetchImpl, opts)
+  } catch (err) {
+    if (!err.retry || options.noRetry) throw err
+    if (err.retryDelayMs) await sleep(err.retryDelayMs)
+    return callProvider(provider, messages, fetchImpl, opts)
+  }
 }
 
 function templateResult(prompt) {
@@ -153,13 +163,13 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
   for (let attempt = 1; attempt <= 3; attempt++) {
     let raw
     try {
-      raw = await callProvider(provider, messages, fetchImpl)
+      raw = await callProvider(provider, messages, fetchImpl, { maxResponseChars: 262144 })
     } catch (err) {
       lastError = err.message
       code = err.code || 'ai_provider_error'
       providerFailures += 1
       // Transport and 5xx failures get one retry; three 503s in a row burned free-tier quota live.
-      if (err.retry === false || attempt === 3 || providerFailures >= 2) throw new HttpError(502, lastError, code)
+      if (err.retry === false || attempt === 3 || providerFailures >= 2) throw withUpstream(new HttpError(502, lastError, code), err)
       if (err.retryDelayMs) await sleep(err.retryDelayMs)
       continue
     }

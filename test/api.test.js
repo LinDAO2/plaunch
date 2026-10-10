@@ -588,6 +588,32 @@ describe('ai route and rate limit', { concurrency: false }, () => {
     }
   })
 
+  test('an upstream Gemini 400 reaches the client with its real status, not as busy', async () => {
+    let calls = 0
+    const server = await startServer({
+      env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'AIzaSyUPSTREAMTESTKEY0000000000000' },
+      fetchImpl: async () => {
+        calls += 1
+        return new Response(JSON.stringify({ error: { code: 400, status: 'INVALID_ARGUMENT', message: 'Request contains an invalid argument.' } }), { status: 400 })
+      }
+    })
+    try {
+      const client = createClient(server.base)
+      await client.prime()
+      const res = await client.request('POST', '/api/ai/generate', { prompt: 'a wordle game', tier: 'freeform' })
+      assert.equal(res.status, 502)
+      assert.equal(res.data.code, 'ai_request_rejected')
+      assert.equal(res.data.upstream.status, 400)
+      assert.equal(res.data.upstream.code, 'INVALID_ARGUMENT')
+      assert.match(res.data.error, /HTTP 400 INVALID_ARGUMENT/)
+      assert.doesNotMatch(res.data.error, /overloaded/)
+      assert.doesNotMatch(JSON.stringify(res.data), /AIzaSyUPSTREAM/)
+      assert.equal(calls, 1)
+    } finally {
+      await server.close()
+    }
+  })
+
   test('daily generation caps return 429', async () => {
     let calls = 0
     const fetchImpl = async () => {
