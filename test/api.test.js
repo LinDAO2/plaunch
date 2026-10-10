@@ -145,7 +145,7 @@ describe('http api', { concurrency: false }, () => {
     assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/)
     assert.equal(page.headers.get('x-frame-options'), 'DENY')
     const home = await client.request('GET', '/')
-    assert.match(home.text, /Think it\./)
+    assert.match(home.text, /Make a game from one sentence/)
     const script = await client.request('GET', '/app.js')
     assert.equal(script.status, 200)
     assert.match(script.headers.get('content-type'), /javascript/)

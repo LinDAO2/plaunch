@@ -73,13 +73,22 @@ const FILES = new Map([
   ['/dashboard.js', 'dashboard.js'],
   ['/sandbox-score.js', 'sandbox-score.js'],
   ['/discover.js', 'discover.js'],
-  ['/admin.js', 'admin.js']
+  ['/admin.js', 'admin.js'],
+  ['/cards.js', 'cards.js'],
+  ['/juice.js', 'juice.js'],
+  ['/icons.js', 'icons.js'],
+  ['/fonts/bricolage-grotesque-latin-700.woff2', 'fonts/bricolage-grotesque-latin-700.woff2'],
+  ['/fonts/source-sans-3-latin-400.woff2', 'fonts/source-sans-3-latin-400.woff2'],
+  ['/fonts/source-sans-3-latin-600.woff2', 'fonts/source-sans-3-latin-600.woff2'],
+  ['/fonts/ibm-plex-mono-latin-400.woff2', 'fonts/ibm-plex-mono-latin-400.woff2'],
+  ['/fonts/ibm-plex-mono-latin-600.woff2', 'fonts/ibm-plex-mono-latin-600.woff2']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.png': 'image/png'
+  '.png': 'image/png',
+  '.woff2': 'font/woff2'
 }
 const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'seed'])
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -581,7 +590,12 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const game = await publishedOrNull(db, shareMatch[1])
     if (!game) return sendHtml(res, 404, renderMissing('Game not found'), ctx, 'embed')
     const board = splitBoards(await listScores(db, game.id), game.type)
-    return sendHtml(res, 200, renderSharePage(game, {
+    let creator = 'Playground'
+    if (game.ownerId) {
+      const found = await db.query('select display_name from users where id = $1', [game.ownerId])
+      creator = found.rows[0]?.display_name || 'Playground'
+    }
+    return sendHtml(res, 200, renderSharePage({ ...game, creator }, {
       origin: requestOrigin(config, req),
       site: config.xSiteHandle,
       scores: board.scores,

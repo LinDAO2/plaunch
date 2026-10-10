@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0c0b12">
+<meta name="theme-color" content="#000000">
 <title>Discover — playground</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="top">
-<a class="brand" href="/">play<span>ground</span><i>.</i></a>
+<a class="brand" href="/"><svg class="mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" fill="#e6ff3a"/></svg>playground</a>
 <nav>
 <a href="/discover">Discover</a>
 <a href="/#studio">Create</a>
@@ -18,12 +18,13 @@
 </nav>
 </header>
 <main class="shell">
-<section class="hero discover-hero">
-<div class="eyebrow">DISCOVER</div>
-<h1>Find a game <span>worth a round.</span></h1>
-<p>Trending counts each player once over the last day. A burst of restarts from the same session does not move the rank, and the creator's own plays stay out of it.</p>
-</section>
-<section class="discover discover-page">
+<section class="wall discover-page">
+<div class="wall-head">
+<div>
+<h1>Games</h1>
+<p class="hint">Trending counts each player once over the last day. A burst of restarts from the same session does not move the rank, and the creator's own plays stay out of it.</p>
+</div>
+</div>
 <div class="view-tabs" role="tablist">
 <button id="view-trending" class="outline" type="button">Trending</button>
 <button id="view-new" class="outline on" type="button">New</button>
@@ -33,7 +34,7 @@
 <div id="tag-row" class="tag-row"></div>
 <div class="cards" id="gallery">Loading games…</div>
 </section>
-<footer class="site-foot"><span>playground beta · no tokens deployed</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+<footer class="site-foot"><span>Playground</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
 </main>
 <script type="module" src="/discover.js"></script>
 </body>

@@ -75,22 +75,30 @@ ${siteTag}
 <meta property="og:url" content="${pageUrl}">
 <meta property="og:image" content="${posterUrl}">
 <link rel="canonical" href="${pageUrl}">
+<link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/play.css">
 </head>
-<body class="play-body">
-<main class="play-shell">
-<p class="eyebrow">PLAYGROUND</p>
+<body class="share-body">
+<header class="top">
+<a class="brand" href="/"><svg class="mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" fill="#e6ff3a"/></svg>playground</a>
+<nav><a href="/discover">Discover</a></nav>
+</header>
+<main class="shell share">
+<img class="poster" src="/api/games/${slug}/poster.png" width="480" height="480" alt="${name} poster">
+<div class="share-copy">
 <h1>${name}</h1>
 <p>${description}</p>
-<img class="poster" src="/api/games/${slug}/poster.png" width="240" height="240" alt="${name} poster">
-<p class="play-links"><a href="${playPath}">Play</a><a href="${studioPath}">Open studio page</a></p>
+<p class="by">By ${escapeHtml(game.creator || 'Playground')}</p>
+<a class="primary" href="${playPath}">Play</a>
+<a href="${studioPath}">Open in studio</a>
 <section class="leaderboard">
-<div class="leaderboard-head"><h3>Leaderboard</h3><span>Top 20</span></div>
-<h3>Checked</h3>
+<div class="leaderboard-head"><h2>Top scores</h2><span>Top 20</span></div>
+<h2>Checked</h2>
 <div class="leaders">${checkedRows}</div>
-<h3>Unverified</h3>
+<h2>Unverified</h2>
 <div class="leaders">${unverifiedRows}</div>
 </section>
+</div>
 </main>
 </body>
 </html>`

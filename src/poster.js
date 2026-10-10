@@ -97,13 +97,9 @@ export function encodePng(width, height, rgb) {
 
 function hexColor(value) {
   const match = /^#?([0-9a-fA-F]{6})$/.exec(String(value || ''))
-  if (!match) return [168, 139, 255]
+  if (!match) return [230, 255, 58]
   const n = Number.parseInt(match[1], 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-
-function mix(a, b, t) {
-  return a.map((channel, index) => Math.round(channel + (b[index] - channel) * t))
 }
 
 function fillRect(rgb, x, y, w, h, color) {
@@ -118,28 +114,6 @@ function fillRect(rgb, x, y, w, h, color) {
       rgb[i++] = r
       rgb[i++] = g
       rgb[i++] = b
-    }
-  }
-}
-
-function fillCircle(rgb, cx, cy, radius, color) {
-  const r2 = radius * radius
-  const x0 = Math.max(0, Math.floor(cx - radius))
-  const y0 = Math.max(0, Math.floor(cy - radius))
-  const x1 = Math.min(SIZE, Math.ceil(cx + radius))
-  const y1 = Math.min(SIZE, Math.ceil(cy + radius))
-  const [r, g, b] = color
-  for (let y = y0; y < y1; y++) {
-    const dy = y - cy
-    let i = (y * SIZE + x0) * 3
-    for (let x = x0; x < x1; x++) {
-      const dx = x - cx
-      if (dx * dx + dy * dy <= r2) {
-        rgb[i] = r
-        rgb[i + 1] = g
-        rgb[i + 2] = b
-      }
-      i += 3
     }
   }
 }
@@ -183,21 +157,25 @@ function label(value, max) {
 export function renderPoster(game) {
   const rgb = Buffer.alloc(SIZE * SIZE * 3)
   const accent = hexColor(game.accent)
-  const ink = [12, 11, 18]
-  const paper = [249, 247, 255]
-  fillRect(rgb, 0, 0, SIZE, SIZE, ink)
+  const paper = [231, 233, 234]
+  const yellow = [230, 255, 58]
+  fillRect(rgb, 0, 0, SIZE, SIZE, [0, 0, 0])
   const seed = hashString(game.id || game.name)
-  fillCircle(rgb, 860 + (seed % 80), 280 + (seed % 40), 280, mix(accent, [255, 255, 255], 0.15))
-  fillCircle(rgb, 240 + ((seed >> 8) % 60), 860, 180, mix(accent, ink, 0.35))
-  fillRect(rgb, 80, 80, 120, 16, accent)
+  fillRect(rgb, 0, 0, 48, SIZE, accent)
+  for (let i = 0; i < 5; i++) {
+    const x = 120 + ((seed >> (i * 3)) % 760)
+    const y = 160 + ((seed >> (i + 2)) % 520)
+    fillRect(rgb, x, y, i % 2 ? 72 : 36, i % 2 ? 36 : 72, accent)
+  }
+  fillRect(rgb, 0, 0, SIZE, 16, yellow)
   const title = label(game.name, 16)
-  const scale = title.length > 12 ? 11 : 14
+  const scale = title.length > 12 ? 10 : 13
   const titleWidth = title.length * 6 * scale
-  drawText(rgb, title, Math.max(80, Math.round((SIZE - titleWidth) / 2)), 470, scale, paper)
+  drawText(rgb, title, Math.max(96, Math.round((SIZE - titleWidth) / 2)), 520, scale, paper)
   const mechanic = label(game.type, 12)
   const mechanicWidth = mechanic.length * 6 * 8
-  drawText(rgb, mechanic, Math.max(80, Math.round((SIZE - mechanicWidth) / 2)), 640, 8, mix(accent, paper, 0.35))
-  fillRect(rgb, 80, 1040, SIZE - 160, 18, accent)
+  drawText(rgb, mechanic, Math.max(96, Math.round((SIZE - mechanicWidth) / 2)), 680, 8, yellow)
+  fillRect(rgb, 0, SIZE - 16, SIZE, 16, yellow)
   return encodePng(SIZE, SIZE, rgb)
 }
 

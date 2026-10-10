@@ -1,3 +1,4 @@
+import { gameCard } from '/cards.js'
 import { api, ensureCsrf } from '/client-api.js'
 
 const $ = (id) => document.getElementById(id)
@@ -36,28 +37,13 @@ function render(games) {
     return
   }
   for (const game of games) {
-    const card = document.createElement('article')
-    card.className = 'card'
-    card.style.borderTop = `3px solid ${game.accent || '#a88bff'}`
-    const kind = document.createElement('div')
-    kind.className = 'mini'
-    kind.textContent = typeNames[game.type] || game.type
-    const title = document.createElement('h3')
-    title.textContent = game.name
-    const desc = document.createElement('p')
-    desc.textContent = game.description
-    const tags = document.createElement('div')
-    tags.className = 'tag-list'
-    tags.textContent = (game.tags || []).join(' · ')
-    const bottom = document.createElement('div')
-    bottom.className = 'card-bottom'
+    const { card, bottom, play } = gameCard(game, {
+      label: typeNames[game.type] || game.type,
+      playHref: `/play/${game.id}`
+    })
     const small = document.createElement('small')
     small.textContent = view === 'trending' ? `${game.trending || 0} players today` : `${game.plays || 0} plays`
-    const play = document.createElement('a')
-    play.href = `/play/${game.id}`
-    play.textContent = 'Play →'
     bottom.append(small, play)
-    card.append(kind, title, desc, tags, bottom)
     gallery.append(card)
   }
 }

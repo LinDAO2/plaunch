@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0c0b12">
+<meta name="theme-color" content="#000000">
 <title>Moderation — playground</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="top">
-<a class="brand" href="/">play<span>ground</span><i>.</i></a>
+<a class="brand" href="/"><svg class="mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" fill="#e6ff3a"/></svg>playground</a>
 <nav>
 <a href="/discover">Discover</a>
 <a href="/#studio">Create</a>
@@ -18,21 +18,27 @@
 </nav>
 </header>
 <main class="shell">
-<section class="hero discover-hero">
-<div class="eyebrow">MODERATION</div>
-<h1>Queue</h1>
-<p id="admin-intro">Games held for review, open abuse reports, and the audit log.</p>
-</section>
+<h1>Moderation</h1>
+<p id="admin-intro" class="hint">Games held for review, open abuse reports, and the audit log.</p>
 <p id="admin-status" class="hint">Checking your account…</p>
 <section id="admin-queue" hidden>
 <h2>Held and hidden</h2>
-<div id="admin-games" class="mod-list"></div>
+<table class="data">
+<thead><tr><th>Game</th><th>Detail</th><th>Actions</th></tr></thead>
+<tbody id="admin-games"></tbody>
+</table>
 <h2>Abuse reports</h2>
-<div id="admin-reports" class="mod-list"></div>
+<table class="data">
+<thead><tr><th>Game</th><th>Detail</th><th>Actions</th></tr></thead>
+<tbody id="admin-reports"></tbody>
+</table>
 <h2>Audit log</h2>
-<div id="admin-audit" class="mod-list"></div>
+<table class="data">
+<thead><tr><th>Action</th><th>Target</th><th>When</th></tr></thead>
+<tbody id="admin-audit"></tbody>
+</table>
 </section>
-<footer class="site-foot"><span>playground beta · no tokens deployed</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+<footer class="site-foot"><span>Playground</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
 </main>
 <script type="module" src="/admin.js"></script>
 </body>

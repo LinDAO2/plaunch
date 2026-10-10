@@ -1,8 +1,24 @@
 import { mountArcade } from '/arcade-view.js'
+import { bindSound, blip, burst, shake } from '/juice.js'
 
 const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's', ' ', 'f'])
 
 export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE', arcade: 'ARCADE' }
+
+export function renderHint(el, game) {
+  if (!el) return
+  const text = controlHint(game)
+  const prefix = 'Mouse or trackpad to move · '
+  el.replaceChildren()
+  if (text.startsWith(prefix)) {
+    const fine = document.createElement('span')
+    fine.className = 'pointer-fine'
+    fine.textContent = prefix
+    el.append(fine, document.createTextNode(text.slice(prefix.length)))
+    return
+  }
+  el.textContent = text
+}
 
 export function controlHint(game) {
   if (game?.tier === 'freeform') return 'Sandboxed canvas. The score comes back to this page. The game cannot read this page or the network.'
@@ -35,6 +51,36 @@ export function createRuntime(els, hooks = {}) {
   let dodgePointer = null
   let game = { name: '', description: '', type: 'tap', duration: 10, accent: '#a88bff' }
   let playStarted = false
+  let goalTimer = 0
+  let prevArcade = { score: 0, lives: null }
+
+  function showGoal() {
+    if (!els.goal) return
+    els.goal.textContent = game.description || ''
+    els.goal.hidden = !game.description
+  }
+
+  function armGoal() {
+    showGoal()
+    clearTimeout(goalTimer)
+    goalTimer = setTimeout(() => {
+      if (els.goal) els.goal.hidden = true
+    }, 3000)
+  }
+
+  function hideRound() {
+    if (els.round) els.round.hidden = true
+  }
+
+  function showRound(points) {
+    if (!els.round || !els.roundScore) return
+    els.play.hidden = true
+    els.roundScore.textContent = points === null
+      ? 'No score'
+      : game.type === 'reaction' ? `Score ${points} ms` : `Score ${points}`
+    if (els.goal) els.goal.hidden = true
+    els.round.hidden = false
+  }
 
   function emitStart() {
     if (playStarted) return
@@ -58,8 +104,10 @@ export function createRuntime(els, hooks = {}) {
     obstacles = []
     els.score.textContent = 'Score: 0'
     els.timer.textContent = `Time: ${remaining}s`
-    els.label.textContent = 'READY, PLAYER ONE'
+    els.label.textContent = 'Ready'
     els.label.hidden = false
+    hideRound()
+    showGoal()
     els.display.textContent = '0'
     els.play.textContent = 'Start game'
     els.play.hidden = false
@@ -90,9 +138,10 @@ export function createRuntime(els, hooks = {}) {
     els.display.textContent = String(value)
     els.label.textContent = label
     els.label.hidden = false
-    els.play.hidden = false
+    els.play.hidden = true
     els.play.textContent = 'Play again'
     lastScore = opts.keepScore === false ? null : points
+    showRound(lastScore)
     hooks.onFinish?.({ points: lastScore, mechanic: game.type, game })
   }
 
@@ -112,6 +161,8 @@ export function createRuntime(els, hooks = {}) {
       els.play.hidden = true
       els.label.textContent = 'ARCADE'
       els.label.hidden = true
+      prevArcade = { score: 0, lives: null }
+      armGoal()
       emitStart()
       const spec = g.spec?.runtime === 'arcade' ? g.spec : null
       if (!spec) {
@@ -121,6 +172,16 @@ export function createRuntime(els, hooks = {}) {
       arcade = mountArcade(els.field, spec, {
         keys: dodgeKeys,
         onScore(snap) {
+          if (snap.score > prevArcade.score) {
+            burst(els.field, snap.playerX, snap.playerY ?? 80, g.accent || '#e6ff3a')
+            blip('score')
+          }
+          if (prevArcade.lives !== null && snap.lives < prevArcade.lives) {
+            shake(els.root)
+            burst(els.field, snap.playerX, snap.playerY ?? 80, '#f4212e')
+            blip('hurt')
+          }
+          prevArcade = { score: snap.score, lives: snap.lives }
           points = snap.score
           els.score.textContent = `Score: ${points}`
           const left = Math.max(0, Math.ceil(((Number(g.duration) || 20) * 1000 - snap.time) / 1000))
@@ -129,7 +190,7 @@ export function createRuntime(els, hooks = {}) {
         onEnd(snap) {
           points = snap.score
           els.score.textContent = `Score: ${points}`
-          finish(snap.won ? '🏆' : String(snap.score), snap.won ? 'YOU WIN' : 'GAME OVER')
+          finish(snap.won ? 'Win' : String(snap.score), snap.won ? 'YOU WIN' : 'GAME OVER')
         }
       })
       return
@@ -141,6 +202,7 @@ export function createRuntime(els, hooks = {}) {
         remaining = g.duration
         els.play.textContent = 'TAP!'
         els.label.textContent = 'GO GO GO'
+        armGoal()
         emitStart()
         timer = setInterval(() => {
           remaining -= 1
@@ -151,17 +213,23 @@ export function createRuntime(els, hooks = {}) {
         points += 1
         els.score.textContent = `Score: ${points}`
         els.display.textContent = String(points)
+        burst(els.field, 50, 46, g.accent || '#e6ff3a')
+        blip('score')
       }
       return
     }
     if (g.type === 'reaction') {
       if (phase === 'wait') {
         clearTimeout(timeout)
-        finish('⚠', 'TOO EARLY', { keepScore: false })
+        shake(els.root)
+        blip('hurt')
+        finish('Too early', 'TOO EARLY', { keepScore: false })
       } else if (phase === 'ready') {
         const ms = Math.max(1, Math.round(performance.now() - startedAt))
         points = ms
         els.score.textContent = `Reaction: ${ms}ms`
+        burst(els.field, 50, 46, '#e6ff3a')
+        blip('score')
         finish(`${ms}ms`, 'NICE REFLEX')
       } else {
         clear()
@@ -169,6 +237,7 @@ export function createRuntime(els, hooks = {}) {
         els.display.textContent = '…'
         els.label.textContent = 'WAIT FOR THE SIGNAL'
         els.play.textContent = 'Wait…'
+        armGoal()
         emitStart()
         timeout = setTimeout(() => {
           if (phase !== 'wait') return
@@ -177,6 +246,8 @@ export function createRuntime(els, hooks = {}) {
           els.display.textContent = 'GO!'
           els.label.textContent = 'CLICK NOW'
           els.play.textContent = 'CLICK!'
+          burst(els.field, 50, 46, '#e6ff3a')
+          blip('go')
         }, 1500 + Math.random() * 2300)
       }
       return
@@ -189,6 +260,7 @@ export function createRuntime(els, hooks = {}) {
         els.label.textContent = 'GUESS 1–10'
         els.display.textContent = '?'
         els.play.textContent = 'Enter guess'
+        armGoal()
         els.timer.textContent = 'No timer'
         if (els.guess) {
           els.guess.hidden = false
@@ -208,7 +280,9 @@ export function createRuntime(els, hooks = {}) {
         els.score.textContent = `Attempts: ${points}`
         if (n === secret) {
           points = Math.max(10, 100 - points * 10)
-          finish('🎉', 'YOU GUESSED IT')
+          burst(els.field, 50, 46, '#e6ff3a')
+          blip('score')
+          finish('Yes', 'YOU GUESSED IT')
         } else {
           els.display.textContent = n < secret ? '↑ HIGHER' : '↓ LOWER'
           if (els.guess) els.guess.value = ''
@@ -227,6 +301,7 @@ export function createRuntime(els, hooks = {}) {
       els.display.textContent = ''
       els.play.hidden = true
       els.label.textContent = 'DODGE THE METEORS'
+      armGoal()
       emitStart()
       const player = document.createElement('div')
       player.className = 'dodge-player'
@@ -256,7 +331,7 @@ export function createRuntime(els, hooks = {}) {
         els.timer.textContent = `Time: ${remaining}s`
         if (remaining <= 0) {
           els.field.style.pointerEvents = 'none'
-          finish('🏆', 'YOU SURVIVED')
+          finish('Clear', 'YOU SURVIVED')
         }
       }, 1000)
       let prev = performance.now()
@@ -288,6 +363,8 @@ export function createRuntime(els, hooks = {}) {
           obstacle.el.style.top = `${obstacle.y}%`
           if (obstacle.y > 72 && obstacle.y < 87 && Math.abs(obstacle.x - dodgeX) < 8) {
             els.field.style.pointerEvents = 'none'
+            shake(els.root)
+            blip('hurt')
             finish(points, 'CRASHED!')
             return
           }
@@ -297,6 +374,8 @@ export function createRuntime(els, hooks = {}) {
           obstacle.el.remove()
           points += 10
           els.score.textContent = `Score: ${points}`
+          burst(els.field, obstacle.x, 70, g.accent || '#ff779e')
+          blip('score')
           return false
         })
         dodgeFrame = requestAnimationFrame(frame)
@@ -324,6 +403,8 @@ export function createRuntime(els, hooks = {}) {
   }
 
   els.play.addEventListener('click', run)
+  if (els.again) els.again.addEventListener('click', run)
+  bindSound(els.sound)
   // Meteor Dodge: the mouse or trackpad steers without a button; on touch this tracks a drag.
   els.field.addEventListener('pointermove', (event) => {
     if (!playing || game.type !== 'dodge' || event.target.closest?.('button')) return

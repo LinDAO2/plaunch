@@ -363,6 +363,33 @@ test('arcade examples validate and diverge across seeded ticks', () => {
   assert.equal(homed, true)
 })
 
+function playUntil(spec, seed, inputFor) {
+  const sim = createSimulation(validateGameSpec(spec), seed)
+  let snap = sim.snapshot()
+  for (let i = 0; i < 800 && !snap.over; i++) snap = sim.tick(50, inputFor(snap))
+  return snap
+}
+
+test('homing gems does not win while idle, and shadow chase lasts a full round', () => {
+  const gems = EXAMPLE_GAMES.find((game) => game.id === 'homing-gems').spec
+  const idleGems = playUntil(gems, 1, () => ({}))
+  assert.equal(idleGems.won, false)
+  assert.ok(idleGems.time > 8000, `idle gems ended at ${idleGems.time}`)
+  const playedGems = playUntil(gems, 2, (snap) => ({
+    left: Math.sin(snap.time / 1000 * 1.5) < 0,
+    right: Math.sin(snap.time / 1000 * 1.5) >= 0
+  }))
+  assert.ok(playedGems.time >= 20000, `played gems ended at ${playedGems.time}`)
+  const chase = EXAMPLE_GAMES.find((game) => game.id === 'shadow-chase').spec
+  const idleChase = playUntil(chase, 1, () => ({}))
+  assert.ok(idleChase.time > 12000, `idle chase ended at ${idleChase.time}`)
+  const playedChase = playUntil(chase, 4, (snap) => {
+    const t = snap.time / 1000
+    return { left: Math.sin(t) < 0, right: Math.sin(t) >= 0, up: Math.cos(t) > 0, down: Math.cos(t) <= 0 }
+  })
+  assert.ok(playedChase.time >= 20000, `played chase ended at ${playedChase.time}`)
+})
+
 test('arcade sim follows the mouse in keys games and moves in 2D in chase games', () => {
   const rain = EXAMPLE_GAMES.find((game) => game.id === 'meteor-rain').spec
   const sim = createSimulation(validateGameSpec(rain), 1)
@@ -814,6 +841,20 @@ test('screenshot artifacts use the first directory mkdir accepts', async () => {
     assert.equal(await resolveArtifactsDir({ env: { ARTIFACTS_DIR: dir }, cwd: '/work' }), dir)
   } finally {
     await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('the site palette is black, off-white, and acid yellow', () => {
+  const css = `${readFileSync(path.join(process.cwd(), 'public/style.css'), 'utf8')}\n${readFileSync(path.join(process.cwd(), 'public/play.css'), 'utf8')}`
+  assert.equal(/radial-gradient|linear-gradient/.test(css), false)
+  assert.equal(/#b397ff/i.test(css), false)
+  assert.match(css, /--brand:\s*#e6ff3a/)
+  assert.match(css, /--bg:\s*#000/)
+  assert.match(css, /bricolage-grotesque-latin-700\.woff2/)
+  assert.match(css, /source-sans-3-latin-400\.woff2/)
+  assert.match(css, /ibm-plex-mono-latin-400\.woff2/)
+  for (const file of ['OFL-BricolageGrotesque.txt', 'OFL-SourceSans3.txt', 'OFL-IBMPlexMono.txt']) {
+    assert.match(readFileSync(path.join(process.cwd(), 'public/fonts', file), 'utf8'), /SIL Open Font License/)
   }
 })
 

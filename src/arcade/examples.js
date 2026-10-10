@@ -100,27 +100,27 @@ export const EXAMPLE_GAMES = [
   example({
     id: 'homing-gems',
     name: 'Homing Gems',
-    description: 'Catch a burst of gems that steer toward you.',
+    description: 'Catch the gems. Keep moving so the shards miss.',
     type: 'arcade',
-    duration: 15,
+    duration: 28,
     accent: '#ffbd70',
     spec: {
       ...shared,
       name: 'Homing Gems',
-      description: 'Catch a burst of gems that steer toward you.',
+      description: 'Catch the gems. Keep moving so the shards miss.',
       theme: 'treasure vault',
       runtime: 'arcade',
-      duration: 15,
+      duration: 28,
       accent: '#ffbd70',
       controls: { keyboard: 'Arrow keys or A and D', touch: 'Drag to catch gems', scheme: 'keys' },
       entities: [
-        { kind: 'collectible', label: 'Gem', sprite: '💎', points: 12, speed: 0.6, shape: 'square' },
-        { kind: 'hazard', label: 'Shard', sprite: '🔺', points: 0, speed: 0.8, shape: 'triangle' }
+        { kind: 'collectible', label: 'Gem', sprite: '💎', points: 6, speed: 0.4, shape: 'square' },
+        { kind: 'hazard', label: 'Shard', sprite: '🔺', points: 0, speed: 1.25, shape: 'triangle' }
       ],
-      spawn: { rate: 0.6, pattern: 'burst' },
+      spawn: { rate: 0.45, pattern: 'burst' },
       movement: 'homing',
-      rules: { win: 'score', seconds: 15, lives: 3, targetScore: 36 },
-      scoreRules: { pointsPerEntity: 12, comboMultiplier: 2 },
+      rules: { win: 'score', seconds: 28, lives: 4, targetScore: 54 },
+      scoreRules: { pointsPerEntity: 6, comboMultiplier: 1 },
       palette: ['#ffbd70', '#3a2a14', '#fff1d6'],
       player: { sprite: '🧲', scheme: 'keys' }
     }
@@ -158,27 +158,27 @@ export const EXAMPLE_GAMES = [
   example({
     id: 'shadow-chase',
     name: 'Shadow Chase',
-    description: 'A shadow peels off the wall and hunts you through the vault.',
+    description: 'Grab the coins and stay away from the shadow.',
     type: 'arcade',
-    duration: 18,
+    duration: 28,
     accent: '#c084fc',
     spec: {
       ...shared,
       name: 'Shadow Chase',
-      description: 'A shadow peels off the wall and hunts you through the vault.',
+      description: 'Grab the coins and stay away from the shadow.',
       theme: 'candlelit vault',
       runtime: 'arcade',
-      duration: 18,
+      duration: 28,
       accent: '#c084fc',
       controls: { keyboard: 'Arrow keys or A and D to flee', touch: 'Drag away from the shadow', scheme: 'keys' },
       entities: [
-        { kind: 'hazard', label: 'Shadow', sprite: '👻', points: 0, speed: 0.7, shape: 'circle' },
-        { kind: 'collectible', label: 'Coin', sprite: '🪙', points: 14, speed: 0.45, shape: 'circle' }
+        { kind: 'hazard', label: 'Shadow', sprite: '👻', points: 0, speed: 0.2, shape: 'circle' },
+        { kind: 'collectible', label: 'Coin', sprite: '🪙', points: 10, speed: 0.2, shape: 'circle' }
       ],
       spawn: { rate: 0.45, pattern: 'burst' },
       movement: 'homing',
-      rules: { win: 'lives', seconds: 18, lives: 2, targetScore: 40 },
-      scoreRules: { pointsPerEntity: 14, comboMultiplier: 1 },
+      rules: { win: 'lives', seconds: 28, lives: 9, targetScore: 40 },
+      scoreRules: { pointsPerEntity: 10, comboMultiplier: 1 },
       palette: ['#c084fc', '#1a1028', '#f3e8ff'],
       player: { sprite: '🏃', scheme: 'keys' },
       primitives: ['chase'],

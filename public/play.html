@@ -3,17 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0c0b12">
+<meta name="theme-color" content="#000000">
 <title>__TITLE__</title>
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/play.css">
 </head>
 <body class="__BODY_CLASS__">
 <div id="embed-gate" class="embed-gate" __GATE_ATTR__>
-<button id="embed-play" class="primary big-button" type="button">Play</button>
+<button id="embed-play" class="primary" type="button">Play</button>
 </div>
 <main class="play-shell">
-<p class="eyebrow">PLAYGROUND</p>
+<div class="play-head">
+<a class="brand" href="/"><svg class="mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" fill="#e6ff3a"/></svg>playground</a>
+<a href="/discover">Discover</a>
+</div>
+<div class="play-stage">
+<section class="stage">
 <div class="play-top">
 <h1 id="preview-name">__NAME__</h1>
 <span class="chip" id="mechanic">__MECHANIC__</span>
@@ -22,21 +27,31 @@
 <p id="controls-hint" class="hint"></p>
 <p id="play-error" class="hint" hidden></p>
 <div class="game" id="game">
-<span class="game-label" id="game-label">READY, PLAYER ONE</span>
+<p id="goal-banner" class="goal-banner">__DESCRIPTION__</p>
+<span class="game-label" id="game-label">Ready</span>
 <strong id="display">0</strong>
 <div id="field" class="field"></div>
 <input id="guess-input" class="guess-input" inputmode="numeric" maxlength="2" hidden placeholder="1–10" aria-label="Guess">
-<button class="primary big-button" id="play" type="button">Start game</button>
-<div class="game-bar"><span id="score">Score: 0</span><span id="timer">Time: 10s</span></div>
+<button class="primary" id="play" type="button">Start game</button>
+<div id="round-over" class="round-over" hidden>
+<p id="round-score" class="round-score">Score 0</p>
+<input id="player" maxlength="22" placeholder="Your player name" autocomplete="nickname">
+<div class="round-actions">
+<button id="submit-score" class="primary" type="button" disabled>Submit</button>
+<button id="play-again" class="outline" type="button">Play again</button>
 </div>
+</div>
+<div class="game-bar"><span id="score">Score: 0</span><span id="timer">Time: 10s</span><button id="sound-toggle" class="outline sound-toggle" type="button" aria-pressed="false">Sound off</button></div>
+</div>
+</section>
+<aside class="side">
 <div class="leaderboard">
-<div class="leaderboard-head"><h3>Leaderboard</h3><span id="leaderboard-scope">Top 20</span></div>
+<div class="leaderboard-head"><h2>Leaderboard</h2><span id="leaderboard-scope">Top 20</span></div>
 <div class="board-tabs" role="tablist">
 <button id="tab-checked" class="outline on" type="button">Checked</button>
 <button id="tab-unverified" class="outline" type="button">Unverified</button>
 </div>
 <div id="leaders" class="leaders">Loading scores…</div>
-<div class="submit-score"><input id="player" maxlength="22" placeholder="Your player name" autocomplete="nickname"><button id="submit-score" class="outline" type="button" disabled>Submit score</button></div>
 <p class="hint">Checked scores are ranked by default. Unverified scores sit on the other tab. A checked score passed a round token, a minimum time, and a score-rate check.</p>
 </div>
 <div id="report-box" hidden>
@@ -53,8 +68,11 @@
 <div class="play-links">
 <button id="report-toggle" class="outline" type="button">Report</button>
 <a id="studio-link" href="/g/__SLUG__">Open in studio</a>
+<a id="share-link" href="/r/__SLUG__">Share card</a>
 </div>
-<footer class="site-foot legal-foot"><span>playground beta</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+</aside>
+</div>
+<footer class="site-foot legal-foot"><span>Playground</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
 </main>
 <div id="toast" role="status" class="toast" hidden></div>
 <script type="module" src="/play.js"></script>

@@ -1,5 +1,5 @@
 import { api, ensureCsrf } from '/client-api.js'
-import { controlHint, createRuntime, typeNames } from '/mechanics.js'
+import { createRuntime, renderHint, typeNames } from '/mechanics.js'
 import { fitSandboxFrame, readSandboxScore, readSandboxSize } from '/sandbox-score.js'
 
 const $ = (id) => document.getElementById(id)
@@ -29,7 +29,12 @@ const runtime = createRuntime({
   play: $('play'),
   score: $('score'),
   timer: $('timer'),
-  guess: $('guess-input')
+  guess: $('guess-input'),
+  goal: $('goal-banner'),
+  round: $('round-over'),
+  roundScore: $('round-score'),
+  again: $('play-again'),
+  sound: $('sound-toggle')
 }, {
   onToast: toast,
   onPlayStarted() {
@@ -43,14 +48,6 @@ const runtime = createRuntime({
     $('submit-score').disabled = points === null
     if (!current || points === null) return
     api(`/games/${current.id}/events`, 'POST', { type: 'play_completed', eventId: crypto.randomUUID() }).catch(() => {})
-    // The score form sits below the game. On a laptop it is usually off screen,
-    // so bring it into view and say what to do next.
-    if (!embed) {
-      const form = document.querySelector('.submit-score')
-      form?.classList.add('ready')
-      form?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      toast('Round over. Add your name and press Submit score to join the leaderboard.')
-    }
   }
 })
 
@@ -118,6 +115,7 @@ function mountFreeform(src) {
   $('game').classList.add('freeform-on')
   $('display').hidden = true
   $('game-label').hidden = true
+  $('goal-banner').hidden = true
   $('timer').hidden = true
   $('score').textContent = 'Score: 0'
 }
@@ -134,6 +132,7 @@ $('play').addEventListener('click', (event) => {
   $('play').hidden = true
   $('display').hidden = true
   $('game-label').hidden = true
+  $('goal-banner').hidden = true
   if (freeformPoints === null) freeformPoints = 0
   $('score').textContent = `Score: ${freeformBest}`
   $('submit-score').disabled = false
@@ -167,7 +166,6 @@ $('submit-score').addEventListener('click', async () => {
     const saved = await api(`/games/${current.id}/scores`, 'POST', body)
     roundToken = null
     $('submit-score').disabled = true
-    document.querySelector('.submit-score')?.classList.remove('ready')
     toast(saved.assurance === 'checked' ? 'Score checked and posted.' : 'Score submitted. It is stored as unverified.')
     await loadScores(saved.assurance === 'checked' ? 'checked' : 'unverified')
   } catch (error) {
@@ -208,8 +206,9 @@ async function boot() {
     current = game
     $('preview-name').textContent = game.name
     $('preview-description').textContent = game.description || ''
+    if (game.accent) $('game').style.borderColor = game.accent
     $('mechanic').textContent = typeNames[game.type] || game.type
-    $('controls-hint').textContent = controlHint(game)
+    renderHint($('controls-hint'), game)
     $('studio-link').href = `/g/${game.id}`
     runtime.setGame(game)
     if (game.tier === 'freeform' && game.sandboxUrl) mountFreeform(game.sandboxUrl)

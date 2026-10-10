@@ -1,5 +1,6 @@
 import { api, ensureCsrf, setCsrf } from '/client-api.js'
-import { controlHint, createRuntime, typeNames } from '/mechanics.js'
+import { gameCard } from '/cards.js'
+import { createRuntime, renderHint, typeNames } from '/mechanics.js'
 import { fitSandboxFrame, readSandboxScore, readSandboxSize } from '/sandbox-score.js'
 
 const $ = (id) => document.getElementById(id)
@@ -30,7 +31,12 @@ const runtime = createRuntime({
   play: $('play'),
   score: $('score'),
   timer: $('timer'),
-  guess: $('guess-input')
+  guess: $('guess-input'),
+  goal: $('goal-banner'),
+  round: $('round-over'),
+  roundScore: $('round-score'),
+  again: $('play-again'),
+  sound: $('sound-toggle')
 }, {
   onToast: toast,
   onPlayStarted() {
@@ -144,7 +150,7 @@ function showSandbox(url) {
   $('play').hidden = true
   $('score').textContent = `Score: ${freeformBest}`
   $('mechanic').textContent = 'FREEFORM'
-  $('controls-hint').textContent = controlHint({ tier: 'freeform' })
+  renderHint($('controls-hint'), { tier: 'freeform' })
 }
 
 function preview() {
@@ -154,7 +160,7 @@ function preview() {
     $('preview-name').textContent = game.name || 'Untitled Game'
     $('preview-description').textContent = game.description
     $('mechanic').textContent = 'FREEFORM'
-    $('controls-hint').textContent = controlHint({ tier: 'freeform' })
+    renderHint($('controls-hint'), { tier: 'freeform' })
     board = { scores: [], unverified: [] }
     boardTab = 'checked'
     $('leaders').textContent = 'Publish or open a game to see scores.'
@@ -191,7 +197,7 @@ function preview() {
   $('preview-name').textContent = game.name || 'Untitled Game'
   $('preview-description').textContent = game.description
   $('mechanic').textContent = typeNames[game.type] || game.type
-  $('controls-hint').textContent = controlHint({ ...game, spec: lastSpec })
+  renderHint($('controls-hint'), { ...game, spec: lastSpec })
   board = { scores: [], unverified: [] }
   boardTab = 'checked'
   $('leaders').textContent = 'Publish or open a game to see scores.'
@@ -303,31 +309,17 @@ function render() {
     return
   }
   for (const game of list) {
-    const card = document.createElement('article')
-    card.className = 'card'
-    card.style.borderTop = `3px solid ${game.accent}`
-    const tag = document.createElement('div')
-    tag.className = 'mini'
-    tag.textContent = (typeNames[game.type] || game.type) + (game.tokenInterest ? ' · TOKEN INTEREST' : '')
-    const title = document.createElement('h3')
-    title.textContent = game.name
-    const desc = document.createElement('p')
-    desc.textContent = game.description
-    const tags = document.createElement('div')
-    tags.className = 'tag-list'
-    tags.textContent = (game.tags || []).join(' · ')
-    const bottom = document.createElement('div')
-    bottom.className = 'card-bottom'
+    const label = (typeNames[game.type] || game.type) + (game.tokenInterest ? ' · token interest' : '')
+    const { card, bottom, play } = gameCard(game, {
+      label,
+      onPlay: () => { showGame(game).catch((error) => toast(error.message)) }
+    })
     const small = document.createElement('small')
     small.textContent = `${game.plays || 0} plays`
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.textContent = 'Play →'
-    button.addEventListener('click', () => { showGame(game).catch((error) => toast(error.message)) })
     const share = document.createElement('button')
     share.type = 'button'
-    share.textContent = '↗'
-    share.title = 'Copy link'
+    share.className = 'outline'
+    share.textContent = 'Copy link'
     share.addEventListener('click', async () => {
       const url = `${location.origin}/g/${game.id}`
       try {
@@ -337,8 +329,7 @@ function render() {
         window.prompt('Copy link', url)
       }
     })
-    bottom.append(small, button, share)
-    card.append(tag, title, desc, tags, bottom)
+    bottom.append(small, play, share)
     $('gallery').append(card)
   }
 }

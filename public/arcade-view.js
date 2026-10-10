@@ -16,7 +16,7 @@ export function mountArcade(field, spec, hooks) {
   const primitives = new Set(spec.primitives || ['fall'])
   const scheme = spec.controls?.scheme || 'keys'
   const input = { left: false, right: false, up: false, down: false, pointerX: null, pointerY: null, taps: [], fire: false, jump: false }
-  const view = { width: 480, height: 320, dpr: 1, hint: hintText(spec) }
+  const view = { width: 480, height: 320, dpr: 1, hint: '' }
   let raf = 0
   let prev = performance.now()
   let stopped = false
@@ -105,17 +105,6 @@ export function mountArcade(field, spec, hooks) {
 
   raf = requestAnimationFrame(frame)
   return { stop }
-}
-
-function hintText(spec) {
-  const scheme = spec.controls?.scheme || 'keys'
-  const primitives = new Set(spec.primitives || [])
-  if (scheme === 'tap') return 'Click or tap the targets'
-  const parts = [scheme === 'drag' ? 'Move the mouse or drag' : 'Move the mouse, drag, or use ← →']
-  if (primitives.has('chase') || primitives.has('maze')) parts[0] = scheme === 'drag' ? 'Move the mouse or drag' : 'Move the mouse, drag, or use the arrow keys'
-  if (primitives.has('platform')) parts.push('Space or ↑ to jump')
-  if (primitives.has('shoot')) parts.push('click or Space to fire')
-  return parts.join(' · ')
 }
 
 function draw(ctx, spec, snap, view) {

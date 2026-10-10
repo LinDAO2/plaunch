@@ -63,6 +63,7 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await page.goto(`${server.base}/play/meteor-dodge?embed=1`, { waitUntil: 'domcontentloaded' })
     await page.waitForSelector('#embed-play', { state: 'visible' })
     assert.equal((await page.locator('#embed-play').innerText()).trim(), 'Play')
+    assert.equal(await page.locator('#play').isVisible(), false)
     const frame = await page.evaluate(() => ({
       w: document.documentElement.scrollWidth,
       h: document.documentElement.scrollHeight
@@ -160,6 +161,71 @@ test('discover and moderation fit a 375px screen', { timeout: 120000 }, async ()
     const privacy = await page.goto(server.base + '/privacy', { waitUntil: 'domcontentloaded' })
     assert.equal(privacy.status(), 200)
     assert.match(await page.locator('.draft-banner').innerText(), /DRAFT — needs legal review/)
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+})
+
+test('redesign pages fit a desktop and a phone', { timeout: 180000 }, async () => {
+  const { chromium } = await import('playwright')
+  const artifacts = await resolveArtifactsDir()
+  const server = await startServer()
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+  const shot = async (page, name) => {
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2)
+    assert.equal(overflow, false, name)
+    await page.screenshot({ path: path.join(artifacts, name), fullPage: true })
+  }
+  try {
+    const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    await desktop.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
+    await desktop.waitForFunction(() => document.body.innerText.includes('Make a game from one sentence') && document.body.innerText.includes('Click Frenzy'))
+    assert.equal(await desktop.evaluate(() => getComputedStyle(document.body).backgroundImage), 'none')
+    await shot(desktop, '01-home-studio-desktop.png')
+    await phone.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
+    await phone.waitForFunction(() => document.body.innerText.includes('Click Frenzy'))
+    await shot(phone, '01-home-studio-phone.png')
+    for (const [page, suffix] of [[desktop, 'desktop'], [phone, 'phone']]) {
+      await page.goto(server.base + '/discover', { waitUntil: 'domcontentloaded' })
+      await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy'))
+      await shot(page, `02-discover-${suffix}.png`)
+      await page.goto(server.base + '/play/meteor-rain', { waitUntil: 'networkidle' })
+      await page.click('#play')
+      await page.waitForFunction(() => document.querySelector('#play')?.hidden === true)
+      await page.waitForTimeout(700)
+      await shot(page, `03-play-meteor-rain-${suffix}.png`)
+      if (suffix === 'desktop') await page.screenshot({ path: path.join(artifacts, 'after-meteor-rain.png') })
+      await page.goto(server.base + '/r/meteor-rain', { waitUntil: 'domcontentloaded' })
+      await page.waitForFunction(() => document.body.innerText.includes('Play'))
+      await shot(page, `04-share-r-meteor-rain-${suffix}.png`)
+      await page.goto(server.base + '/studio/dashboard', { waitUntil: 'domcontentloaded' })
+      await shot(page, `05-studio-dashboard-${suffix}.png`)
+      await page.goto(server.base + '/admin', { waitUntil: 'domcontentloaded' })
+      await shot(page, `06-admin-${suffix}.png`)
+      await page.goto(server.base + '/privacy', { waitUntil: 'domcontentloaded' })
+      await shot(page, `08-privacy-${suffix}.png`)
+      await page.goto(server.base + '/terms', { waitUntil: 'domcontentloaded' })
+      await shot(page, `09-terms-${suffix}.png`)
+    }
+    for (const slug of ['homing-gems', 'shadow-chase']) {
+      await desktop.goto(`${server.base}/play/${slug}`, { waitUntil: 'networkidle' })
+      await desktop.click('#play')
+      await desktop.waitForFunction(() => document.querySelector('#goal-banner')?.textContent.length > 8)
+      await desktop.waitForTimeout(600)
+      await desktop.screenshot({ path: path.join(artifacts, `after-${slug}.png`) })
+    }
+    const embed = await browser.newPage({ viewport: { width: 480, height: 480 } })
+    await embed.goto(`${server.base}/play/meteor-dodge?embed=1`, { waitUntil: 'domcontentloaded' })
+    await embed.waitForSelector('#embed-play', { state: 'visible' })
+    assert.equal(await embed.locator('#play').isVisible(), false)
+    const frame = await embed.evaluate(() => ({ w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight }))
+    assert.ok(frame.w <= 480 && frame.h <= 480, `embed ${frame.w}x${frame.h}`)
+    await embed.screenshot({ path: path.join(artifacts, '07-embed-480-gate.png') })
+    await desktop.close()
+    await phone.close()
+    await embed.close()
   } finally {
     await browser.close()
     await server.close()

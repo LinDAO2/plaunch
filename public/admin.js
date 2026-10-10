@@ -16,20 +16,16 @@ function button(label, onClick) {
   return el
 }
 
-function row(title, detail, actions) {
-  const item = document.createElement('article')
-  item.className = 'mod-row'
-  const text = document.createElement('div')
-  const heading = document.createElement('h3')
-  heading.textContent = title
-  const body = document.createElement('p')
-  body.textContent = detail
-  text.append(heading, body)
-  const bar = document.createElement('div')
-  bar.className = 'mod-actions'
-  for (const action of actions) bar.append(action)
-  item.append(text, bar)
-  return item
+function cell(text, label) {
+  const td = document.createElement('td')
+  td.dataset.label = label
+  if (typeof text === 'string') td.textContent = text
+  else td.append(text)
+  return td
+}
+
+function fill(host, rows) {
+  host.replaceChildren(...rows)
 }
 
 async function act(path, body) {
@@ -38,45 +34,67 @@ async function act(path, body) {
 }
 
 function paint(queue) {
-  const games = $('admin-games')
-  games.replaceChildren()
-  if (!queue.games.length) games.textContent = 'Nothing is waiting.'
-  for (const game of queue.games) {
-    const reason = game.flagReason ? ` · ${game.flagReason}` : ''
-    const actions = []
-    if (game.status === 'pending' || game.status === 'hidden') {
-      actions.push(button('Unhide', () => act(`/admin/games/${game.id}/unhide`).catch((error) => note(error.message))))
-    }
-    if (game.status !== 'hidden') {
-      actions.push(button('Hide', () => act(`/admin/games/${game.id}/hide`).catch((error) => note(error.message))))
-    }
-    actions.push(button('Archive', () => act(`/admin/games/${game.id}/archive`).catch((error) => note(error.message))))
-    if (game.status === 'published') {
-      actions.push(button('Feature', () => act(`/admin/games/${game.id}/feature`, { featured: true }).catch((error) => note(error.message))))
-    }
-    games.append(row(game.name, `${game.status}${reason}`, actions))
+  if (!queue.games.length) {
+    const tr = document.createElement('tr')
+    tr.append(cell('Nothing is waiting.', 'Game'))
+    fill($('admin-games'), [tr])
+  } else {
+    fill($('admin-games'), queue.games.map((game) => {
+      const reason = game.flagReason ? ` · ${game.flagReason}` : ''
+      const actions = document.createElement('div')
+      actions.className = 'mod-actions'
+      if (game.status === 'pending' || game.status === 'hidden') {
+        actions.append(button('Unhide', () => act(`/admin/games/${game.id}/unhide`).catch((error) => note(error.message))))
+      }
+      if (game.status !== 'hidden') {
+        actions.append(button('Hide', () => act(`/admin/games/${game.id}/hide`).catch((error) => note(error.message))))
+      }
+      actions.append(button('Archive', () => act(`/admin/games/${game.id}/archive`).catch((error) => note(error.message))))
+      if (game.status === 'published') {
+        actions.append(button('Feature', () => act(`/admin/games/${game.id}/feature`, { featured: true }).catch((error) => note(error.message))))
+      }
+      const tr = document.createElement('tr')
+      tr.append(cell(game.name, 'Game'), cell(`${game.status}${reason}`, 'Detail'), cell(actions, 'Actions'))
+      return tr
+    }))
   }
 
-  const reports = $('admin-reports')
-  reports.replaceChildren()
-  if (!queue.reports.length) reports.textContent = 'No open reports.'
-  for (const report of queue.reports) {
-    reports.append(row(
-      report.gameName || 'Game',
-      `${report.reason}${report.details ? ` — ${report.details}` : ''}`,
-      [
+  if (!queue.reports.length) {
+    const tr = document.createElement('tr')
+    tr.append(cell('No open reports.', 'Game'))
+    fill($('admin-reports'), [tr])
+  } else {
+    fill($('admin-reports'), queue.reports.map((report) => {
+      const actions = document.createElement('div')
+      actions.className = 'mod-actions'
+      actions.append(
         button('Reviewed', () => act(`/admin/reports/${report.id}`, { status: 'reviewed' }).catch((error) => note(error.message))),
         button('Dismiss', () => act(`/admin/reports/${report.id}`, { status: 'dismissed' }).catch((error) => note(error.message)))
-      ]
-    ))
+      )
+      const tr = document.createElement('tr')
+      tr.append(
+        cell(report.gameName || 'Game', 'Game'),
+        cell(`${report.reason}${report.details ? ` — ${report.details}` : ''}`, 'Detail'),
+        cell(actions, 'Actions')
+      )
+      return tr
+    }))
   }
 
-  const audit = $('admin-audit')
-  audit.replaceChildren()
-  if (!queue.audit.length) audit.textContent = 'No audit entries yet.'
-  for (const entry of queue.audit) {
-    const when = new Date(entry.createdAt).toLocaleString()
-    audit.append(row(entry.action, `${entry.targetType} ${entry.targetId} · ${when}`, []))
+  if (!queue.audit.length) {
+    const tr = document.createElement('tr')
+    tr.append(cell('No audit entries yet.', 'Action'))
+    fill($('admin-audit'), [tr])
+  } else {
+    fill($('admin-audit'), queue.audit.map((entry) => {
+      const tr = document.createElement('tr')
+      tr.append(
+        cell(entry.action, 'Action'),
+        cell(`${entry.targetType} ${entry.targetId}`, 'Target'),
+        cell(new Date(entry.createdAt).toLocaleString(), 'When')
+      )
+      return tr
+    }))
   }
   $('admin-queue').hidden = false
   $('admin-status').hidden = true
