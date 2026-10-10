@@ -1,13 +1,16 @@
 import { mountArcade } from '/arcade-view.js'
 
+const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's', ' ', 'f'])
+
 export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE', arcade: 'ARCADE' }
 
 export function controlHint(game) {
   if (game?.tier === 'freeform') return 'Sandboxed canvas. The score comes back to this page. The game cannot read this page or the network.'
   if (game?.spec?.controls?.keyboard && game?.spec?.controls?.touch) {
-    return `${game.spec.controls.keyboard} · ${game.spec.controls.touch}`
+    const pointer = game.spec.controls.scheme === 'tap' ? '' : 'Mouse or trackpad to move · '
+    return `${pointer}${game.spec.controls.keyboard} · ${game.spec.controls.touch}`
   }
-  if (game?.type === 'dodge') return 'Arrow keys or A/D · on-screen arrows'
+  if (game?.type === 'dodge') return 'Move the mouse, use the arrow keys or A/D, or tap the on-screen arrows'
   if (game?.type === 'reaction') return 'Wait for the signal, then tap. Faster is better.'
   if (game?.type === 'guess') return 'Guess a number from 1 to 10. Fewer attempts score higher.'
   return 'Tap as many times as you can before time runs out.'
@@ -29,6 +32,7 @@ export function createRuntime(els, hooks = {}) {
   let dodgeX = 50
   let dodgeTick = 0
   const dodgeKeys = new Set()
+  let dodgePointer = null
   let game = { name: '', description: '', type: 'tap', duration: 10, accent: '#a88bff' }
   let playStarted = false
 
@@ -55,6 +59,7 @@ export function createRuntime(els, hooks = {}) {
     els.score.textContent = 'Score: 0'
     els.timer.textContent = `Time: ${remaining}s`
     els.label.textContent = 'READY, PLAYER ONE'
+    els.label.hidden = false
     els.display.textContent = '0'
     els.play.textContent = 'Start game'
     els.play.hidden = false
@@ -84,6 +89,7 @@ export function createRuntime(els, hooks = {}) {
     if (els.guess) els.guess.hidden = true
     els.display.textContent = String(value)
     els.label.textContent = label
+    els.label.hidden = false
     els.play.hidden = false
     els.play.textContent = 'Play again'
     lastScore = opts.keepScore === false ? null : points
@@ -105,6 +111,7 @@ export function createRuntime(els, hooks = {}) {
       els.display.textContent = ''
       els.play.hidden = true
       els.label.textContent = 'ARCADE'
+      els.label.hidden = true
       emitStart()
       const spec = g.spec?.runtime === 'arcade' ? g.spec : null
       if (!spec) {
@@ -243,6 +250,7 @@ export function createRuntime(els, hooks = {}) {
         dodgeX = Math.min(94, Math.max(6, dodgeX + dir * 9))
         player.style.left = `calc(${dodgeX}% - 21px)`
       }
+      dodgePointer = null
       timer = setInterval(() => {
         remaining -= 1
         els.timer.textContent = `Time: ${remaining}s`
@@ -257,8 +265,15 @@ export function createRuntime(els, hooks = {}) {
         const dt = Math.min(45, now - prev)
         prev = now
         dodgeTick += dt
-        if (dodgeKeys.has('ArrowLeft') || dodgeKeys.has('a')) move(-0.15 * dt)
-        if (dodgeKeys.has('ArrowRight') || dodgeKeys.has('d')) move(0.15 * dt)
+        const keyLeft = dodgeKeys.has('ArrowLeft') || dodgeKeys.has('a')
+        const keyRight = dodgeKeys.has('ArrowRight') || dodgeKeys.has('d')
+        if (keyLeft || keyRight) dodgePointer = null
+        if (keyLeft) move(-0.15 * dt)
+        if (keyRight) move(0.15 * dt)
+        if (dodgePointer !== null) {
+          const delta = dodgePointer - dodgeX
+          move(Math.sign(delta) * Math.min(Math.abs(delta), 0.12 * dt * 9) / 9)
+        }
         if (dodgeTick > spawnInterval()) {
           dodgeTick = 0
           const x = 8 + Math.random() * 84
@@ -293,9 +308,13 @@ export function createRuntime(els, hooks = {}) {
   function onKeyDown(event) {
     const tag = document.activeElement?.tagName
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
-    if (['ArrowLeft', 'ArrowRight', 'a', 'd', 'A', 'D'].includes(event.key)) {
-      dodgeKeys.add(event.key.length === 1 ? event.key.toLowerCase() : event.key)
-      if (playing) event.preventDefault()
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+    if (GAME_KEYS.has(key)) {
+      // Only steer while a round is running, and stop arrows and Space from
+      // scrolling the page out from under the game.
+      if (!playing) return
+      dodgeKeys.add(key)
+      event.preventDefault()
     }
   }
   function onKeyUp(event) {
@@ -305,6 +324,12 @@ export function createRuntime(els, hooks = {}) {
   }
 
   els.play.addEventListener('click', run)
+  // Meteor Dodge: the mouse or trackpad steers without a button; on touch this tracks a drag.
+  els.field.addEventListener('pointermove', (event) => {
+    if (!playing || game.type !== 'dodge' || event.target.closest?.('button')) return
+    const rect = els.field.getBoundingClientRect()
+    dodgePointer = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 100
+  })
   if (els.guess) {
     els.guess.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {

@@ -15,6 +15,12 @@ function round3(value) {
   return Math.round(value * 1000) / 1000
 }
 
+function approach(from, to, maxStep) {
+  const delta = to - from
+  if (Math.abs(delta) <= maxStep) return to
+  return from + Math.sign(delta) * maxStep
+}
+
 function cellKey(c, r) {
   return `${c},${r}`
 }
@@ -246,13 +252,24 @@ export function createSimulation(spec, seed = 1) {
       state.playerY = spot.y
       return
     }
+    const free = chaseMove && !primitives.has('platform')
     if (scheme === 'keys') {
+      const steering = input.left || input.right || (free && (input.up || input.down))
       if (input.left) state.playerX -= step * 0.08
       if (input.right) state.playerX += step * 0.08
+      if (free && input.up) state.playerY -= step * 0.08
+      if (free && input.down) state.playerY += step * 0.08
+      // Mouse, trackpad, or touch: glide toward the pointer at a capped speed.
+      if (!steering && Number.isFinite(input.pointerX)) {
+        state.playerX = approach(state.playerX, input.pointerX, step * 0.12)
+        if (free && Number.isFinite(input.pointerY)) state.playerY = approach(state.playerY, input.pointerY, step * 0.12)
+      }
     } else if (scheme === 'drag' && Number.isFinite(input.pointerX)) {
       state.playerX = input.pointerX
+      if (free && Number.isFinite(input.pointerY)) state.playerY = input.pointerY
     }
     state.playerX = Math.max(6, Math.min(94, state.playerX))
+    if (free) state.playerY = Math.max(8, Math.min(92, state.playerY))
     if (!primitives.has('platform')) return
     const prevY = state.playerY
     if ((input.jump || input.up) && state.playerVy === 0 && prevY >= 83) state.playerVy = -52

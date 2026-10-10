@@ -363,6 +363,26 @@ test('arcade examples validate and diverge across seeded ticks', () => {
   assert.equal(homed, true)
 })
 
+test('arcade sim follows the mouse in keys games and moves in 2D in chase games', () => {
+  const rain = EXAMPLE_GAMES.find((game) => game.id === 'meteor-rain').spec
+  const sim = createSimulation(validateGameSpec(rain), 1)
+  let snap = sim.snapshot()
+  assert.equal(snap.playerX, 50)
+  for (let i = 0; i < 20; i++) snap = sim.tick(50, { pointerX: 10 })
+  assert.equal(snap.playerX, 10)
+  const one = createSimulation(validateGameSpec(rain), 1)
+  const glide = one.tick(50, { pointerX: 90 })
+  assert.ok(glide.playerX > 50 && glide.playerX < 90, `capped glide ${glide.playerX}`)
+  const keyed = createSimulation(validateGameSpec(rain), 1).tick(50, { pointerX: 90, left: true })
+  assert.ok(keyed.playerX < 50, `keys win over pointer ${keyed.playerX}`)
+  const chaseSpec = EXAMPLE_GAMES.find((game) => game.id === 'shadow-chase').spec
+  const runner = createSimulation(validateGameSpec(chaseSpec), 1)
+  const startY = runner.snapshot().playerY
+  let fled = runner.snapshot()
+  for (let i = 0; i < 10; i++) fled = runner.tick(50, { up: true })
+  assert.ok(fled.playerY < startY - 10, `chase up ${fled.playerY}`)
+})
+
 test('arcade sim honors taps, combos, lives, and win rules', () => {
   const harvest = EXAMPLE_GAMES.find((game) => game.id === 'lane-harvest').spec
   const berries = validateGameSpec({

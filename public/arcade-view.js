@@ -1,5 +1,8 @@
 import { createSimulation } from '/arcade-sim.js'
 
+const HINT_MS = 3500
+const DISC = { hazard: '#ff5c7a', obstacle: '#ff5c7a', collectible: '#ffd36b', target: '#ffd36b' }
+
 export function mountArcade(field, spec, hooks) {
   const canvas = document.createElement('canvas')
   canvas.className = 'arcade-canvas'
@@ -11,11 +14,29 @@ export function mountArcade(field, spec, hooks) {
   const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0
   const sim = createSimulation(spec, seed || 1)
   const primitives = new Set(spec.primitives || ['fall'])
-  const input = { left: false, right: false, up: false, down: false, pointerX: null, taps: [], fire: false, jump: false }
+  const scheme = spec.controls?.scheme || 'keys'
+  const input = { left: false, right: false, up: false, down: false, pointerX: null, pointerY: null, taps: [], fire: false, jump: false }
+  const view = { width: 480, height: 320, dpr: 1, hint: hintText(spec) }
   let raf = 0
   let prev = performance.now()
   let stopped = false
   let jumpQueued = false
+
+  // Match the drawing buffer to the on-screen size so sprites are not stretched
+  // and stay sharp on Retina screens. Game logic works in percentages.
+  function fit() {
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+    const dpr = Math.min(3, Math.max(1, window.devicePixelRatio || 1))
+    view.width = rect.width
+    view.height = rect.height
+    view.dpr = dpr
+    canvas.width = Math.round(rect.width * dpr)
+    canvas.height = Math.round(rect.height * dpr)
+  }
+  fit()
+  const resizer = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null
+  resizer?.observe(canvas)
 
   function worldPoint(event) {
     const rect = canvas.getBoundingClientRect()
@@ -28,13 +49,16 @@ export function mountArcade(field, spec, hooks) {
   function onPointer(event) {
     if (stopped) return
     const point = worldPoint(event)
-    if (spec.controls?.scheme === 'tap') {
+    if (scheme === 'tap') {
       if (event.type === 'pointerdown') input.taps.push(point)
-    } else if (spec.controls?.scheme === 'drag') {
+    } else {
+      // Keys and drag games both follow the mouse or trackpad (no button needed)
+      // and a finger drag on touch screens.
       input.pointerX = point.x
+      input.pointerY = point.y
     }
     if (event.type === 'pointerdown' && primitives.has('platform') && point.y < 42) jumpQueued = true
-    if (event.type === 'pointerdown' && primitives.has('shoot') && spec.controls?.scheme !== 'tap') input.fire = true
+    if (event.type === 'pointerdown' && primitives.has('shoot') && scheme !== 'tap') input.fire = true
   }
 
   canvas.addEventListener('pointerdown', onPointer)
@@ -44,6 +68,7 @@ export function mountArcade(field, spec, hooks) {
     if (stopped) return
     stopped = true
     cancelAnimationFrame(raf)
+    resizer?.disconnect()
     canvas.removeEventListener('pointerdown', onPointer)
     canvas.removeEventListener('pointermove', onPointer)
   }
@@ -57,13 +82,18 @@ export function mountArcade(field, spec, hooks) {
     input.right = keys?.has('ArrowRight') || keys?.has('d') || false
     input.up = keys?.has('ArrowUp') || keys?.has('w') || false
     input.down = keys?.has('ArrowDown') || keys?.has('s') || false
+    // A key press takes over from the pointer until the pointer moves again.
+    if (input.left || input.right || input.up || input.down) {
+      input.pointerX = null
+      input.pointerY = null
+    }
     input.jump = jumpQueued || (primitives.has('platform') && (keys?.has(' ') || input.up))
     if (primitives.has('shoot') && (keys?.has(' ') || keys?.has('f'))) input.fire = true
     jumpQueued = false
     const snap = sim.tick(dt, input)
     input.taps = []
     input.fire = false
-    draw(ctx, spec, snap)
+    draw(ctx, spec, snap, view)
     hooks.onScore?.(snap)
     if (snap.over) {
       stop()
@@ -77,9 +107,21 @@ export function mountArcade(field, spec, hooks) {
   return { stop }
 }
 
-function draw(ctx, spec, snap) {
-  const width = ctx.canvas.width
-  const height = ctx.canvas.height
+function hintText(spec) {
+  const scheme = spec.controls?.scheme || 'keys'
+  const primitives = new Set(spec.primitives || [])
+  if (scheme === 'tap') return 'Click or tap the targets'
+  const parts = [scheme === 'drag' ? 'Move the mouse or drag' : 'Move the mouse, drag, or use ← →']
+  if (primitives.has('chase') || primitives.has('maze')) parts[0] = scheme === 'drag' ? 'Move the mouse or drag' : 'Move the mouse, drag, or use the arrow keys'
+  if (primitives.has('platform')) parts.push('Space or ↑ to jump')
+  if (primitives.has('shoot')) parts.push('click or Space to fire')
+  return parts.join(' · ')
+}
+
+function draw(ctx, spec, snap, view) {
+  const { width, height, dpr } = view
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  const unit = Math.max(0.7, Math.min(1.6, Math.min(width / 480, height / 360)))
   const primitives = new Set(spec.primitives || [])
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = '#120f1c'
@@ -101,7 +143,8 @@ function draw(ctx, spec, snap) {
     }
     ctx.fillRect(0, (84 / 100) * height, width, 8)
   }
-  ctx.font = '28px sans-serif'
+  const size = Math.round(28 * unit)
+  ctx.font = `${size}px sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   for (const shot of snap.shots || []) {
@@ -112,16 +155,40 @@ function draw(ctx, spec, snap) {
   }
   if (spec.controls?.scheme !== 'tap') {
     const py = Number.isFinite(snap.playerY) ? snap.playerY : 84
-    ctx.fillText(spec.player?.sprite || '●', (snap.playerX / 100) * width, (py / 100) * height)
+    sprite(ctx, spec.player?.sprite || '●', (snap.playerX / 100) * width, (py / 100) * height, size, '#9affd9')
   }
   for (const entity of snap.entities) {
-    ctx.fillText(entity.sprite || '●', (entity.x / 100) * width, (entity.y / 100) * height)
+    sprite(ctx, entity.sprite || '●', (entity.x / 100) * width, (entity.y / 100) * height, size, DISC[entity.kind] || '#c9b6ff')
   }
-  ctx.font = '14px sans-serif'
+  ctx.font = `${Math.round(14 * unit)}px sans-serif`
   ctx.fillStyle = '#f9f7ff'
   ctx.textAlign = 'left'
-  ctx.fillText(String(snap.score), 12, 18)
+  ctx.fillText(String(snap.score), 12, 18 * unit)
   ctx.textAlign = 'right'
   const tag = primitives.has('maze') ? 'grid' : primitives.has('popup') ? 'hide' : ''
-  ctx.fillText(tag ? `lives ${snap.lives} · ${tag}` : `lives ${snap.lives}`, width - 12, 18)
+  ctx.fillText(tag ? `lives ${snap.lives} · ${tag}` : `lives ${snap.lives}`, width - 12, 18 * unit)
+  if (snap.time < HINT_MS && view.hint) {
+    ctx.globalAlpha = Math.min(1, (HINT_MS - snap.time) / 600)
+    ctx.font = `600 ${Math.round(15 * unit)}px sans-serif`
+    ctx.textAlign = 'center'
+    const textWidth = ctx.measureText(view.hint).width
+    ctx.fillStyle = '#000000a0'
+    ctx.fillRect(width / 2 - textWidth / 2 - 14, height * 0.42 - 18 * unit, textWidth + 28, 36 * unit)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText(view.hint, width / 2, height * 0.42)
+    ctx.globalAlpha = 1
+  }
+}
+
+// A soft colored disc behind every sprite keeps it visible even when the
+// glyph renders as a dark monochrome symbol (for example ☄ on many systems).
+function sprite(ctx, glyph, x, y, size, color) {
+  ctx.fillStyle = color
+  ctx.globalAlpha = 0.35
+  ctx.beginPath()
+  ctx.arc(x, y, size * 0.62, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(glyph, x, y)
 }
