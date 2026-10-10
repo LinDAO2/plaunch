@@ -1,4 +1,5 @@
 import { EXAMPLE_GAMES } from './arcade/examples.js'
+import { tagsFor } from './ai/tags.js'
 import { specFromGame } from './ai/gamespec.js'
 
 const CLASSICS = [
@@ -19,11 +20,11 @@ export async function seed(db) {
     for (const game of EXAMPLES) {
       const spec = game.spec
       const result = await tx.query(
-        `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at)
-         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', $7::jsonb, $8, $8, $8)
+        `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tags)
+         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', $7::jsonb, $8, $8, $8, $9::jsonb)
          on conflict (id) do nothing
          returning id`,
-        [game.id, game.name, game.description, game.type, game.duration, game.accent, JSON.stringify(spec), game.createdAt]
+        [game.id, game.name, game.description, game.type, game.duration, game.accent, JSON.stringify(spec), game.createdAt, JSON.stringify(tagsFor({ name: game.name, description: game.description, mechanic: game.type }))]
       )
       if (!result.rows.length) continue
       inserted += 1

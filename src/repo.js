@@ -34,8 +34,17 @@ export function mapGame(row) {
     generation: row.generation,
     spec: parseJson(row.spec),
     tier: row.tier === 'freeform' ? 'freeform' : 'spec',
-    freeformHtml: row.freeform_html || null
+    freeformHtml: row.freeform_html || null,
+    tags: readTags(row.tags),
+    featured: row.featured === true,
+    flagReason: row.flag_reason || ''
   }
+}
+
+function readTags(value) {
+  const parsed = parseJson(value)
+  if (!Array.isArray(parsed)) return []
+  return parsed.filter((tag) => typeof tag === 'string')
 }
 
 export function publicGame(game, { canEdit = false, assets = null, includeSpec = true } = {}) {
@@ -53,8 +62,11 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     status: game.status,
     ownerId: game.ownerId,
     generation: game.generation,
-    canEdit
+    canEdit,
+    tags: game.tags || [],
+    featured: game.featured === true
   }
+  if (canEdit) out.flagReason = game.flagReason || ''
   if (includeSpec) out.spec = game.spec
   if (assets) {
     out.assets = assets.map((asset) => ({
@@ -129,11 +141,12 @@ export async function createGame(db, fields, spec, userId) {
     const id = await uniqueSlug(tx, fields.name)
     const now = new Date().toISOString()
     const tier = fields.tier === 'freeform' ? 'freeform' : 'spec'
+    const status = fields.status === 'pending' ? 'pending' : 'published'
     const inserted = await tx.query(
-      `insert into games (id, owner_id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tier, freeform_html)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, 'published', 0, $9, $10::jsonb, $11, $11, $11, $12, $13)
+      `insert into games (id, owner_id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tier, freeform_html, tags, featured, flag_reason)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11::jsonb, $12, $12, $13, $14, $15, $16::jsonb, false, $17)
        returning *`,
-      [id, userId, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || 'manual', spec == null ? null : JSON.stringify(spec), now, tier, tier === 'freeform' ? fields.freeformHtml : null]
+      [id, userId, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, status, fields.generation || 'manual', spec == null ? null : JSON.stringify(spec), now, status === 'published' ? now : null, tier, tier === 'freeform' ? fields.freeformHtml : null, JSON.stringify(fields.tags || []), fields.flagReason || '']
     )
     const game = mapGame(inserted.rows[0])
     const version = await insertVersion(tx, game, userId)
@@ -149,10 +162,11 @@ export async function updateGame(db, id, fields, spec, userId) {
     if (!current) throw new HttpError(404, 'Game not found', 'not_found')
     if (!current.ownerId || current.ownerId !== userId) throw new HttpError(403, 'You can only edit your own games', 'forbidden')
     const tier = fields.tier === 'freeform' ? 'freeform' : 'spec'
+    const status = fields.status || current.status
     const updated = await tx.query(
-      `update games set name = $2, description = $3, mechanic = $4, duration = $5, accent = $6, token_interest = $7, generation = $8, spec = $9::jsonb, tier = $10, freeform_html = $11, updated_at = now()
+      `update games set name = $2, description = $3, mechanic = $4, duration = $5, accent = $6, token_interest = $7, generation = $8, spec = $9::jsonb, tier = $10, freeform_html = $11, tags = $12::jsonb, status = $13, flag_reason = $14, updated_at = now()
        where id = $1 returning *`,
-      [id, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || current.generation, spec == null ? null : JSON.stringify(spec), tier, tier === 'freeform' ? (fields.freeformHtml || current.freeformHtml) : null]
+      [id, fields.name, fields.description, fields.type, fields.duration, fields.accent, fields.tokenInterest, fields.generation || current.generation, spec == null ? null : JSON.stringify(spec), tier, tier === 'freeform' ? (fields.freeformHtml || current.freeformHtml) : null, JSON.stringify(fields.tags || current.tags || []), status, fields.flagReason ?? current.flagReason ?? '']
     )
     const game = mapGame(updated.rows[0])
     const version = await insertVersion(tx, game, userId)
@@ -175,7 +189,7 @@ export async function archiveGame(db, id, userId) {
   })
 }
 
-export async function recordEvent(db, { gameId, eventType, eventId }) {
+export async function recordEvent(db, { gameId, eventType, eventId, actorHash = null, userId = null }) {
   return db.transaction(async (tx) => {
     const existing = await tx.query('select * from games where id = $1 for update', [gameId])
     const game = mapGame(existing.rows[0])
@@ -185,10 +199,21 @@ export async function recordEvent(db, { gameId, eventType, eventId }) {
       if (dup.rows.length) return { plays: game.plays, duplicate: true }
     }
     const roundToken = eventType === 'play_started' ? randomBytes(24).toString('base64url') : null
+    let burst = false
+    if (eventType === 'play_started' && actorHash) {
+      const recent = await tx.query(
+        `select count(*)::int as n from plays
+         where game_id = $1 and event_type = 'play_started' and actor_hash = $2
+           and created_at > now() - interval '2 minutes'`,
+        [gameId, actorHash]
+      )
+      burst = Number(recent.rows[0].n) >= 2
+    }
     try {
       await tx.query(
-        'insert into plays (game_id, event_type, event_id, round_token_hash) values ($1, $2, $3, $4)',
-        [gameId, eventType, eventId, roundToken ? hashToken(roundToken) : null]
+        `insert into plays (game_id, event_type, event_id, round_token_hash, actor_hash, user_id, burst)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [gameId, eventType, eventId, roundToken ? hashToken(roundToken) : null, eventType === 'play_started' ? actorHash : null, userId, burst]
       )
     } catch (err) {
       if (err.code === '23505') return { plays: game.plays, duplicate: true, roundToken: null }
@@ -349,6 +374,208 @@ export function rankedForGame(scores, mechanic) {
   return rankScores(scores, mechanic)
 }
 
+const TRENDING_SQL = `
+  select p.game_id, count(distinct p.actor_hash)::int as score
+  from plays p
+  join games og on og.id = p.game_id
+  where p.event_type = 'play_started'
+    and p.actor_hash is not null
+    and p.created_at > now() - interval '24 hours'
+    and (p.user_id is null or og.owner_id is null or p.user_id <> og.owner_id)
+    and not exists (
+      select 1 from plays b
+      where b.game_id = p.game_id
+        and b.actor_hash = p.actor_hash
+        and b.event_type = 'play_started'
+        and b.burst = true
+        and b.created_at > now() - interval '24 hours'
+    )
+  group by p.game_id
+`
+
+export async function discoverGames(db, { view = 'new', tag = '', q = '' } = {}) {
+  const params = []
+  const where = [`g.status = 'published'`]
+  if (view === 'featured') where.push('g.featured = true')
+  if (tag) {
+    params.push(JSON.stringify([tag]))
+    where.push(`g.tags @> $${params.length}::jsonb`)
+  }
+  const needle = String(q || '').trim().slice(0, 80).replace(/[%_]/g, '')
+  if (needle) {
+    params.push(`%${needle}%`)
+    where.push(`(g.name ilike $${params.length} or g.description ilike $${params.length} or g.tags::text ilike $${params.length})`)
+  }
+  const order = view === 'trending'
+    ? 'coalesce(t.score, 0) desc, g.created_at desc, g.id asc'
+    : 'g.created_at desc, g.id asc'
+  const result = await db.query(
+    `select g.*, coalesce(t.score, 0)::int as trending
+     from games g
+     left join (${TRENDING_SQL}) t on t.game_id = g.id
+     where ${where.join(' and ')}
+     order by ${order}
+     limit 60`,
+    params
+  )
+  return result.rows.map((row) => {
+    const game = publicGame(mapGame(row), { includeSpec: false })
+    game.trending = Number(row.trending) || 0
+    return game
+  })
+}
+
+async function writeAudit(db, { actorId, action, targetType, targetId, detail }) {
+  await db.query(
+    `insert into audit_log (actor_id, action, target_type, target_id, detail) values ($1, $2, $3, $4, $5::jsonb)`,
+    [actorId || null, action, targetType, String(targetId || ''), JSON.stringify(detail || {})]
+  )
+}
+
+function auditRow(row) {
+  return {
+    id: row.id,
+    actorId: row.actor_id || null,
+    action: row.action,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    detail: parseJson(row.detail) || {},
+    createdAt: iso(row.created_at)
+  }
+}
+
+export async function moderateGame(db, { id, actorId, action }) {
+  const next = { hide: 'hidden', unhide: 'published', archive: 'archived' }[action]
+  if (!next) throw new HttpError(400, 'Unknown moderation action', 'validation_error')
+  return db.transaction(async (tx) => {
+    const existing = await tx.query('select * from games where id = $1 for update', [id])
+    const current = mapGame(existing.rows[0])
+    if (!current) throw new HttpError(404, 'Game not found', 'not_found')
+    if (action === 'unhide' && current.status !== 'hidden' && current.status !== 'pending') {
+      throw new HttpError(400, 'Only hidden or pending games can be made public', 'validation_error')
+    }
+    const featured = action === 'hide' || action === 'archive' ? false : current.featured
+    const updated = await tx.query(
+      `update games set status = $2, featured = $3, published_at = case when $2 = 'published' then now() else published_at end, updated_at = now()
+       where id = $1 returning *`,
+      [id, next, featured]
+    )
+    const game = mapGame(updated.rows[0])
+    await writeAudit(tx, { actorId, action: `game.${action}`, targetType: 'game', targetId: id, detail: { status: next } })
+    await insertVersion(tx, game, actorId)
+    return game
+  })
+}
+
+export async function featureGame(db, { id, actorId, featured }) {
+  return db.transaction(async (tx) => {
+    const existing = await tx.query('select * from games where id = $1 for update', [id])
+    const current = mapGame(existing.rows[0])
+    if (!current) throw new HttpError(404, 'Game not found', 'not_found')
+    if (featured && current.status !== 'published') {
+      throw new HttpError(400, 'Only a public game can be featured', 'validation_error')
+    }
+    const updated = await tx.query(
+      `update games set featured = $2, updated_at = now() where id = $1 returning *`,
+      [id, featured === true]
+    )
+    const game = mapGame(updated.rows[0])
+    await writeAudit(tx, {
+      actorId,
+      action: featured ? 'game.feature' : 'game.unfeature',
+      targetType: 'game',
+      targetId: id,
+      detail: { featured: featured === true }
+    })
+    return game
+  })
+}
+
+export async function banUser(db, { userId, actorId }) {
+  if (!userId) throw new HttpError(404, 'User not found', 'not_found')
+  if (userId === actorId) throw new HttpError(400, 'You cannot ban your own account', 'validation_error')
+  return db.transaction(async (tx) => {
+    const found = await tx.query('select id, email, banned_at from users where id = $1 for update', [userId])
+    const row = found.rows[0]
+    if (!row) throw new HttpError(404, 'User not found', 'not_found')
+    if (!row.banned_at) {
+      await tx.query('update users set banned_at = now(), updated_at = now() where id = $1', [userId])
+    }
+    await tx.query('delete from sessions where user_id = $1', [userId])
+    await writeAudit(tx, { actorId, action: 'user.ban', targetType: 'user', targetId: userId, detail: { email: row.email } })
+    return { id: row.id, email: row.email, banned: true }
+  })
+}
+
+export async function reviewReport(db, { id, actorId, status }) {
+  if (status !== 'reviewed' && status !== 'dismissed') {
+    throw new HttpError(400, 'Report status must be reviewed or dismissed', 'validation_error')
+  }
+  return db.transaction(async (tx) => {
+    const updated = await tx.query(
+      `update abuse_reports set status = $2 where id = $1 and status = 'open' returning id, game_id, status`,
+      [id, status]
+    )
+    const row = updated.rows[0]
+    if (!row) throw new HttpError(404, 'Open report not found', 'not_found')
+    await writeAudit(tx, {
+      actorId,
+      action: status === 'dismissed' ? 'report.dismiss' : 'report.review',
+      targetType: 'report',
+      targetId: id,
+      detail: { gameId: row.game_id, status }
+    })
+    return { id: row.id, gameId: row.game_id, status: row.status }
+  })
+}
+
+export async function recordHold(db, { actorId, gameId, reason, source }) {
+  await writeAudit(db, {
+    actorId,
+    action: 'game.hold',
+    targetType: 'game',
+    targetId: gameId,
+    detail: { reason, source }
+  })
+}
+
+export async function moderationQueue(db) {
+  const pending = await db.query(`select * from games where status in ('pending', 'hidden') order by updated_at desc limit 50`)
+  const reports = await db.query(
+    `select r.id, r.game_id, r.reason, r.details, r.status, r.created_at, g.name as game_name
+     from abuse_reports r
+     left join games g on g.id = r.game_id
+     where r.status = 'open'
+     order by r.created_at asc
+     limit 50`
+  )
+  const audit = await db.query(`select * from audit_log order by created_at desc limit 40`)
+  return {
+    games: pending.rows.map((row) => {
+      const game = mapGame(row)
+      return {
+        id: game.id,
+        name: game.name,
+        status: game.status,
+        flagReason: game.flagReason,
+        tags: game.tags,
+        ownerId: game.ownerId,
+        createdAt: game.createdAt
+      }
+    }),
+    reports: reports.rows.map((row) => ({
+      id: row.id,
+      gameId: row.game_id,
+      gameName: row.game_name || '',
+      reason: row.reason,
+      details: row.details,
+      status: row.status,
+      createdAt: iso(row.created_at)
+    })),
+    audit: audit.rows.map(auditRow)
+  }
+}
+
 export async function createAbuseReport(db, { gameId, userId, reason, details }) {
   const game = await getGameRow(db, gameId)
   if (!game) throw new HttpError(404, 'Game not found', 'not_found')
@@ -375,10 +602,10 @@ export async function createUser(db, { email, passwordHash, displayName }) {
 }
 
 export async function findUserByEmail(db, email) {
-  const result = await db.query('select id, email, display_name, password_hash from users where lower(email) = lower($1)', [email])
+  const result = await db.query('select id, email, display_name, password_hash, banned_at from users where lower(email) = lower($1)', [email])
   const row = result.rows[0]
   if (!row) return null
-  return { id: row.id, email: row.email, displayName: row.display_name, passwordHash: row.password_hash }
+  return { id: row.id, email: row.email, displayName: row.display_name, passwordHash: row.password_hash, bannedAt: row.banned_at || null }
 }
 
 export async function createSession(db, userId, token, ttlSeconds) {
@@ -394,13 +621,13 @@ export async function deleteSession(db, token) {
 export async function findUserBySession(db, token) {
   if (!token) return null
   const result = await db.query(
-    `select u.id, u.email, u.display_name
+    `select u.id, u.email, u.display_name, u.banned_at
      from sessions s join users u on u.id = s.user_id
      where s.token_hash = $1 and s.expires_at > now()`,
     [hashToken(token)]
   )
   const row = result.rows[0]
-  if (!row) return null
+  if (!row || row.banned_at) return null
   return { id: row.id, email: row.email, displayName: row.display_name }
 }
 

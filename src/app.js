@@ -1,5 +1,4 @@
-import { randomBytes } from 'node:crypto'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,6 +6,8 @@ import { aiStatus } from './ai/generate.js'
 import { assertFreeform } from './ai/freeform-check.js'
 import { validateGameSpec } from './ai/gamespec.js'
 import { generateIdea } from './ai/idea.js'
+import { TAGS, tagsFor } from './ai/tags.js'
+import { blocklistReason, classifySafety } from './safety.js'
 import { HttpError } from './errors.js'
 import { renderPlayPage, renderSharePage } from './html.js'
 import { posterPng } from './poster.js'
@@ -16,6 +17,7 @@ import { hashPassword, verifyPassword } from './passwords.js'
 import { createRateLimiter } from './rate-limit.js'
 import {
   archiveGame,
+  banUser,
   consumeAiCredit,
   createAbuseReport,
   createGame,
@@ -23,6 +25,8 @@ import {
   createUser,
   dashboardFor,
   deleteSession,
+  discoverGames,
+  featureGame,
   findUserByEmail,
   findUserBySession,
   getGameRow,
@@ -31,8 +35,12 @@ import {
   listOwnedGames,
   listPublishedGames,
   listScores,
+  moderateGame,
+  moderationQueue,
   publicGame,
   recordEvent,
+  recordHold,
+  reviewReport,
   savePreview,
   specForSave,
   submitScore,
@@ -63,7 +71,9 @@ const FILES = new Map([
   ['/arcade-sim.js', 'arcade-sim.js'],
   ['/arcade-view.js', 'arcade-view.js'],
   ['/dashboard.js', 'dashboard.js'],
-  ['/sandbox-score.js', 'sandbox-score.js']
+  ['/sandbox-score.js', 'sandbox-score.js'],
+  ['/discover.js', 'discover.js'],
+  ['/admin.js', 'admin.js']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -89,6 +99,65 @@ async function currentUser(req, db) {
 function requireUser(user) {
   if (!user) throw new HttpError(401, 'Sign in required', 'unauthorized')
   return user
+}
+
+function isAdmin(config, user) {
+  if (!user?.email) return false
+  return (config.adminEmails || []).includes(user.email.toLowerCase())
+}
+
+function requireAdmin(config, user) {
+  const current = requireUser(user)
+  if (!isAdmin(config, current)) throw new HttpError(403, 'Moderator access required', 'forbidden')
+  return current
+}
+
+function userPayload(config, user) {
+  return { id: user.id, email: user.email, displayName: user.displayName, admin: isAdmin(config, user) }
+}
+
+const ACTOR_PATTERN = /^[A-Za-z0-9_-]{20,80}$/
+
+function actorHash(req, ctx) {
+  const cookies = readCookies(req)
+  let actor = cookies.pg_actor || ''
+  if (!ACTOR_PATTERN.test(actor)) {
+    actor = randomBytes(18).toString('base64url')
+    rememberCookie(ctx, serializeCookie('pg_actor', actor, {
+      httpOnly: true,
+      maxAge: ctx.config.sessionTtlSeconds,
+      secure: ctx.config.cookieSecure
+    }))
+  }
+  const session = cookies.pg_session || actor
+  const ip = String(req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '')
+  return createHash('sha256').update(`${session}|${ip}`).digest('hex')
+}
+
+async function stampListing(fields, body, previous, env, fetchImpl) {
+  fields.tags = tagsFor({
+    prompt: body.prompt,
+    name: fields.name,
+    description: fields.description,
+    mechanic: fields.type,
+    tier: fields.tier
+  })
+  const verdict = await classifySafety({
+    text: [body.prompt, fields.name, fields.description, fields.tier === 'freeform' ? fields.freeformHtml : ''].filter(Boolean).join('\n'),
+    env,
+    fetchImpl
+  })
+  if (verdict.flagged) {
+    fields.status = 'pending'
+    fields.flagReason = verdict.reason
+  } else if (previous && previous.status !== 'published') {
+    fields.status = previous.status
+    fields.flagReason = previous.flagReason || ''
+  } else {
+    fields.status = 'published'
+    fields.flagReason = ''
+  }
+  return verdict
 }
 
 function generationOf(value, fallback = 'manual') {
@@ -183,7 +252,7 @@ function clearSession(ctx) {
 
 async function sendUser(res, ctx, user, csrf, status = 200) {
   return sendJson(res, status, {
-    user: { id: user.id, email: user.email, displayName: user.displayName },
+    user: userPayload(ctx.config, user),
     csrfToken: csrf
   }, ctx)
 }
@@ -244,7 +313,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
 
   if (method === 'GET' && pathname === '/api/auth/me') {
     const user = await currentUser(req, db)
-    return sendJson(res, 200, { user: user ? { id: user.id, email: user.email, displayName: user.displayName } : null }, ctx)
+    return sendJson(res, 200, { user: user ? userPayload(config, user) : null }, ctx)
   }
 
   if (method === 'POST' && pathname === '/api/auth/register') {
@@ -268,6 +337,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const ok = user ? await verifyPassword(password, user.passwordHash) : false
     if (!user) await verifyPassword(password, await dummyHash(config))
     if (!user || !ok) throw new HttpError(401, 'Invalid email or password', 'unauthorized')
+    if (user.bannedAt) throw new HttpError(403, 'This account is banned', 'banned')
     const token = randomBytes(32).toString('base64url')
     await createSession(db, user.id, token, config.sessionTtlSeconds)
     const csrf = issueSession(ctx, token)
@@ -289,6 +359,14 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const user = aiStatus(config.env).mode === 'ai' ? requireUser(await currentUser(req, db)) : null
     if (user) await consumeAiCredit(db, user.id, config.aiDailyUser, config.aiDailyGlobal)
     const result = await generateIdea({ prompt: body.prompt, tier: body.tier, env: config.env, fetchImpl })
+    const tags = tagsFor({
+      prompt: body.prompt,
+      name: result.game?.name,
+      description: result.game?.description,
+      mechanic: result.game?.type,
+      tier: result.tier
+    })
+    const blocked = blocklistReason([body.prompt, result.game?.name, result.game?.description, result.html].filter(Boolean).join('\n'))
     return sendJson(res, 200, {
       mode: result.mode,
       provider: result.provider,
@@ -298,7 +376,9 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
       notice: result.notice,
       tier: result.tier,
       html: result.html || null,
-      tierReason: result.tierReason || ''
+      tierReason: result.tierReason || '',
+      tags,
+      safety: { flagged: Boolean(blocked), reason: blocked }
     }, ctx)
   }
 
@@ -322,6 +402,17 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     return sendJson(res, 200, { games: games.map((game) => present(config, game, { includeSpec: false })) }, ctx)
   }
 
+  if (method === 'GET' && pathname === '/api/discover') {
+    const view = url.searchParams.get('view') || 'new'
+    if (!['new', 'trending', 'featured'].includes(view)) {
+      throw new HttpError(400, 'Discover view must be new, trending, or featured', 'validation_error')
+    }
+    const tag = url.searchParams.get('tag') || ''
+    if (tag && !TAGS.includes(tag)) throw new HttpError(400, 'Unknown tag', 'validation_error')
+    const games = await discoverGames(db, { view, tag, q: url.searchParams.get('q') || '' })
+    return sendJson(res, 200, { view, tag, games }, ctx)
+  }
+
   if (method === 'GET' && pathname === '/api/me/games') {
     const user = requireUser(await currentUser(req, db))
     const games = await listOwnedGames(db, user.id)
@@ -338,7 +429,9 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const user = requireUser(await currentUser(req, db))
     const body = await readJson(req, HTML_LIMIT)
     const { fields, spec } = fieldsForSave(body, null)
+    const verdict = await stampListing(fields, body, null, config.env, fetchImpl)
     const { game, version } = await createGame(db, fields, spec, user.id)
+    if (verdict.flagged) await recordHold(db, { actorId: user.id, gameId: game.id, reason: verdict.reason, source: verdict.source })
     const assets = await listAssets(db, game.id)
     return sendJson(res, 201, { game: present(config, game, { canEdit: true, assets }), url: `/g/${game.id}`, version }, ctx)
   }
@@ -348,6 +441,42 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const user = await currentUser(req, db)
     const report = await createAbuseReport(db, { ...body, userId: user?.id })
     return sendJson(res, 201, { report }, ctx)
+  }
+
+  if (pathname === '/api/admin/queue' && method === 'GET') {
+    requireAdmin(config, await currentUser(req, db))
+    return sendJson(res, 200, await moderationQueue(db), ctx)
+  }
+
+  const adminGame = pathname.match(/^\/api\/admin\/games\/([a-z0-9-]+)\/(hide|unhide|archive|feature)$/)
+  if (adminGame && method === 'POST') {
+    const actor = requireAdmin(config, await currentUser(req, db))
+    const id = adminGame[1]
+    const action = adminGame[2]
+    if (!SLUG.test(id)) throw new HttpError(404, 'Game not found', 'not_found')
+    if (action === 'feature') {
+      const body = await readJson(req)
+      const game = await featureGame(db, { id, actorId: actor.id, featured: body.featured === true })
+      return sendJson(res, 200, { game: present(config, game, { canEdit: true }) }, ctx)
+    }
+    const game = await moderateGame(db, { id, actorId: actor.id, action })
+    return sendJson(res, 200, { game: present(config, game, { canEdit: true }) }, ctx)
+  }
+
+  const adminReport = pathname.match(/^\/api\/admin\/reports\/([0-9a-f-]{36})$/i)
+  if (adminReport && method === 'POST') {
+    const actor = requireAdmin(config, await currentUser(req, db))
+    const body = await readJson(req)
+    const report = await reviewReport(db, { id: adminReport[1], actorId: actor.id, status: body.status })
+    return sendJson(res, 200, { report }, ctx)
+  }
+
+  const adminBan = pathname.match(/^\/api\/admin\/users\/([0-9a-f-]{36})\/ban$/i)
+  if (adminBan && method === 'POST') {
+    const actor = requireAdmin(config, await currentUser(req, db))
+    await readJson(req)
+    const banned = await banUser(db, { userId: adminBan[1], actorId: actor.id })
+    return sendJson(res, 200, { user: banned }, ctx)
   }
 
   const gameMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)(?:\/(scores|play|events|archive|share))?$/)
@@ -372,7 +501,9 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
       if (!existing) throw new HttpError(404, 'Game not found', 'not_found')
       const body = await readJson(req, HTML_LIMIT)
       const { fields, spec } = fieldsForSave(body, existing)
+      const verdict = await stampListing(fields, body, existing, config.env, fetchImpl)
       const { game, version } = await updateGame(db, id, fields, spec, user.id)
+      if (verdict.flagged) await recordHold(db, { actorId: user.id, gameId: game.id, reason: verdict.reason, source: verdict.source })
       const assets = await listAssets(db, id)
       return sendJson(res, 200, { game: present(config, game, { canEdit: true, assets }), version }, ctx)
     }
@@ -385,7 +516,14 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
 
     if (method === 'POST' && (sub === 'play' || sub === 'events')) {
       const event = sub === 'play' ? { type: 'play_started', eventId: null } : validateEvent(await readJson(req))
-      const result = await recordEvent(db, { gameId: id, eventType: event.type, eventId: event.eventId })
+      const user = await currentUser(req, db)
+      const result = await recordEvent(db, {
+        gameId: id,
+        eventType: event.type,
+        eventId: event.eventId,
+        actorHash: event.type === 'play_started' ? actorHash(req, ctx) : null,
+        userId: user?.id || null
+      })
       const body = { plays: result.plays, type: event.type, duplicate: result.duplicate }
       if (result.roundToken) body.roundToken = result.roundToken
       return sendJson(res, 200, body, ctx)
@@ -416,8 +554,16 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     }
   }
 
-  if (method === 'GET' && (pathname === '/' || pathname === '/studio/dashboard' || /^\/g\/[a-z0-9-]+$/.test(pathname))) {
-    const file = pathname === '/studio/dashboard' ? 'dashboard.html' : 'index.html'
+  const pages = {
+    '/': 'index.html',
+    '/discover': 'discover.html',
+    '/admin': 'admin.html',
+    '/privacy': 'privacy.html',
+    '/terms': 'terms.html',
+    '/studio/dashboard': 'dashboard.html'
+  }
+  if (method === 'GET' && (pages[pathname] || /^\/g\/[a-z0-9-]+$/.test(pathname))) {
+    const file = pages[pathname] || 'index.html'
     const html = await readFile(path.join(PUBLIC, file))
     return sendHtml(res, 200, html, ctx, 'studio')
   }

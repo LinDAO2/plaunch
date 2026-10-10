@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c0b12">
+<title>Privacy — playground</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+<a class="brand" href="/">play<span>ground</span><i>.</i></a>
+<nav>
+<a href="/discover">Discover</a>
+<a href="/#studio">Create</a>
+<a class="outline account-btn" href="/">Studio</a>
+</nav>
+</header>
+<main class="shell legal">
+<p class="draft-banner">DRAFT — needs legal review. This page is a placeholder, not a privacy policy, and it is not in effect.</p>
+<h1>Privacy</h1>
+<p>A lawyer still has to write the real policy before this site takes public accounts. The notes below describe what the software stores today so that review has a starting point.</p>
+<h2>Account</h2>
+<p>An account stores an email address, a display name, and a password hash. The session cookie is HttpOnly. A separate cookie keeps a CSRF token.</p>
+<h2>Games and plays</h2>
+<p>Published games store the title, description, mechanic, and, for sandbox games, the HTML document. A play start stores a hash of the session and IP address, not the raw IP. That hash is used to count unique players for Trending and to ignore bursts. The creator's own signed-in plays are left out of that rank.</p>
+<h2>Reports and moderation</h2>
+<p>Abuse reports store a reason, optional details, and the reporter when they are signed in. Moderators are the addresses in ADMIN_EMAILS. Hide, unhide, archive, feature, ban, and report decisions are written to an audit log.</p>
+<h2>What this draft does not do</h2>
+<p>It does not name a controller, a retention period, a contact address, or a region. Do not link to it as if those promises exist.</p>
+</main>
+<footer class="site-foot"><span>Draft for legal review</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+</body>
+</html>

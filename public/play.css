@@ -30,3 +30,13 @@ body.embed .embed-gate .big-button{font-size:22px;min-width:160px;min-height:64p
 .play-body .dodge-controls button{min-width:72px;min-height:48px;font-size:22px;touch-action:manipulation}
 .play-body .big-button,.play-body .outline{touch-action:manipulation}
 #play-error:not([hidden]){color:#ffb4c6}
+body.embed .legal-foot{display:none}
+@media (max-width:420px){
+.play-shell{padding:16px 14px 32px}
+.play-shell h1{font-size:32px;letter-spacing:-.8px}
+.play-top{align-items:flex-start}
+.play-body .dodge-controls{gap:12px;width:calc(100% - 24px);bottom:88px}
+.play-body .game strong{font-size:56px}
+.submit-score{flex-direction:column}
+.site-foot{flex-direction:column;align-items:flex-start;gap:8px}
+}

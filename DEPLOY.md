@@ -16,7 +16,7 @@ Create these before the first boot. No wallet, no chain, no extra database vendo
    - [Render](https://render.com).
 4. **Postgres** comes from that same choice: the `postgres` service in `docker-compose.prod.yml`, Fly Postgres, or the Render Postgres in `render.yaml`. You do not need a separate database account.
 
-Also generate `SESSION_SECRET` locally (`openssl rand -hex 32`). Set `COOKIE_SECURE=true` once both origins are HTTPS.
+Also generate `SESSION_SECRET` locally (`openssl rand -hex 32`). Set `COOKIE_SECURE=true` once both origins are HTTPS. Set `ADMIN_EMAILS` to the moderator addresses, comma-separated. Those accounts open `/admin`.
 
 Leave `ALLOW_SAME_SITE_USERCONTENT` unset, or set it to `false`. The value `true` is only for the weaker subdomain layout at the bottom of this file.
 

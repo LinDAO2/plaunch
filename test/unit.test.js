@@ -17,6 +17,8 @@ import { checkPlausible, plausibilityFor } from '../src/plausibility.js'
 import { posterPng, POSTER_SIZE } from '../src/poster.js'
 import { aiStatus, geminiRequest, openAiRequest, resolveProvider } from '../src/ai/providers.js'
 import { loadConfig, registrableDomain } from '../src/config.js'
+import { blocklistReason, classifySafety } from '../src/safety.js'
+import { tagsFor } from '../src/ai/tags.js'
 import { databaseKind, openDatabase } from '../src/db.js'
 import { redact } from '../src/log.js'
 import { migrate } from '../src/migrate.js'
@@ -716,6 +718,42 @@ test('an unsure idea asks the model which tier to use', async () => {
   assert.equal(calls, 2)
   assert.equal(result.tier, 'spec')
   assert.match(result.tierReason, /model/)
+})
+
+test('tags follow the mechanic and the idea', () => {
+  const dodge = tagsFor({ name: 'Meteor Dodge', description: 'Dodge falling meteors.', mechanic: 'dodge', tier: 'spec' })
+  assert.ok(dodge.includes('dodge'))
+  assert.equal(dodge.includes('sandbox'), false)
+  const chess = tagsFor({ prompt: 'a chess game on a board', mechanic: 'arcade', tier: 'freeform' })
+  assert.ok(chess.includes('puzzle'))
+  assert.ok(chess.includes('sandbox'))
+  const runner = tagsFor({ prompt: 'endless runner where you jump over cacti', mechanic: 'arcade', tier: 'freeform' })
+  assert.ok(runner.includes('runner'))
+})
+
+test('the blocklist flags sexual content and leaves arcade copy alone', () => {
+  assert.equal(blocklistReason('Dodge falling meteors in a tiny arena.'), '')
+  assert.equal(blocklistReason('Cosmic Rush'), '')
+  assert.equal(blocklistReason('an nsfw porn night'), 'sexual content')
+})
+
+test('gemini safety classification runs only when the blocklist is clean and a key is set', async () => {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"flag":true,"reason":"hate"}' }] } }] }), { status: 200 })
+  }
+  const hit = await classifySafety({ text: 'a sunny garden tap', env: { GEMINI_API_KEY: 'k' }, fetchImpl })
+  assert.equal(calls, 1)
+  assert.equal(hit.flagged, true)
+  assert.equal(hit.source, 'gemini')
+  assert.equal(hit.reason, 'hate')
+  const local = await classifySafety({ text: 'nsfw porn', env: { GEMINI_API_KEY: 'k' }, fetchImpl })
+  assert.equal(calls, 1)
+  assert.equal(local.source, 'blocklist')
+  const offline = await classifySafety({ text: 'a sunny garden tap', env: {}, fetchImpl })
+  assert.equal(offline.flagged, false)
+  assert.equal(calls, 1)
 })
 
 test('usercontent injects the WebRTC prelude before game code', async () => {

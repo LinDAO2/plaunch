@@ -78,6 +78,7 @@ export function loadConfig(env = process.env) {
     usercontentOrigin: sandboxOrigin,
     usercontentPort: intEnv(env.USERCONTENT_PORT, portOf(sandboxOrigin, 43921)),
     serverRole: serverRole(env.SERVER_ROLE),
+    adminEmails: adminEmails(env.ADMIN_EMAILS),
     mainOrigins: [],
     warnings,
     env
@@ -107,6 +108,10 @@ function assertSeparateSandbox(appOrigin, sandboxOrigin) {
   if (shared && shared === registrableDomain(sandboxHost)) {
     throw new Error(`USERCONTENT_ORIGIN host "${sandboxHost}" shares the registrable domain "${shared}" with PUBLIC_BASE_URL host "${appHost}". ${remedy}`)
   }
+}
+
+function adminEmails(value) {
+  return String(value || '').split(',').map((item) => item.trim().toLowerCase()).filter(Boolean)
 }
 
 function serverRole(value) {

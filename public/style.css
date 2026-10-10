@@ -36,3 +36,52 @@
 #report-box{margin-top:12px}
 #report-box select,#report-box textarea{width:100%;margin-top:8px;background:#0e0d15;border:1px solid #373044;color:#fff;border-radius:10px;padding:10px}
 button,a{touch-action:manipulation}
+.tag-row,.view-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.tag{background:#241c31;color:#efe7ff;border:1px solid #4c3d63;border-radius:999px;padding:8px 12px;font-size:12px}
+.tag.on,.view-tabs .on{border-color:#b397ff;color:#fff}
+.tag-list{color:#b79bff;font-size:11px;margin:8px 0}
+.discover-page{padding-top:0}
+.discover-hero{padding-bottom:12px}
+.discover-hero h1{font-size:clamp(36px,8vw,64px);letter-spacing:-2px}
+.site-foot{padding:30px 0 60px;border-top:1px solid #ffffff1b;display:flex;justify-content:space-between;gap:12px;color:#7d728f;font-size:12px}
+.site-foot nav{display:flex;gap:16px}
+.site-foot a{color:#cbb8ff}
+.legal{padding-bottom:24px}
+.legal h1{font-size:clamp(36px,8vw,56px);letter-spacing:-1.5px}
+.legal h2{font-size:18px;margin-top:28px}
+.legal p{color:#c9c2d4;line-height:1.6;max-width:68ch}
+.draft-banner{background:#3a2430;color:#ffd0dc;border:1px solid #8a445c;border-radius:12px;padding:12px 14px;font-weight:750}
+.mod-list{display:flex;flex-direction:column;gap:12px;margin:8px 0 28px}
+.mod-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1px solid #33293f;background:#16131ef0;border-radius:16px;padding:14px}
+.mod-row h3{margin:0 0 6px;font-size:16px}
+.mod-row p{margin:0;color:#b7b0c4;font-size:13px;line-height:1.45}
+.mod-actions{display:flex;flex-wrap:wrap;gap:8px}
+.mod-actions .outline{padding:8px 12px}
+@media (max-width:420px){
+.top{height:auto;flex-wrap:wrap;align-items:flex-start;padding:12px 14px;gap:8px}
+.top nav{width:100%;flex-wrap:wrap;gap:8px 12px}
+.top nav a{display:inline}
+.status{display:none}
+.brand{font-size:22px}
+.shell{padding:0 14px}
+.hero{padding:28px 0 16px}
+.hero h1{font-size:40px;letter-spacing:-1.4px}
+.hero p{font-size:15px}
+.actions{flex-direction:column}
+.actions a,.account-btn{width:auto}
+.metrics{gap:12px}
+.twocol{grid-template-columns:1fr}
+.panel{padding:16px}
+.discover{padding:28px 0}
+.discover h2{font-size:28px;letter-spacing:-.8px}
+.searchbox{flex-wrap:wrap}
+.searchbox input,.searchbox select{width:100%}
+.game strong{font-size:56px}
+.dodge-controls{gap:16px;width:calc(100% - 28px);justify-content:space-between}
+.card h3{font-size:20px;overflow-wrap:anywhere}
+.card p,.mod-row p,.mod-row h3{overflow-wrap:anywhere}
+.mod-row{flex-direction:column}
+.site-foot{flex-direction:column;align-items:flex-start}
+.submit-score{flex-direction:column}
+footer.site-foot{padding-bottom:36px}
+}

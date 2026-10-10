@@ -11,9 +11,10 @@
 <header class="top">
 <a class="brand" href="/">play<span>ground</span><i>.</i></a>
 <nav>
-<a href="#discover">Discover</a>
+<a href="/discover">Discover</a>
 <a href="#studio">Create</a>
 <a class="dash-link" href="/studio/dashboard">Dashboard</a>
+<a id="admin-link" href="/admin" hidden>Moderation</a>
 <span class="status">● public beta</span>
 <button id="account" class="outline account-btn" type="button">Sign in</button>
 </nav>
@@ -23,7 +24,7 @@
 <div class="eyebrow">THE LAUNCHPAD FOR PLAYABLE IDEAS</div>
 <h1>Think it. <span>Play it.</span><br>Launch it.</h1>
 <p>Type any game idea. Arcade ideas become a spec the built-in runtime can play. Everything else becomes a self-contained game in a sandbox that cannot see this page or the network.</p>
-<div class="actions"><a class="primary" href="#studio">Create a game ↗</a><a class="outline" href="#discover">Explore launches →</a></div>
+<div class="actions"><a class="primary" href="#studio">Create a game ↗</a><a class="outline" href="/discover">Explore launches →</a></div>
 <div class="metrics"><span><b>4</b> game engines</span><span><b>∞</b> ideas</span><span><b>1</b> click to publish</span></div>
 </section>
 <div class="grid" id="studio">
@@ -39,6 +40,7 @@
 <option value="freeform">Freeform sandbox</option>
 </select>
 <p id="tier-note" class="hint">Auto uses an arcade spec when the idea fits, and a sandbox game otherwise.</p>
+<p id="tag-line" class="hint"></p>
 <p id="gen-mode" class="hint mode-label">Checking generator…</p>
 <div class="separator"><span>MAKE IT YOURS</span></div>
 <label for="name">Game name</label>
@@ -99,11 +101,12 @@
 <section id="discover" class="discover">
 <div class="discover-top">
 <div><div class="eyebrow">03 / DISCOVER</div><h2>Just dropped <span>↘</span></h2></div>
-<div class="searchbox"><input id="search" placeholder="Search games..."><select id="sort" aria-label="Sort games"><option value="new">Newest</option><option value="popular">Most played</option></select></div>
+<div class="searchbox"><input id="search" placeholder="Search games..." aria-label="Search games"><select id="sort" aria-label="Sort games"><option value="new">New</option><option value="trending">Trending</option><option value="featured">Featured</option></select></div>
 </div>
+<div id="tag-row" class="tag-row"></div>
 <div class="cards" id="gallery"></div>
 </section>
-<footer>playground beta • built for experimentation • no tokens deployed <span>✦</span></footer>
+<footer class="site-foot"><span>playground beta · no tokens deployed</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
 </main>
 <div id="auth-dialog" class="auth-dialog" hidden>
 <form id="auth-form" class="auth-card">

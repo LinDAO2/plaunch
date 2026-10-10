@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.7.1')
+    assert.equal(res.data.version, '0.8.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -685,6 +685,126 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       assert.equal(third.status, 429)
       const health = await fetch(server.base + '/api/health')
       assert.equal(health.status, 200)
+    } finally {
+      await server.close()
+    }
+  })
+})
+
+describe('discover and moderation', { concurrency: false }, () => {
+  test('trending dedupes a session, ignores a burst, and skips the creator', async () => {
+    const server = await startServer({ env: { ADMIN_EMAILS: 'mod@example.com' }, seed: false })
+    try {
+      const owner = createClient(server.base)
+      await owner.prime()
+      assert.equal((await owner.request('POST', '/api/auth/register', {
+        email: 'owner@example.com', password: 'test-password-123', displayName: 'Owner'
+      })).status, 201)
+      const created = await owner.request('POST', '/api/games', {
+        name: 'Trend Tap', description: 'A quiet tap game', type: 'tap', duration: 10, accent: '#112233'
+      })
+      assert.equal(created.status, 201)
+      assert.ok(created.data.game.tags.includes('tap'))
+      const id = created.data.game.id
+      assert.equal((await owner.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'owner-play-1' })).status, 200)
+      const stranger = createClient(server.base)
+      await stranger.prime()
+      assert.equal((await stranger.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'stranger-play-1' })).status, 200)
+      assert.equal((await stranger.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'stranger-play-2' })).status, 200)
+      const once = await stranger.request('GET', '/api/discover?view=trending')
+      assert.equal(once.data.games.find((game) => game.id === id).trending, 1)
+      assert.equal((await stranger.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'stranger-play-3' })).status, 200)
+      const burst = await stranger.request('GET', '/api/discover?view=trending')
+      assert.equal(burst.data.games.find((game) => game.id === id).trending, 0)
+      const other = createClient(server.base)
+      await other.prime()
+      await other.request('POST', `/api/games/${id}/events`, { type: 'play_started', eventId: 'other-play-1' })
+      const again = await other.request('GET', '/api/discover?view=trending&tag=tap&q=Trend')
+      assert.equal(again.data.games.find((game) => game.id === id).trending, 1)
+      assert.equal((await other.request('GET', '/api/discover?tag=puzzle')).data.games.some((game) => game.id === id), false)
+      assert.equal((await other.request('GET', '/api/discover?view=nope')).status, 400)
+
+      const player = createClient(server.base)
+      await player.prime()
+      const joined = await player.request('POST', '/api/auth/register', {
+        email: 'player@example.com', password: 'test-password-123', displayName: 'Player'
+      })
+      const held = await player.request('POST', '/api/games', {
+        name: 'After dark', description: 'nsfw scene', type: 'tap', duration: 10, accent: '#222222'
+      })
+      assert.equal(held.status, 201)
+      assert.equal(held.data.game.status, 'pending')
+      assert.match(held.data.game.flagReason, /sexual content/)
+      assert.equal((await player.request('GET', '/api/games')).data.games.some((game) => game.id === held.data.game.id), false)
+      assert.equal((await player.request('GET', `/play/${held.data.game.id}`)).status, 404)
+      assert.equal((await player.request('POST', '/api/abuse-reports', {
+        gameId: id, reason: 'spam', details: 'Too many popups'
+      })).status, 201)
+      assert.equal((await player.request('GET', '/api/admin/queue')).status, 403)
+
+      const mod = createClient(server.base)
+      await mod.prime()
+      const modUser = await mod.request('POST', '/api/auth/register', {
+        email: 'mod@example.com', password: 'test-password-123', displayName: 'Mod'
+      })
+      assert.equal(modUser.data.user.admin, true)
+      assert.equal((await mod.request('POST', `/api/admin/games/${id}/feature`, { featured: true })).status, 200)
+      const featured = await mod.request('GET', '/api/discover?view=featured')
+      assert.equal(featured.data.games.some((game) => game.id === id), true)
+      const queue = await mod.request('GET', '/api/admin/queue')
+      assert.equal(queue.status, 200)
+      assert.equal(queue.data.games.some((game) => game.id === held.data.game.id && game.status === 'pending'), true)
+      assert.equal(queue.data.reports.length, 1)
+      assert.equal(queue.data.audit.some((entry) => entry.action === 'game.hold'), true)
+      const reportId = queue.data.reports[0].id
+      assert.equal((await mod.request('POST', `/api/admin/reports/${reportId}`, { status: 'reviewed' })).status, 200)
+      assert.equal((await mod.request('POST', `/api/admin/games/${held.data.game.id}/unhide`, {})).status, 200)
+      assert.equal((await player.request('GET', `/play/${held.data.game.id}`)).status, 200)
+      assert.equal((await mod.request('POST', `/api/admin/games/${id}/hide`, {})).status, 200)
+      assert.equal((await player.request('GET', `/play/${id}`)).status, 404)
+      assert.equal((await mod.request('POST', `/api/admin/games/${id}/unhide`, {})).status, 200)
+      assert.equal((await mod.request('POST', `/api/admin/users/${modUser.data.user.id}/ban`, {})).status, 400)
+      const banned = await mod.request('POST', `/api/admin/users/${joined.data.user.id}/ban`, {})
+      assert.equal(banned.status, 200)
+      const locked = await player.request('POST', '/api/auth/login', {
+        email: 'player@example.com', password: 'test-password-123'
+      })
+      assert.equal(locked.status, 403)
+      assert.equal(locked.data.code, 'banned')
+      const privacy = await player.request('GET', '/privacy')
+      assert.equal(privacy.status, 200)
+      assert.match(privacy.text, /DRAFT — needs legal review/)
+      const terms = await player.request('GET', '/terms')
+      assert.match(terms.text, /DRAFT — needs legal review/)
+      assert.match(terms.text, /not in effect/)
+    } finally {
+      await server.close()
+    }
+  })
+
+  test('a gemini safety flag holds a clean title for review', async () => {
+    let calls = 0
+    const server = await startServer({
+      env: { GEMINI_API_KEY: 'safety-key' },
+      seed: false,
+      fetchImpl: async () => {
+        calls += 1
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"flag":true,"reason":"hate"}' }] } }] }), { status: 200 })
+      }
+    })
+    try {
+      const client = createClient(server.base)
+      await client.prime()
+      await client.request('POST', '/api/auth/register', {
+        email: 'safety@example.com', password: 'test-password-123', displayName: 'Safety'
+      })
+      const held = await client.request('POST', '/api/games', {
+        name: 'Sunny garden', description: 'Tap the flowers', type: 'tap', duration: 10, accent: '#339966'
+      })
+      assert.equal(held.status, 201)
+      assert.equal(held.data.game.status, 'pending')
+      assert.equal(held.data.game.flagReason, 'hate')
+      assert.equal(calls, 1)
     } finally {
       await server.close()
     }

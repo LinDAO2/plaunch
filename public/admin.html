@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c0b12">
+<title>Moderation — playground</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+<a class="brand" href="/">play<span>ground</span><i>.</i></a>
+<nav>
+<a href="/discover">Discover</a>
+<a href="/#studio">Create</a>
+<a href="/admin">Moderation</a>
+<a class="outline account-btn" href="/">Studio</a>
+</nav>
+</header>
+<main class="shell">
+<section class="hero discover-hero">
+<div class="eyebrow">MODERATION</div>
+<h1>Queue</h1>
+<p id="admin-intro">Games held for review, open abuse reports, and the audit log.</p>
+</section>
+<p id="admin-status" class="hint">Checking your account…</p>
+<section id="admin-queue" hidden>
+<h2>Held and hidden</h2>
+<div id="admin-games" class="mod-list"></div>
+<h2>Abuse reports</h2>
+<div id="admin-reports" class="mod-list"></div>
+<h2>Audit log</h2>
+<div id="admin-audit" class="mod-list"></div>
+</section>
+<footer class="site-foot"><span>playground beta · no tokens deployed</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+</main>
+<script type="module" src="/admin.js"></script>
+</body>
+</html>

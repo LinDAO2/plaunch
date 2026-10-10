@@ -19,6 +19,8 @@ let freeformPoints = null
 let freeformBest = 0
 let lastGeneration = 'manual'
 let authMode = 'login'
+let activeTag = ''
+const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap']
 
 const runtime = createRuntime({
   root: $('game'),
@@ -99,6 +101,7 @@ function syncSpec(spec, game) {
 
 function payload() {
   const game = editor()
+  const prompt = $('prompt').value
   if (lastTier === 'freeform' && lastHtml) {
     return {
       name: game.name,
@@ -109,11 +112,12 @@ function payload() {
       tokenInterest: game.tokenInterest,
       generation: lastGeneration || 'rule-based-template',
       tier: 'freeform',
-      html: lastHtml
+      html: lastHtml,
+      prompt
     }
   }
   const spec = syncSpec(lastSpec, game)
-  const body = { ...game, generation: lastGeneration || 'manual', tier: 'spec' }
+  const body = { ...game, generation: lastGeneration || 'manual', tier: 'spec', prompt }
   if (spec) body.spec = spec
   return body
 }
@@ -290,13 +294,12 @@ async function showGame(summary) {
 }
 
 function render() {
-  const q = $('search').value.trim().toLowerCase()
-  const sort = $('sort').value
-  const list = games.filter((game) => (game.name + ' ' + game.description).toLowerCase().includes(q))
-    .sort((a, b) => sort === 'popular' ? b.plays - a.plays : b.createdAt.localeCompare(a.createdAt))
+  const list = games
   $('gallery').replaceChildren()
   if (!list.length) {
-    $('gallery').textContent = games.length ? 'No games match your search.' : 'No published games yet.'
+    const q = $('search').value.trim()
+    const sort = $('sort').value
+    $('gallery').textContent = q ? 'No games match your search.' : sort === 'featured' ? 'No featured games yet.' : 'No published games yet.'
     return
   }
   for (const game of list) {
@@ -310,6 +313,9 @@ function render() {
     title.textContent = game.name
     const desc = document.createElement('p')
     desc.textContent = game.description
+    const tags = document.createElement('div')
+    tags.className = 'tag-list'
+    tags.textContent = (game.tags || []).join(' · ')
     const bottom = document.createElement('div')
     bottom.className = 'card-bottom'
     const small = document.createElement('small')
@@ -332,13 +338,35 @@ function render() {
       }
     })
     bottom.append(small, button, share)
-    card.append(tag, title, desc, bottom)
+    card.append(tag, title, desc, tags, bottom)
     $('gallery').append(card)
   }
 }
 
+function paintTags() {
+  const row = $('tag-row')
+  if (!row) return
+  row.replaceChildren()
+  for (const tag of ['', ...CATALOG]) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'tag' + (activeTag === tag ? ' on' : '')
+    button.textContent = tag || 'All'
+    button.addEventListener('click', () => {
+      activeTag = tag
+      paintTags()
+      loadGames().catch((error) => { $('gallery').textContent = error.message })
+    })
+    row.append(button)
+  }
+}
+
 async function loadGames() {
-  const out = await api('/games')
+  const params = new URLSearchParams({ view: $('sort').value || 'new' })
+  const q = $('search').value.trim()
+  if (q) params.set('q', q)
+  if (activeTag) params.set('tag', activeTag)
+  const out = await api(`/discover?${params}`)
   games = out.games
   render()
 }
@@ -369,6 +397,8 @@ async function refreshAccount() {
   const { user } = await api('/auth/me')
   me = user
   $('account').textContent = user ? (user.displayName || user.email) : 'Sign in'
+  const adminLink = $('admin-link')
+  if (adminLink) adminLink.hidden = !(user && user.admin)
   await loadMine()
   refreshOwnerButtons()
 }
@@ -463,6 +493,9 @@ $('generate').addEventListener('click', async () => {
       }
     }
     $('tier-note').textContent = result.tierReason || ''
+    const tags = result.tags || []
+    const held = result.safety?.flagged ? ` Held for review (${result.safety.reason}).` : ''
+    $('tag-line').textContent = tags.length ? `Tags: ${tags.join(', ')}.${held}` : held.trim()
     lastGeneration = result.game?.generation || 'manual'
     opened = null
     fill({ ...result.game, spec: result.spec, tokenInterest: false })
@@ -487,8 +520,13 @@ $('publish').addEventListener('click', async () => {
   try {
     $('publish').disabled = true
     const { game } = await api('/games', 'POST', payload())
-    setStatus(`Published: ${location.origin}/g/${game.id}`)
-    toast('Game published. Share the page URL.')
+    if (game.status === 'pending') {
+      setStatus('Held for review. It stays off Discover until a moderator approves it.')
+      toast('Held for review.')
+    } else {
+      setStatus(`Published: ${location.origin}/g/${game.id}`)
+      toast('Game published. Share the page URL.')
+    }
     await loadGames()
     await loadMine()
     await showGame(game)
@@ -625,12 +663,13 @@ $('share-x').addEventListener('click', () => {
   api(`/games/${opened.id}/share`, 'POST', {}).catch(() => {})
 })
 
-$('search').addEventListener('input', render)
-$('sort').addEventListener('change', render)
+$('search').addEventListener('input', () => { loadGames().catch((error) => toast(error.message)) })
+$('sort').addEventListener('change', () => { loadGames().catch((error) => toast(error.message)) })
 window.addEventListener('popstate', () => location.reload())
 
 async function boot() {
   $('gallery').textContent = 'Loading games…'
+  paintTags()
   try {
     await ensureCsrf()
     await refreshMode()

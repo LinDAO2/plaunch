@@ -1,4 +1,4 @@
-# Playground — game launchpad v0.7.1
+# Playground — game launchpad v0.8
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
@@ -70,6 +70,12 @@ Signed-in AI generation is capped per UTC day by `AI_DAILY_LIMIT_PER_USER` (defa
 Freeform HTML is stored on the game and served only by the usercontent listener (`GET /g/:slug` and short-lived `GET /preview/:token`). Its CSP is `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'`, with `frame-ancestors` for the app origin, x.com, and twitter.com. Scores come back only as `postMessage` `{ type: "playground-score", points }`. The parent accepts that shape from the iframe, and only when `event.origin` is `"null"`.
 
 Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production requires `PUBLIC_BASE_URL` and `USERCONTENT_ORIGIN`, and it refuses to boot when those hosts match or share a registrable domain. A separate domain such as `playgroundusercontent.com` is the layout to use. `ALLOW_SAME_SITE_USERCONTENT=true` is the explicit opt-in for a subdomain. Auto tier prefers a freeform game when the idea needs its own rules, physics, or levels, and keeps the arcade spec for a simple tap, dodge, reaction, guess, or arcade game. An idea the keyword check cannot place is sent to the model when a key is set. `POST /api/freeform/preview` requires a signed-in creator and counts toward the AI rate limit. `/play/:slug?embed=1` and `/r/:slug` use the same 480×480 player for freeform games. The parent hides its timer and shows the best score; the game draws its own HUD.
+
+Discover is at `/discover`. Trending ranks unique `play_started` events from the last 24 hours. The same session and IP hash counts once, a burst of three starts inside two minutes is left out, and the creator's own signed-in plays are left out. New is chronological. Featured is set by a moderator.
+
+`ADMIN_EMAILS` is a comma-separated moderator list. Moderators use `/admin` to review abuse reports, hide or unhide a game, archive it, feature it, and ban an account. Those actions are written to `audit_log`. A title, description, or prompt that hits the blocklist is stored as `pending` and stays off Discover until a moderator unhides it. When `GEMINI_API_KEY` is set, publish also asks Gemini for a safety classification, and a flagged game is held the same way.
+
+`/privacy` and `/terms` are drafts. They say they need legal review and are not in effect.
 
 Production layout, accounts, and DNS records are in [DEPLOY.md](DEPLOY.md).
 

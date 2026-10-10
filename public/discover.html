@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c0b12">
+<title>Discover — playground</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+<a class="brand" href="/">play<span>ground</span><i>.</i></a>
+<nav>
+<a href="/discover">Discover</a>
+<a href="/#studio">Create</a>
+<a class="dash-link" href="/studio/dashboard">Dashboard</a>
+<a class="outline account-btn" href="/#studio">Studio</a>
+</nav>
+</header>
+<main class="shell">
+<section class="hero discover-hero">
+<div class="eyebrow">DISCOVER</div>
+<h1>Find a game <span>worth a round.</span></h1>
+<p>Trending counts each player once over the last day. A burst of restarts from the same session does not move the rank, and the creator's own plays stay out of it.</p>
+</section>
+<section class="discover discover-page">
+<div class="view-tabs" role="tablist">
+<button id="view-trending" class="outline" type="button">Trending</button>
+<button id="view-new" class="outline on" type="button">New</button>
+<button id="view-featured" class="outline" type="button">Featured</button>
+</div>
+<div class="searchbox"><input id="search" placeholder="Search games" aria-label="Search games"></div>
+<div id="tag-row" class="tag-row"></div>
+<div class="cards" id="gallery">Loading games…</div>
+</section>
+<footer class="site-foot"><span>playground beta · no tokens deployed</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+</main>
+<script type="module" src="/discover.js"></script>
+</body>
+</html>

@@ -112,3 +112,56 @@ test('freeform games on /play receive pointer and keyboard input and fit the fra
     await server.close()
   }
 })
+
+test('discover and moderation fit a 375px screen', { timeout: 120000 }, async () => {
+  const { chromium } = await import('playwright')
+  const { mkdir } = await import('node:fs/promises')
+  const { createClient } = await import('../testing/helpers.js')
+  await mkdir('/opt/cursor/artifacts', { recursive: true })
+  const server = await startServer({ env: { ADMIN_EMAILS: 'mod@example.com' } })
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+  try {
+    const maker = createClient(server.base)
+    await maker.prime()
+    await maker.request('POST', '/api/auth/register', {
+      email: 'maker@example.com', password: 'test-password-123', displayName: 'Maker'
+    })
+    await maker.request('POST', '/api/games', {
+      name: 'After dark', description: 'nsfw scene', type: 'tap', duration: 10, accent: '#332244'
+    })
+    await maker.request('POST', '/api/abuse-reports', {
+      gameId: 'click-frenzy', reason: 'spam', details: 'Too many popups'
+    })
+    const page = await browser.newPage({ viewport: { width: 375, height: 812 } })
+    const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)
+    await page.goto(server.base + '/discover', { waitUntil: 'domcontentloaded' })
+    await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy'))
+    assert.equal(await fits(), true)
+    await page.screenshot({ path: '/opt/cursor/artifacts/discover_375.png', fullPage: true })
+    await page.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
+    await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy'))
+    assert.equal(await fits(), true)
+    await page.goto(`${server.base}/play/click-frenzy`, { waitUntil: 'domcontentloaded' })
+    await page.waitForFunction(() => document.querySelector('#preview-name')?.textContent === 'Click Frenzy')
+    assert.equal(await fits(), true)
+    await page.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
+    await page.click('#account')
+    await page.click('#auth-switch')
+    await page.fill('#auth-email', 'mod@example.com')
+    await page.fill('#auth-password', 'test-password-123')
+    await page.fill('#auth-name', 'Mod')
+    await page.click('#auth-submit')
+    await page.waitForFunction(() => document.querySelector('#account')?.textContent.includes('Mod'))
+    await page.goto(server.base + '/admin', { waitUntil: 'domcontentloaded' })
+    await page.waitForFunction(() => document.body.innerText.includes('After dark') && document.body.innerText.includes('Too many popups'))
+    assert.equal(await fits(), true)
+    await page.locator('#admin-games').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: '/opt/cursor/artifacts/moderation_375.png', fullPage: true })
+    const privacy = await page.goto(server.base + '/privacy', { waitUntil: 'domcontentloaded' })
+    assert.equal(privacy.status(), 200)
+    assert.match(await page.locator('.draft-banner').innerText(), /DRAFT — needs legal review/)
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+})
