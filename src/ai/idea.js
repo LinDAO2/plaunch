@@ -1,4 +1,5 @@
 import { HttpError } from '../errors.js'
+import { generateWorldIdea, wantsWorld } from '../blocks/spec.js'
 import { heuristicTier } from './classify.js'
 import { generateFreeform } from './freeform.js'
 import { aiStatus, generateGame, requestModelText } from './generate.js'
@@ -38,6 +39,7 @@ export async function generateIdea({ prompt, tier, env, fetchImpl }) {
     ? (tier === 'spec' || tier === 'freeform' ? tier : 'auto')
     : null
   if (!explicit) throw new HttpError(400, 'Generator tier must be auto, spec, or freeform', 'validation_error')
+  if (wantsWorld(prompt) && explicit !== 'freeform') return generateWorldIdea(prompt)
   let choice = explicit === 'auto' ? heuristicTier(prompt) : explicit
   let via = explicit === 'auto' ? 'heuristic' : 'studio'
   if (choice === 'uncertain') {

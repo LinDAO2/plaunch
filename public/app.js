@@ -1,5 +1,7 @@
 import { api, ensureCsrf, setCsrf } from '/client-api.js'
 import { gameCard } from '/cards.js'
+import { mountWorld } from '/blocks-view.js'
+import { ensureWorldSpec } from '/blocks/spec.js'
 import { createRuntime, renderHint, typeNames } from '/mechanics.js'
 import { fitSandboxFrame, readSandboxScore, readSandboxSize } from '/sandbox-score.js'
 
@@ -12,6 +14,8 @@ let boardTab = 'checked'
 let opened = null
 let games = []
 let lastSpec = null
+let worldView = null
+let worldKey = ''
 let lastTier = 'spec'
 let lastHtml = null
 let previewUrl = ''
@@ -154,9 +158,38 @@ function showSandbox(url) {
   renderHint($('controls-hint'), { tier: 'freeform' })
 }
 
+function showWorldPreview(game) {
+  try { lastSpec = ensureWorldSpec(game, lastSpec) } catch { /* keep the last valid world spec */ }
+  const key = lastSpec ? `${lastSpec.biome}|${lastSpec.terrainSeed}|${lastSpec.worldSize}|${lastSpec.structure}` : ''
+  $('field').classList.remove('freeform-on')
+  $('game').classList.remove('freeform-on')
+  $('display').hidden = true
+  $('game-label').hidden = true
+  $('timer').hidden = true
+  $('play').hidden = true
+  $('play').disabled = true
+  document.body.classList.add('world-play')
+  if (!worldView || worldKey !== key) {
+    worldView?.destroy()
+    worldView = null
+    worldKey = key
+    worldView = mountWorld({ spec: lastSpec, field: $('field'), offline: true })
+  }
+  current = null
+  $('preview-name').textContent = game.name || 'Block World'
+  $('preview-description').textContent = game.description
+  $('mechanic').textContent = typeNames.world
+  renderHint($('controls-hint'), { ...game, type: 'world', spec: lastSpec })
+  $('leaders').textContent = 'Blocks placed and time played show on the play page. They stay unverified.'
+  $('leaderboard-scope').textContent = 'Unverified'
+  const share = $('share-x')
+  if (share) share.hidden = true
+}
+
 function preview() {
   const game = editor()
   if (lastTier === 'freeform') {
+    clearWorld()
     current = null
     $('preview-name').textContent = game.name || 'Untitled Game'
     $('preview-description').textContent = game.description
@@ -186,6 +219,12 @@ function preview() {
     freeformFrame = null
     return
   }
+  if (game.type === 'world') {
+    showWorldPreview(game)
+    return
+  }
+  if (lastSpec?.runtime === 'world') lastSpec = null
+  clearWorld()
   $('field').classList.remove('freeform-on')
   $('game').classList.remove('freeform-on')
   $('display').hidden = false
@@ -237,10 +276,23 @@ function showAsk() {
   $('discover').hidden = false
 }
 
+function clearWorld() {
+  worldView?.destroy()
+  worldView = null
+  worldKey = ''
+  document.body.classList.remove('world-play')
+  $('field')?.classList.remove('world-on')
+  const play = $('play')
+  if (play) play.disabled = false
+}
+
 function applyDifficulty() {
   if (!lastSpec) return
   const level = $('difficulty').value
   const next = { ...lastSpec, difficulty: level }
+  if (lastSpec.runtime === 'world') {
+    next.worldSize = level === 'easy' ? 'small' : level === 'hard' ? 'large' : 'medium'
+  }
   if (lastSpec.spawn && baseSpawnRate) {
     const factor = level === 'easy' ? 0.7 : level === 'hard' ? 1.4 : 1
     next.spawn = { ...lastSpec.spawn, rate: Math.max(0.2, Math.round(baseSpawnRate * factor * 100) / 100) }

@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.8.1')
+    assert.equal(res.data.version, '0.9.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -43,7 +43,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/games')
     assert.equal(res.status, 200)
     const ids = res.data.games.map((item) => item.id)
-    assert.deepEqual(ids.sort(), ['click-frenzy', 'homing-gems', 'lane-harvest', 'lightning-reflex', 'lucky-seven', 'meteor-dodge', 'meteor-rain', 'mole-garden', 'shadow-chase', 'zigzag-orbs'])
+    assert.deepEqual(ids.sort(), ['blocks-candy-moon', 'blocks-grassland', 'click-frenzy', 'homing-gems', 'lane-harvest', 'lightning-reflex', 'lucky-seven', 'meteor-dodge', 'meteor-rain', 'mole-garden', 'shadow-chase', 'zigzag-orbs'])
     assert.equal(res.data.games.every((item) => item.plays === 0), true)
   })
 

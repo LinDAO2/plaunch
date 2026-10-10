@@ -1,3 +1,4 @@
+import { generateWorldIdea, wantsWorld } from './blocks/spec.js'
 import { HttpError } from './errors.js'
 import { cleanText, validateGameInput } from './validate.js'
 
@@ -6,6 +7,20 @@ export const TEMPLATE_NOTICE = 'This preview uses a template matcher, not an AI 
 export function generateTemplate(prompt) {
   const p = cleanText(prompt, 600).toLowerCase()
   if (p.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
+  if (wantsWorld(p)) {
+    const idea = generateWorldIdea(p)
+    return {
+      ...idea.game,
+      notice: TEMPLATE_NOTICE,
+      biome: idea.spec.biome,
+      terrainSeed: idea.spec.terrainSeed,
+      worldSize: idea.spec.worldSize,
+      structure: idea.spec.structure,
+      goal: idea.spec.goal,
+      palette: idea.spec.palette,
+      theme: idea.spec.theme
+    }
+  }
   const type = /dodge|meteor|avoid|falling|obstacle|surviv/.test(p) ? 'dodge'
     : /reaction|reflex|quick|green|signal/.test(p) ? 'reaction'
       : /guess|number|mystery|higher|lower|trivia/.test(p) ? 'guess'

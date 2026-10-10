@@ -1,4 +1,7 @@
 import { deflateSync } from 'node:zlib'
+import { blockHex } from './blocks/blocks.js'
+import { lookFor } from './blocks/spec.js'
+import { blockAt, skyHex, worldFromSpec } from './blocks/terrain.js'
 
 const SIZE = 1200
 const cache = new Map()
@@ -158,7 +161,56 @@ function tint(color, amount) {
   return color.map((channel) => Math.round(channel * amount))
 }
 
+function drawIso(rgb, x, y, z, color) {
+  const s = 26
+  const cx = 600 + (x - z) * s
+  const cy = 700 + (x + z) * 12 - (y - 6) * 16
+  const top = color.map((channel) => Math.min(255, Math.round(channel * 1.08)))
+  const left = color.map((channel) => Math.round(channel * 0.72))
+  const right = color.map((channel) => Math.round(channel * 0.48))
+  fillRect(rgb, cx - s, cy - 8, s, 20, left)
+  fillRect(rgb, cx, cy - 8, s, 20, right)
+  fillRect(rgb, cx - s / 2, cy - 26, s, 14, top)
+}
+
+function renderWorldPoster(game) {
+  const rgb = Buffer.alloc(SIZE * SIZE * 3)
+  const look = game.spec?.runtime === 'world' ? game.spec : lookFor(game.id)
+  const world = worldFromSpec(look)
+  const sky = hexColor(skyHex(world.biome))
+  const accent = hexColor(game.accent)
+  const ink = world.biome === 'moon' ? [231, 233, 234] : [0, 0, 0]
+  fillRect(rgb, 0, 0, SIZE, SIZE, sky)
+  fillRect(rgb, 0, 0, SIZE, 28, accent)
+  fillRect(rgb, 0, SIZE - 28, SIZE, 28, accent)
+  fillRect(rgb, 0, 0, 28, SIZE, accent)
+  fillRect(rgb, SIZE - 28, 0, 28, SIZE, accent)
+  const originX = (world.size >> 1) - 7
+  const originZ = (world.size >> 1) - 7
+  const cols = []
+  for (let z = originZ; z < originZ + 14; z++) {
+    for (let x = originX; x < originX + 14; x++) {
+      let top = 0
+      for (let y = world.height - 1; y >= 0; y--) {
+        if (blockAt(x, y, z, world)) { top = y; break }
+      }
+      for (let y = Math.max(0, top - 2); y <= top; y++) {
+        const id = blockAt(x, y, z, world)
+        if (id) cols.push({ x: x - originX, z: z - originZ, y, color: hexColor(blockHex(id)) })
+      }
+    }
+  }
+  cols.sort((a, b) => (a.x + a.z) - (b.x + b.z) || a.y - b.y)
+  for (const col of cols) drawIso(rgb, col.x, col.y, col.z, col.color)
+  const title = label(game.name, 18)
+  const scale = title.length > 14 ? 7 : 9
+  const titleWidth = title.length * 6 * scale
+  drawText(rgb, title, Math.max(48, Math.round((SIZE - titleWidth) / 2)), 56, scale, ink)
+  return encodePng(SIZE, SIZE, rgb)
+}
+
 export function renderPoster(game) {
+  if (game.type === 'world') return renderWorldPoster(game)
   const rgb = Buffer.alloc(SIZE * SIZE * 3)
   const accent = hexColor(game.accent)
   const paper = [231, 233, 234]

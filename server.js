@@ -3,6 +3,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { aiStatus } from './src/ai/generate.js'
 import { createApp } from './src/app.js'
+import { createWorldHub } from './src/blocks/hub.js'
 import { loadConfig } from './src/config.js'
 import { databaseKind, openDatabase } from './src/db.js'
 import { log } from './src/log.js'
@@ -28,14 +29,18 @@ export async function start() {
   const applied = await migrate(db)
   const seeded = config.seedOnEmpty ? await seedIfEmpty(db) : 0
   const servers = []
+  const hubs = []
   if (config.serverRole === 'usercontent') {
     config.mainOrigins = unique([config.publicBaseUrl])
     const usercontent = http.createServer(createUsercontentApp({ db, config }))
     await listen(usercontent, config.port)
     servers.push(usercontent)
   } else {
-    const app = createApp({ db, config })
+    const hub = createWorldHub({ db, config })
+    const app = createApp({ db, config, hub })
     const server = http.createServer(app)
+    hub.attach(server)
+    hubs.push(hub)
     await listen(server, config.port)
     servers.push(server)
     config.mainOrigins = unique([
@@ -59,6 +64,7 @@ export async function start() {
     ai: aiStatus(config.env).mode
   })
   const shutdown = () => {
+    Promise.all(hubs.map((hub) => hub.close())).finally(() => undefined)
     let pending = servers.length
     if (!pending) {
       db.close().finally(() => process.exit(0))

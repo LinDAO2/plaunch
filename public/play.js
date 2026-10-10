@@ -1,4 +1,5 @@
 import { api, ensureCsrf } from '/client-api.js'
+import { mountWorld } from '/blocks-view.js'
 import { createRuntime, renderHint, typeNames } from '/mechanics.js'
 import { fitSandboxFrame, readSandboxScore, readSandboxSize } from '/sandbox-score.js'
 
@@ -12,6 +13,37 @@ let freeformPoints = null
 let freeformBest = 0
 let board = { scores: [], unverified: [] }
 let boardTab = 'checked'
+let worldBoardTimer = null
+
+function formatPlayed(ms) {
+  const seconds = Math.max(0, Math.round(Number(ms) / 1000))
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+}
+
+function renderWorldBoard(data) {
+  $('leaderboard-scope').textContent = `${data.online || 0} online · unverified`
+  if ($('tab-checked')) $('tab-checked').hidden = true
+  if ($('tab-unverified')) $('tab-unverified').hidden = true
+  const note = $('board-note')
+  if (note) note.textContent = 'Blocks placed and time played are unverified. The server counts them.'
+  const leaders = $('leaders')
+  leaders.replaceChildren()
+  if (!data.stats?.length) {
+    leaders.textContent = 'No blocks placed yet. Time in the world still counts.'
+    return
+  }
+  for (const row of data.stats) {
+    const line = document.createElement('p')
+    line.textContent = `${row.name} · ${row.blocksPlaced} blocks placed · ${formatPlayed(row.timePlayedMs)} played · unverified`
+    leaders.append(line)
+  }
+}
+
+async function loadWorldBoard() {
+  const data = await api(`/games/${slug}/world`)
+  renderWorldBoard(data)
+}
 
 function toast(msg) {
   const el = $('toast')
@@ -210,6 +242,23 @@ async function boot() {
     $('mechanic').textContent = typeNames[game.type] || game.type
     renderHint($('controls-hint'), game)
     $('studio-link').href = `/g/${game.id}`
+    if (game.type === 'world') {
+      document.body.classList.add('world-play')
+      const fresh = $('play').cloneNode(true)
+      fresh.hidden = true
+      $('play').replaceWith(fresh)
+      $('display').hidden = true
+      $('game-label').hidden = true
+      $('timer').hidden = true
+      $('score').hidden = true
+      $('sound-toggle').hidden = true
+      if ($('goal-banner')) $('goal-banner').hidden = true
+      mountWorld({ spec: game.spec, slug: game.id, field: $('field') })
+      await loadWorldBoard()
+      worldBoardTimer = setInterval(() => { loadWorldBoard().catch(() => {}) }, 4000)
+      await api(`/games/${game.id}/events`, 'POST', { type: 'game_viewed', eventId: crypto.randomUUID() }).catch(() => {})
+      return
+    }
     runtime.setGame(game)
     if (game.tier === 'freeform' && game.sandboxUrl) mountFreeform(game.sandboxUrl)
     await loadScores()

@@ -3,7 +3,7 @@ import { bindSound, blip, burst, shake } from '/juice.js'
 
 const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'd', 'w', 's', ' ', 'f'])
 
-export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE', arcade: 'ARCADE' }
+export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE', arcade: 'ARCADE', world: 'BLOCKS' }
 
 export function renderHint(el, game) {
   if (!el) return
@@ -21,6 +21,9 @@ export function renderHint(el, game) {
 }
 
 export function controlHint(game) {
+  if (game?.type === 'world' || game?.spec?.runtime === 'world') {
+    return 'Click or drag to look. WASD and space. Click breaks, right click or E places. On a phone, use the stick, drag to look, and the place and jump buttons.'
+  }
   if (game?.tier === 'freeform') return 'Sandboxed canvas. The score comes back to this page. The game cannot read this page or the network.'
   if (game?.spec?.controls?.keyboard && game?.spec?.controls?.touch) {
     const pointer = game.spec.controls.scheme === 'tap' ? '' : 'Mouse or trackpad to move · '

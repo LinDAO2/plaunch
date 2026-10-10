@@ -53,6 +53,9 @@ function paint(queue) {
       if (game.status === 'published') {
         actions.append(button('Feature', () => act(`/admin/games/${game.id}/feature`, { featured: true }).catch((error) => note(error.message))))
       }
+      if (game.type === 'world') {
+        actions.append(button('Reset world', () => act(`/admin/games/${game.id}/reset-world`).catch((error) => note(error.message))))
+      }
       const tr = document.createElement('tr')
       tr.append(cell(game.name, 'Game'), cell(`${game.status}${reason}`, 'Detail'), cell(actions, 'Actions'))
       return tr
@@ -103,6 +106,21 @@ function paint(queue) {
 async function load() {
   paint(await api('/admin/queue'))
 }
+
+$('reset-world').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const id = $('reset-slug').value.trim().toLowerCase()
+  if (!/^[a-z0-9-]{1,48}$/.test(id)) {
+    note('Enter a world slug.')
+    return
+  }
+  try {
+    await act(`/admin/games/${id}/reset-world`)
+    note('World reset.')
+  } catch (error) {
+    note(error.message)
+  }
+})
 
 async function boot() {
   try {

@@ -1,6 +1,6 @@
 import { HttpError } from './errors.js'
 
-export const MECHANICS = new Set(['tap', 'reaction', 'guess', 'dodge', 'arcade'])
+export const MECHANICS = new Set(['tap', 'reaction', 'guess', 'dodge', 'arcade', 'world'])
 
 export function cleanText(value, max) {
   if (typeof value !== 'string') return ''

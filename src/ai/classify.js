@@ -1,6 +1,8 @@
+import { wantsWorld } from '../blocks/spec.js'
+
 const FREEFORM = [
   'tetris', 'chess', 'poker', 'rpg', 'dialogue', 'story', 'racing', 'match-3', 'match3',
-  'card game', 'tower defense', 'minecraft', 'inventory', 'crafting', 'board game',
+  'card game', 'tower defense', 'inventory', 'crafting', 'board game',
   'wordle', 'trivia', 'rhythm', 'fighting', 'metroidvania', 'roguelike', 'visual novel',
   'paint', 'drawing game', 'physics', 'platformer', 'endless', 'runner', 'cactus', 'cacti',
   'level', 'levels', 'flappy', 'side-scroll', 'sidescroller', 'puzzle', 'simulation',
@@ -21,6 +23,7 @@ function mentions(text, hint) {
 // Freeform wins when the idea needs its own rules, physics, or levels, even if it also says "jump".
 // Simple tap, dodge, reaction, guess, and arcade-primitive ideas stay on the spec.
 export function heuristicTier(prompt) {
+  if (wantsWorld(prompt)) return 'world'
   const text = String(prompt || '').toLowerCase()
   if (FREEFORM.some((hint) => mentions(text, hint))) return 'freeform'
   if (SPEC.some((hint) => mentions(text, hint))) return 'spec'

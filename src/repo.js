@@ -529,6 +529,16 @@ export async function reviewReport(db, { id, actorId, status }) {
   })
 }
 
+export async function resetWorld(db, { id, actorId }) {
+  const current = await getGameRow(db, id)
+  if (!current) throw new HttpError(404, 'Game not found', 'not_found')
+  if (current.type !== 'world') throw new HttpError(400, 'This game has no shared world', 'validation_error')
+  await db.query('delete from world_edits where game_id = $1', [id])
+  await db.query('delete from world_stats where game_id = $1', [id])
+  await writeAudit(db, { actorId, action: 'world.reset', targetType: 'game', targetId: id, detail: {} })
+  return current
+}
+
 export async function recordHold(db, { actorId, gameId, reason, source }) {
   await writeAudit(db, {
     actorId,
@@ -556,6 +566,7 @@ export async function moderationQueue(db) {
       return {
         id: game.id,
         name: game.name,
+        type: game.type,
         status: game.status,
         flagReason: game.flagReason,
         tags: game.tags,

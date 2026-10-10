@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { createApp } from '../src/app.js'
+import { createWorldHub } from '../src/blocks/hub.js'
 import { loadConfig } from '../src/config.js'
 import { openDatabase } from '../src/db.js'
 import { migrate } from '../src/migrate.js'
@@ -29,8 +30,10 @@ export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
   const db = await openDatabase('pglite:memory')
   await migrate(db)
   if (seed) await seedIfEmpty(db)
-  const app = createApp({ db, config, fetchImpl })
+  const hub = createWorldHub({ db, config })
+  const app = createApp({ db, config, fetchImpl, hub })
   const server = http.createServer(app)
+  hub.attach(server)
   const usercontent = http.createServer(createUsercontentApp({ db, config }))
   const serverListening = once(server, 'listening')
   const userListening = once(usercontent, 'listening')
@@ -47,8 +50,10 @@ export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
     db,
     config,
     base,
+    hub,
     usercontentBase: config.usercontentOrigin,
     async close() {
+      await hub.close()
       await new Promise((resolve, reject) => usercontent.close((err) => err ? reject(err) : resolve()))
       await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()))
       await db.close()

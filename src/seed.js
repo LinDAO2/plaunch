@@ -1,6 +1,7 @@
 import { EXAMPLE_GAMES } from './arcade/examples.js'
 import { tagsFor } from './ai/tags.js'
 import { specFromGame } from './ai/gamespec.js'
+import { featuredWorlds } from './blocks/spec.js'
 
 const CLASSICS = [
   { id: 'click-frenzy', name: 'Click Frenzy', description: 'Tap as fast as you can.', type: 'tap', duration: 10, accent: '#a88bff', createdAt: '2026-10-09T00:00:00Z' },
@@ -11,7 +12,8 @@ const CLASSICS = [
 
 const EXAMPLES = [
   ...CLASSICS.map((game) => ({ ...game, spec: specFromGame(game, { theme: game.type }) })),
-  ...EXAMPLE_GAMES.map((game) => ({ ...game, createdAt: '2026-10-10T00:00:00Z' }))
+  ...EXAMPLE_GAMES.map((game) => ({ ...game, createdAt: '2026-10-10T00:00:00Z' })),
+  ...featuredWorlds().map((game) => ({ ...game, createdAt: '2026-10-10T00:00:00Z' }))
 ]
 
 export async function seed(db) {
@@ -20,11 +22,11 @@ export async function seed(db) {
     for (const game of EXAMPLES) {
       const spec = game.spec
       const result = await tx.query(
-        `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tags)
-         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', $7::jsonb, $8, $8, $8, $9::jsonb)
+        `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tags, featured)
+         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', $7::jsonb, $8, $8, $8, $9::jsonb, $10)
          on conflict (id) do nothing
          returning id`,
-        [game.id, game.name, game.description, game.type, game.duration, game.accent, JSON.stringify(spec), game.createdAt, JSON.stringify(tagsFor({ name: game.name, description: game.description, mechanic: game.type }))]
+        [game.id, game.name, game.description, game.type, game.duration, game.accent, JSON.stringify(spec), game.createdAt, JSON.stringify(tagsFor({ name: game.name, description: game.description, mechanic: game.type })), game.featured === true]
       )
       if (!result.rows.length) continue
       inserted += 1

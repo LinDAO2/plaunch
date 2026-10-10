@@ -3,7 +3,7 @@ import { api, ensureCsrf } from '/client-api.js'
 
 const $ = (id) => document.getElementById(id)
 const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap']
-const typeNames = { tap: 'Tap', reaction: 'Reaction', guess: 'Guess', dodge: 'Dodge', arcade: 'Arcade' }
+const typeNames = { tap: 'Tap', reaction: 'Reaction', guess: 'Guess', dodge: 'Dodge', arcade: 'Arcade', world: 'Blocks' }
 let view = 'new'
 let tag = ''
 

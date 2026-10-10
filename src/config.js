@@ -78,6 +78,7 @@ export function loadConfig(env = process.env) {
     usercontentOrigin: sandboxOrigin,
     usercontentPort: intEnv(env.USERCONTENT_PORT, portOf(sandboxOrigin, 43921)),
     serverRole: serverRole(env.SERVER_ROLE),
+    worldGuestCap: intEnv(env.WORLD_GUEST_CAP, 8),
     adminEmails: adminEmails(env.ADMIN_EMAILS),
     mainOrigins: [],
     warnings,

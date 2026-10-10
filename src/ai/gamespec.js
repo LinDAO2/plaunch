@@ -1,3 +1,5 @@
+import { validateWorldSpec, worldSpecFromFields } from '../blocks/spec.js'
+
 const CLASSIC = ['tap', 'reaction', 'guess', 'dodge']
 const RUNTIMES = [...CLASSIC, 'arcade']
 const DIFFICULTIES = ['easy', 'normal', 'hard']
@@ -309,6 +311,7 @@ export function validateGameSpec(input) {
   if (!isObject(input)) throw new Error('Game spec must be an object')
   if (JSON.stringify(input).length > 12000) throw new Error('Game spec is too large')
   rejectExecutable(input)
+  if (input.runtime === 'world' || input.version === '1.2') return validateWorldSpec(input)
   const modern = input.version === '1.1'
   if (input.version !== '1' && !modern) throw new Error('Game spec version must be 1')
   assertOnly(input, modern ? V11_KEYS : SPEC_KEYS, 'Game spec')
@@ -395,6 +398,7 @@ export function validateGameSpec(input) {
 
 export function specFromGame(game, extras = {}) {
   const runtime = game.type || game.runtime
+  if (runtime === 'world') return worldSpecFromFields({ ...extras, ...game })
   if (runtime === 'arcade') return defaultArcadeSpec(game, extras)
   return validateGameSpec({
     version: '1',

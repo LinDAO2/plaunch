@@ -15,7 +15,7 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy') && document.body.innerText.includes('0 plays'))
     await page.waitForFunction(() => /Template/i.test(document.querySelector('#gen-mode')?.textContent || ''))
     const mechanics = await page.locator('#type option').allTextContents()
-    assert.deepEqual(mechanics, ['Tap challenge', 'Reaction test', 'Number guess', 'Meteor dodge', 'Arcade'])
+    assert.deepEqual(mechanics, ['Tap challenge', 'Reaction test', 'Number guess', 'Meteor dodge', 'Arcade', 'Block world'])
 
     await page.fill('#prompt', 'space dodge falling meteors')
     await page.click('#generate')

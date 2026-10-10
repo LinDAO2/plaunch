@@ -482,7 +482,7 @@ test('file-backed PGlite data survives a restart', async () => {
     const first = await openDatabase(`pglite://${dir}`)
     await migrate(first)
     const seeded = await seedIfEmpty(first)
-    assert.equal(seeded, 10)
+    assert.equal(seeded, 12)
     await first.query(`update games set plays = 4 where id = 'click-frenzy'`)
     await first.close()
     const second = await openDatabase(`pglite://${dir}`)

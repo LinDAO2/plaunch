@@ -1,5 +1,6 @@
 import { HttpError } from '../errors.js'
 import { cleanText } from '../validate.js'
+import { generateWorldIdea, wantsWorld } from '../blocks/spec.js'
 import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
 import { DEFAULT_AI_TIMEOUT_MS, aiStatus, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
@@ -133,6 +134,10 @@ function templateResult(prompt) {
 }
 
 export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }) {
+  if (wantsWorld(prompt)) {
+    const idea = generateWorldIdea(prompt)
+    return { mode: idea.mode, provider: null, model: null, game: idea.game, spec: idea.spec, notice: idea.notice }
+  }
   const status = aiStatus(env)
   if (status.mode !== 'ai') return templateResult(prompt)
   const provider = resolveProvider(env)

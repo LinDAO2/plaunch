@@ -40,12 +40,14 @@ import {
   publicGame,
   recordEvent,
   recordHold,
+  resetWorld,
   reviewReport,
   savePreview,
   specForSave,
   submitScore,
   updateGame
 } from './repo.js'
+import { listWorldStats } from './blocks/store.js'
 import { splitBoards } from './scores.js'
 import { TEMPLATE_NOTICE, generateTemplate } from './template.js'
 import { specFromGame } from './ai/gamespec.js'
@@ -61,6 +63,8 @@ import {
 } from './validate.js'
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public')
+const BLOCKS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'blocks')
+const BLOCK_FILES = new Set(['blocks.js', 'terrain.js', 'mesh.js', 'spec.js'])
 const FILES = new Map([
   ['/style.css', 'style.css'],
   ['/app.js', 'app.js'],
@@ -77,6 +81,7 @@ const FILES = new Map([
   ['/cards.js', 'cards.js'],
   ['/juice.js', 'juice.js'],
   ['/icons.js', 'icons.js'],
+  ['/blocks-view.js', 'blocks-view.js'],
   ['/fonts/bricolage-grotesque-latin-700.woff2', 'fonts/bricolage-grotesque-latin-700.woff2'],
   ['/fonts/source-sans-3-latin-400.woff2', 'fonts/source-sans-3-latin-400.woff2'],
   ['/fonts/source-sans-3-latin-600.woff2', 'fonts/source-sans-3-latin-600.woff2'],
@@ -266,7 +271,7 @@ async function sendUser(res, ctx, user, csrf, status = 200) {
   }, ctx)
 }
 
-export function createApp({ db, config, fetchImpl } = {}) {
+export function createApp({ db, config, fetchImpl, hub = null } = {}) {
   const limits = createRateLimiter(config)
 
   return async function app(req, res) {
@@ -282,7 +287,7 @@ export function createApp({ db, config, fetchImpl } = {}) {
         return
       }
       if (UNSAFE.has(req.method || 'GET')) assertCsrf(req)
-      status = await dispatch(req, res, ctx, url, { db, config, fetchImpl: fetchImpl || globalThis.fetch })
+      status = await dispatch(req, res, ctx, url, { db, config, fetchImpl: fetchImpl || globalThis.fetch, hub })
     } catch (err) {
       status = err.status || 500
       if (!res.headersSent) {
@@ -301,7 +306,7 @@ export function createApp({ db, config, fetchImpl } = {}) {
   }
 }
 
-async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
+async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   const { pathname } = url
   const method = req.method || 'GET'
 
@@ -457,7 +462,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     return sendJson(res, 200, await moderationQueue(db), ctx)
   }
 
-  const adminGame = pathname.match(/^\/api\/admin\/games\/([a-z0-9-]+)\/(hide|unhide|archive|feature)$/)
+  const adminGame = pathname.match(/^\/api\/admin\/games\/([a-z0-9-]+)\/(hide|unhide|archive|feature|reset-world)$/)
   if (adminGame && method === 'POST') {
     const actor = requireAdmin(config, await currentUser(req, db))
     const id = adminGame[1]
@@ -467,6 +472,12 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
       const body = await readJson(req)
       const game = await featureGame(db, { id, actorId: actor.id, featured: body.featured === true })
       return sendJson(res, 200, { game: present(config, game, { canEdit: true }) }, ctx)
+    }
+    if (action === 'reset-world') {
+      await readJson(req)
+      const game = await resetWorld(db, { id, actorId: actor.id })
+      hub?.reset(id)
+      return sendJson(res, 200, { game: present(config, game, { canEdit: true }), reset: true }, ctx)
     }
     const game = await moderateGame(db, { id, actorId: actor.id, action })
     return sendJson(res, 200, { game: present(config, game, { canEdit: true }) }, ctx)
@@ -488,7 +499,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     return sendJson(res, 200, { user: banned }, ctx)
   }
 
-  const gameMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)(?:\/(scores|play|events|archive|share))?$/)
+  const gameMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)(?:\/(scores|play|events|archive|share|world))?$/)
   if (gameMatch) {
     const id = gameMatch[1]
     const sub = gameMatch[2]
@@ -541,6 +552,14 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     if (method === 'POST' && sub === 'share') {
       const result = await incrementShares(db, id)
       return sendJson(res, 200, result, ctx)
+    }
+
+    if (method === 'GET' && sub === 'world') {
+      const game = await getGameRow(db, id)
+      if (!game || game.status !== 'published') throw new HttpError(404, 'Game not found', 'not_found')
+      if (game.type !== 'world') throw new HttpError(400, 'This game has no shared world', 'validation_error')
+      const stats = await listWorldStats(db, id)
+      return sendJson(res, 200, { online: hub ? hub.online(id) : 0, stats, verified: false }, ctx)
     }
 
     if (method === 'GET' && sub === 'scores') {
@@ -608,6 +627,17 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     const game = await publishedOrNull(db, posterMatch[1])
     if (!game) return sendJson(res, 404, { error: 'Game not found', code: 'not_found' }, ctx)
     return sendImage(res, posterPng(game), ctx)
+  }
+
+  if (method === 'GET' && pathname.startsWith('/blocks/')) {
+    const name = pathname.slice('/blocks/'.length)
+    if (!BLOCK_FILES.has(name)) return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
+    try {
+      const bytes = await readFile(path.join(BLOCKS, name))
+      return sendJsonRaw(res, 200, bytes, ctx, '.js')
+    } catch {
+      return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
+    }
   }
 
   if (method === 'GET' && FILES.has(pathname)) {
