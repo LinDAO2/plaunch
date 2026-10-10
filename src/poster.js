@@ -154,28 +154,31 @@ function label(value, max) {
     .slice(0, max) || 'GAME'
 }
 
+function tint(color, amount) {
+  return color.map((channel) => Math.round(channel * amount))
+}
+
 export function renderPoster(game) {
   const rgb = Buffer.alloc(SIZE * SIZE * 3)
   const accent = hexColor(game.accent)
   const paper = [231, 233, 234]
   const yellow = [230, 255, 58]
-  fillRect(rgb, 0, 0, SIZE, SIZE, [0, 0, 0])
   const seed = hashString(game.id || game.name)
-  fillRect(rgb, 0, 0, 48, SIZE, accent)
-  for (let i = 0; i < 5; i++) {
-    const x = 120 + ((seed >> (i * 3)) % 760)
-    const y = 160 + ((seed >> (i + 2)) % 520)
-    fillRect(rgb, x, y, i % 2 ? 72 : 36, i % 2 ? 36 : 72, accent)
+  fillRect(rgb, 0, 0, SIZE, SIZE, tint(accent, 0.34))
+  fillRect(rgb, 0, 0, SIZE, 28, accent)
+  fillRect(rgb, 0, SIZE - 28, SIZE, 28, accent)
+  fillRect(rgb, 0, 0, 28, SIZE, accent)
+  fillRect(rgb, SIZE - 28, 0, 28, SIZE, accent)
+  for (let i = 0; i < 4; i++) {
+    const x = 160 + ((seed >> (i * 4)) % 760)
+    const y = 140 + ((seed >> (i + 3)) % 520)
+    fillRect(rgb, x, y, 120, 120, i % 2 ? accent : paper)
   }
-  fillRect(rgb, 0, 0, SIZE, 16, yellow)
+  fillRect(rgb, SIZE / 2 - 70, SIZE - 280, 140, 140, yellow)
   const title = label(game.name, 16)
-  const scale = title.length > 12 ? 10 : 13
+  const scale = title.length > 12 ? 8 : 10
   const titleWidth = title.length * 6 * scale
-  drawText(rgb, title, Math.max(96, Math.round((SIZE - titleWidth) / 2)), 520, scale, paper)
-  const mechanic = label(game.type, 12)
-  const mechanicWidth = mechanic.length * 6 * 8
-  drawText(rgb, mechanic, Math.max(96, Math.round((SIZE - mechanicWidth) / 2)), 680, 8, yellow)
-  fillRect(rgb, 0, SIZE - 16, SIZE, 16, yellow)
+  drawText(rgb, title, Math.max(80, Math.round((SIZE - titleWidth) / 2)), 80, scale, paper)
   return encodePng(SIZE, SIZE, rgb)
 }
 

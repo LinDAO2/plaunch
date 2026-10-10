@@ -10,9 +10,10 @@
 <body>
 <header class="top">
 <a class="brand" href="/"><svg class="mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" fill="#e6ff3a"/></svg>playground</a>
+<p id="gen-mode" class="badge">Template</p>
 <nav>
 <a href="/discover">Discover</a>
-<a href="#studio">Create</a>
+<a href="#ask">Create</a>
 <a class="dash-link" href="/studio/dashboard">Dashboard</a>
 <a id="admin-link" href="/admin" hidden>Moderation</a>
 <button id="account" class="outline account-btn" type="button">Sign in</button>
@@ -20,43 +21,18 @@
 </header>
 <main class="shell">
 <div class="home">
-<section class="prompt-lead" id="studio">
+<section class="ask" id="ask">
 <h1>Make a game from one sentence. Share it on X.</h1>
-<label for="prompt">Game idea</label>
-<textarea id="prompt" placeholder="A space game where you dodge falling meteors."></textarea>
+<textarea id="prompt" aria-label="Game idea" placeholder="A space game where you dodge falling meteors."></textarea>
+<div class="ideas">
+<button class="idea" type="button" data-prompt="A space game where you dodge falling meteors.">Dodge meteors</button>
+<button class="idea" type="button" data-prompt="Tap as fast as you can before time runs out.">Tap challenge</button>
+<button class="idea" type="button" data-prompt="Wait for the signal to turn green, then tap.">Green light</button>
+<button class="idea" type="button" data-prompt="Guess the secret number from 1 to 10.">Number guess</button>
+<button class="idea" type="button" data-prompt="Catch the gems and keep moving so the shards miss.">Catch the gems</button>
+<button class="idea" type="button" data-prompt="Grab the coins and stay away from the shadow.">Flee the shadow</button>
+</div>
 <button id="generate" class="primary" type="button">Generate</button>
-<label for="tier">Generator</label>
-<select id="tier">
-<option value="auto">Auto — arcade spec when it fits</option>
-<option value="spec">Arcade spec</option>
-<option value="freeform">Freeform sandbox</option>
-</select>
-<p id="tier-note" class="hint">Auto uses an arcade spec when the idea fits, and a sandbox game otherwise.</p>
-<p id="tag-line" class="hint"></p>
-<p id="gen-mode" class="hint">Checking generator…</p>
-<label for="name">Game name</label>
-<input id="name" maxlength="45" value="Click Frenzy">
-<label for="description">Description</label>
-<textarea id="description" maxlength="180">Tap as fast as you can.</textarea>
-<div class="twocol">
-<div><label for="type">Game mechanic</label><select id="type"><option value="tap">Tap challenge</option><option value="reaction">Reaction test</option><option value="guess">Number guess</option><option value="dodge">Meteor dodge</option><option value="arcade">Arcade</option></select></div>
-<div><label for="duration">Duration</label><select id="duration"><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
-</div>
-<label for="accent">Theme color</label>
-<input id="accent" type="color" value="#a88bff">
-<label class="check"><input id="token" type="checkbox"> <span>I'm interested in adding a game token later</span></label>
-<p class="hint">Token features are waitlist-only. No minting, wallet connection, or investment functionality is live.</p>
-<button id="publish" class="primary block" type="button">Publish</button>
-<a id="share-x" class="outline block" target="_blank" rel="noopener noreferrer" hidden>Share on X</a>
-<button id="update" class="outline block" type="button" hidden>Save changes</button>
-<button id="archive" class="outline block" type="button" hidden>Archive game</button>
-<button id="new-game" class="outline block" type="button">New game</button>
-<p id="status" role="status" class="hint"></p>
-<div id="mine" hidden>
-<h3>Your games</h3>
-<p class="hint"><a href="/studio/dashboard">Open the creator dashboard</a> for views, plays, completions, and shares.</p>
-<div id="mine-list" class="mine-list"></div>
-</div>
 </section>
 <section class="wall" id="discover">
 <div class="wall-head">
@@ -66,6 +42,9 @@
 <div id="tag-row" class="tag-row"></div>
 <div class="cards" id="gallery"></div>
 </section>
+<section class="editor" id="editor" hidden>
+<div class="editor-layout">
+<div class="editor-stage">
 <section class="preview-wrap">
 <div class="preview-top"><h2 id="preview-name">Click Frenzy</h2><span class="chip" id="mechanic">TAP</span></div>
 <p id="preview-description">Tap as fast as you can.</p>
@@ -102,6 +81,49 @@
 <textarea id="report-details" maxlength="500" placeholder="What happened?"></textarea>
 <button id="report-send" class="outline" type="button">Send report</button>
 </div>
+</div>
+</section>
+</div>
+<aside class="editor-controls">
+<label for="name">Name</label>
+<input id="name" maxlength="45" value="Click Frenzy">
+<label for="accent">Color</label>
+<input id="accent" type="color" value="#e6ff3a">
+<label for="difficulty">Difficulty</label>
+<select id="difficulty">
+<option value="easy">Easy</option>
+<option value="normal" selected>Normal</option>
+<option value="hard">Hard</option>
+</select>
+<button id="publish" class="primary block" type="button">Publish</button>
+<a id="share-x" class="outline block" target="_blank" rel="noopener noreferrer" hidden>Share on X</a>
+<details class="advanced" id="advanced">
+<summary>Advanced</summary>
+<label for="description">Description</label>
+<textarea id="description" maxlength="180">Tap as fast as you can.</textarea>
+<div class="twocol">
+<div><label for="type">Game mechanic</label><select id="type"><option value="tap">Tap challenge</option><option value="reaction">Reaction test</option><option value="guess">Number guess</option><option value="dodge">Meteor dodge</option><option value="arcade">Arcade</option></select></div>
+<div><label for="duration">Duration</label><select id="duration"><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
+</div>
+<label for="tier">Generator</label>
+<select id="tier">
+<option value="auto">Auto</option>
+<option value="spec">Built-in game</option>
+<option value="freeform">Sandbox</option>
+</select>
+<p id="tier-note" class="hint">Auto picks a built-in game when the idea fits, and a sandbox game otherwise.</p>
+<p id="tag-line" class="hint"></p>
+</details>
+<button id="update" class="outline block" type="button" hidden>Save changes</button>
+<button id="archive" class="outline block" type="button" hidden>Archive game</button>
+<button id="new-game" class="outline block" type="button">New game</button>
+<p id="status" role="status" class="hint"></p>
+<div id="mine" hidden>
+<h3>Your games</h3>
+<p class="hint"><a href="/studio/dashboard">Open the creator dashboard</a> for views, plays, and shares.</p>
+<div id="mine-list" class="mine-list"></div>
+</div>
+</aside>
 </div>
 </section>
 </div>

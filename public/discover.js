@@ -37,13 +37,22 @@ function render(games) {
     return
   }
   for (const game of games) {
-    const { card, bottom, play } = gameCard(game, {
+    const { card, bottom, share } = gameCard(game, {
       label: typeNames[game.type] || game.type,
       playHref: `/play/${game.id}`
     })
     const small = document.createElement('small')
     small.textContent = view === 'trending' ? `${game.trending || 0} players today` : `${game.plays || 0} plays`
-    bottom.append(small, play)
+    share.addEventListener('click', async () => {
+      const url = `${location.origin}/r/${game.id}`
+      try {
+        await navigator.clipboard.writeText(url)
+        share.setAttribute('aria-label', 'Link copied')
+      } catch {
+        window.prompt('Share link', url)
+      }
+    })
+    bottom.append(small)
     gallery.append(card)
   }
 }

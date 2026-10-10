@@ -1,6 +1,7 @@
 const D = {
   play: 'M4 2.5v11l9-5.5z',
-  copy: 'M6 2h7v2h2v10H6V2zm2 2v8h5V4H8zM3 5h2v9h7v2H3V5z'
+  copy: 'M6 2h7v2h2v10H6V2zm2 2v8h5V4H8zM3 5h2v9h7v2H3V5z',
+  share: 'M3 8h6V5l5 4-5 4V10H3V8z'
 }
 
 export function icon(name) {

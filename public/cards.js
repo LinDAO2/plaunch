@@ -3,22 +3,71 @@ import { icon } from '/icons.js'
 const posters = new Set()
 let frame = 0
 
+const CASTS = {
+  'click-frenzy': { player: '👆', sprites: ['＋', '＋', '＋'] },
+  'lightning-reflex': { player: '🟢', sprites: ['●', '●'] },
+  'lucky-seven': { player: '7', sprites: ['?', '?', '7'] },
+  'meteor-dodge': { player: '🚀', sprites: ['☄', '☄', '⭐', '☄'] },
+  'meteor-rain': { player: '🚀', sprites: ['☄', '⭐', '☄', '⭐'] },
+  'lane-harvest': { player: '🧺', sprites: ['🍓', '🐛', '🍓', '🫐'] },
+  'zigzag-orbs': { player: '🛸', sprites: ['✨', '✨', '🔮', '✨'] },
+  'homing-gems': { player: '🧲', sprites: ['💎', '🔺', '💎', '🔺'] },
+  'mole-garden': { player: '🔨', sprites: ['🐹', '🌿', '🐹', '🐹'] },
+  'shadow-chase': { player: '🏃', sprites: ['👻', '🪙', '👻', '🪙'] }
+}
+
+const BY_TYPE = {
+  tap: { player: '👆', sprites: ['＋', '＋', '＋'] },
+  reaction: { player: '🟢', sprites: ['●', '●', '●'] },
+  guess: { player: '?', sprites: ['7', '3', '9'] },
+  dodge: { player: '🚀', sprites: ['☄', '⭐', '☄', '☄'] },
+  arcade: { player: '🛸', sprites: ['⭐', '💎', '🔺', '🪙'] }
+}
+
+function castFor(game) {
+  return CASTS[game.id] || BY_TYPE[game.type] || BY_TYPE.arcade
+}
+
+function disc(ctx, x, y, radius, color) {
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.arc(x, y, radius, 0, Math.PI * 2)
+  ctx.fill()
+}
+
 function paint(item, now) {
-  const { canvas, accent, seed } = item
+  const { canvas, accent, seed, cast } = item
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const w = canvas.width
   const h = canvas.height
+  ctx.clearRect(0, 0, w, h)
   ctx.fillStyle = '#000000'
   ctx.fillRect(0, 0, w, h)
   ctx.fillStyle = accent
-  for (let i = 0; i < 6; i++) {
-    const y = ((now / 16 + i * 48 + seed) % (h + 24)) - 24
-    const x = (seed * 13 + i * 67) % (w - 18)
-    ctx.fillRect(x, y, i % 2 ? 14 : 8, i % 2 ? 8 : 14)
-  }
-  ctx.fillStyle = '#e6ff3a'
-  ctx.fillRect(0, h - 4, w, 4)
+  ctx.globalAlpha = 0.28
+  ctx.fillRect(0, 0, w, h)
+  ctx.globalAlpha = 1
+  ctx.strokeStyle = accent
+  ctx.lineWidth = 10
+  ctx.strokeRect(8, 8, w - 16, h - 16)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  cast.sprites.forEach((glyph, i) => {
+    const span = h / Math.max(cast.sprites.length, 1)
+    const y = ((now / 14 + i * span + seed) % (h + 70)) - 36
+    const x = 64 + ((seed * 19 + i * 110) % (w - 128))
+    disc(ctx, x, y, 26, i % 2 ? '#ffffff' : accent)
+    ctx.fillStyle = '#000000'
+    ctx.font = '36px sans-serif'
+    ctx.fillText(glyph, x, y + 2)
+  })
+  const px = w / 2 + Math.sin(now / 380 + seed) * (w * 0.28)
+  const py = h - 58
+  disc(ctx, px, py, 34, '#e6ff3a')
+  ctx.fillStyle = '#000000'
+  ctx.font = '40px sans-serif'
+  ctx.fillText(cast.player, px, py + 2)
 }
 
 function loop(now) {
@@ -26,13 +75,14 @@ function loop(now) {
   frame = requestAnimationFrame(loop)
 }
 
-export function livePoster(accent, seed) {
+export function livePoster(game) {
   const canvas = document.createElement('canvas')
   canvas.className = 'live-poster'
-  canvas.width = 480
-  canvas.height = 270
+  canvas.width = 640
+  canvas.height = 360
   canvas.setAttribute('aria-hidden', 'true')
-  posters.add({ canvas, accent: /^#[0-9a-fA-F]{6}$/.test(accent || '') ? accent : '#e6ff3a', seed: Number(seed) || 1 })
+  const accent = /^#[0-9a-fA-F]{6}$/.test(game.accent || '') ? game.accent : '#e6ff3a'
+  posters.add({ canvas, accent, seed: hash(game.id || game.name), cast: castFor(game) })
   if (!frame) frame = requestAnimationFrame(loop)
   return canvas
 }
@@ -44,12 +94,15 @@ function hash(value) {
   return h % 997
 }
 
-export function gameCard(game, { label, onPlay, playHref }) {
+export function gameCard(game, { label, playHref }) {
   const card = document.createElement('article')
   card.className = 'card'
+  const link = document.createElement('a')
+  link.className = 'card-link'
+  link.href = playHref || `/play/${game.id}`
   const frameEl = document.createElement('div')
   frameEl.className = 'card-frame'
-  frameEl.append(livePoster(game.accent, hash(game.id)))
+  frameEl.append(livePoster(game))
   const body = document.createElement('div')
   body.className = 'card-body'
   const kind = document.createElement('p')
@@ -59,22 +112,15 @@ export function gameCard(game, { label, onPlay, playHref }) {
   title.textContent = game.name
   const desc = document.createElement('p')
   desc.textContent = game.description
-  const tags = document.createElement('p')
-  tags.className = 'tag-list'
-  tags.textContent = (game.tags || []).join(' · ')
   const bottom = document.createElement('div')
   bottom.className = 'card-bottom'
-  body.append(kind, title, desc, tags, bottom)
-  card.append(frameEl, body)
-
-  const play = onPlay ? document.createElement('button') : document.createElement('a')
-  play.className = 'outline play-link'
-  if (onPlay) {
-    play.type = 'button'
-    play.addEventListener('click', onPlay)
-  } else {
-    play.href = playHref
-  }
-  play.append(icon('play'), document.createTextNode(' Play'))
-  return { card, bottom, play }
+  body.append(kind, title, desc, bottom)
+  link.append(frameEl, body)
+  const share = document.createElement('button')
+  share.type = 'button'
+  share.className = 'card-share'
+  share.setAttribute('aria-label', 'Share')
+  share.append(icon('share'))
+  card.append(link, share)
+  return { card, bottom, share, link }
 }

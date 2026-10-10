@@ -110,13 +110,13 @@ export function mountArcade(field, spec, hooks) {
 function draw(ctx, spec, snap, view) {
   const { width, height, dpr } = view
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  const unit = Math.max(0.7, Math.min(1.6, Math.min(width / 480, height / 360)))
+  const unit = Math.max(0.9, Math.min(2.6, Math.min(width / 420, height / 320)))
   const primitives = new Set(spec.primitives || [])
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = '#120f1c'
+  ctx.fillStyle = '#000000'
   ctx.fillRect(0, 0, width, height)
-  ctx.fillStyle = spec.palette?.[1] || spec.accent || '#a88bff'
-  ctx.globalAlpha = 0.18
+  ctx.fillStyle = spec.accent || '#e6ff3a'
+  ctx.globalAlpha = 0.14
   ctx.fillRect(0, 0, width, height)
   ctx.globalAlpha = 1
   if (snap.walls?.length) {
@@ -132,7 +132,7 @@ function draw(ctx, spec, snap, view) {
     }
     ctx.fillRect(0, (84 / 100) * height, width, 8)
   }
-  const size = Math.round(28 * unit)
+  const size = Math.round(36 * unit)
   ctx.font = `${size}px sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -150,7 +150,7 @@ function draw(ctx, spec, snap, view) {
     sprite(ctx, entity.sprite || '●', (entity.x / 100) * width, (entity.y / 100) * height, size, DISC[entity.kind] || '#c9b6ff')
   }
   ctx.font = `${Math.round(14 * unit)}px sans-serif`
-  ctx.fillStyle = '#f9f7ff'
+  ctx.fillStyle = '#e7e9ea'
   ctx.textAlign = 'left'
   ctx.fillText(String(snap.score), 12, 18 * unit)
   ctx.textAlign = 'right'

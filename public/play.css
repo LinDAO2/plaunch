@@ -10,7 +10,7 @@
 .play-head a { text-decoration: none; font-size: 15px; }
 .play-stage { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
 .stage, .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.play-body .game { height: min(72vh, 640px); }
+.play-body .game { height: min(80vh, 820px); }
 .play-body h1 { font-size: 40px; }
 .share {
   display: grid;

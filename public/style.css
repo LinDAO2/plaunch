@@ -89,14 +89,46 @@ p { margin: 0; }
 .top nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .top nav a { font-size: 15px; text-decoration: none; }
 .shell { max-width: 1120px; margin: 0 auto; padding: 32px 24px 48px; }
+.badge {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
 
-.home {
+.home { display: flex; flex-direction: column; gap: 32px; }
+.ask {
+  min-height: calc(100vh - 128px);
+  max-width: 760px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  justify-content: center;
+  gap: 16px;
 }
-.prompt-lead, .wall, .preview-wrap, .panel { display: flex; flex-direction: column; gap: 16px; }
-.prompt-lead h1 { max-width: 16em; }
+.ask textarea { min-height: 148px; font-size: 20px; line-height: 1.35; }
+.ideas { display: flex; flex-wrap: wrap; gap: 8px; }
+.idea {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #000;
+  color: var(--text);
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 15px;
+}
+.wall, .preview-wrap, .panel, .editor-stage, .editor-controls { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.editor-layout { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+.editor .game { height: min(80vh, 760px); }
+.advanced {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.advanced summary { cursor: pointer; font-size: 15px; }
 label { font-size: 13px; color: var(--muted); }
 textarea, input, select {
   width: 100%;
@@ -148,15 +180,30 @@ input[type="color"] { padding: 4px; height: 40px; }
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
 }
-.card { border: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; min-width: 0; }
+.card { position: relative; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+.card-link { color: inherit; text-decoration: none; display: flex; flex-direction: column; min-width: 0; }
 .card-frame { border-bottom: 1px solid var(--line); background: #000; }
 .live-poster { display: block; width: 100%; height: auto; }
 .card-body { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
-.card h3 { font-size: 20px; }
+.card h3 { font-size: 20px; color: var(--text); }
 .card p { font-size: 15px; color: var(--muted); }
 .mini, .tag-list, .card-bottom small { font-size: 13px; color: var(--muted); }
 .card-bottom { justify-content: space-between; }
-.play-link svg { display: block; }
+.card-share {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: #000;
+  color: var(--text);
+}
+.card-share svg { display: block; margin: 0 auto; }
 
 .game {
   position: relative;
@@ -169,19 +216,25 @@ input[type="color"] { padding: 4px; height: 40px; }
 }
 .goal-banner {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 4;
   margin: 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  font-size: 17px;
+  font-size: 15px;
   color: var(--text);
   background: #000;
-  border: 1px solid var(--line);
+  border: 0;
+  border-bottom: 1px solid var(--line);
   padding: 8px 16px;
   pointer-events: none;
 }
+.game:has(.goal-banner:not([hidden])) .field { top: 48px; }
 .game-label {
   position: absolute;
   top: 72px;
@@ -357,7 +410,9 @@ input[type="color"] { padding: 4px; height: 40px; }
   font-size: 13px;
   color: var(--muted);
 }
+.site-foot nav { display: flex; align-items: center; }
 .site-foot a { color: var(--muted); }
+.site-foot nav a + a { border-left: 1px solid var(--line); margin-left: 8px; padding-left: 8px; }
 .auth-dialog {
   position: fixed;
   inset: 0;
@@ -398,13 +453,7 @@ input[type="color"] { padding: 4px; height: 40px; }
   .pointer-fine { display: none; }
 }
 @media (min-width: 960px) {
-  .home {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 32px;
-    align-items: start;
-  }
-  .wall { grid-column: 2; grid-row: 1 / span 2; }
+  .editor-layout { grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.7fr); }
 }
 @media (max-width: 720px) {
   h1 { font-size: 28px; }

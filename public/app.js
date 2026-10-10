@@ -21,6 +21,7 @@ let freeformBest = 0
 let lastGeneration = 'manual'
 let authMode = 'login'
 let activeTag = ''
+let baseSpawnRate = null
 const CATALOG = ['action', 'arcade', 'casual', 'dodge', 'guess', 'puzzle', 'reaction', 'runner', 'sandbox', 'tap']
 
 const runtime = createRuntime({
@@ -76,7 +77,7 @@ function editor() {
     type: $('type').value,
     duration: Number($('duration').value),
     accent: $('accent').value,
-    tokenInterest: $('token').checked
+    tokenInterest: false
   }
 }
 
@@ -215,9 +216,36 @@ function fill(game) {
   $('type').value = game.type
   ensureDuration(game.duration)
   $('accent').value = game.accent
-  $('token').checked = !!game.tokenInterest
-  if (game.spec !== undefined) lastSpec = game.spec
+  if (game.spec !== undefined) {
+    lastSpec = game.spec
+    baseSpawnRate = game.spec?.spawn?.rate ?? null
+  }
+  const level = game.spec?.difficulty
+  $('difficulty').value = level === 'easy' || level === 'hard' ? level : 'normal'
   preview()
+}
+
+function showEditor() {
+  $('ask').hidden = true
+  $('discover').hidden = true
+  $('editor').hidden = false
+}
+
+function showAsk() {
+  $('editor').hidden = true
+  $('ask').hidden = false
+  $('discover').hidden = false
+}
+
+function applyDifficulty() {
+  if (!lastSpec) return
+  const level = $('difficulty').value
+  const next = { ...lastSpec, difficulty: level }
+  if (lastSpec.spawn && baseSpawnRate) {
+    const factor = level === 'easy' ? 0.7 : level === 'hard' ? 1.4 : 1
+    next.spawn = { ...lastSpec.spawn, rate: Math.max(0.2, Math.round(baseSpawnRate * factor * 100) / 100) }
+  }
+  lastSpec = next
 }
 
 function refreshOwnerButtons() {
@@ -293,7 +321,8 @@ async function showGame(summary) {
       share.hidden = true
     }
   }
-  $('studio').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  showEditor()
+  $('editor').scrollIntoView({ behavior: 'smooth', block: 'start' })
   refreshOwnerButtons()
   await loadScores()
   api(`/games/${game.id}/events`, 'POST', { type: 'game_viewed', eventId: crypto.randomUUID() }).catch(() => {})
@@ -309,27 +338,22 @@ function render() {
     return
   }
   for (const game of list) {
-    const label = (typeNames[game.type] || game.type) + (game.tokenInterest ? ' · token interest' : '')
-    const { card, bottom, play } = gameCard(game, {
-      label,
-      onPlay: () => { showGame(game).catch((error) => toast(error.message)) }
+    const { card, bottom, share } = gameCard(game, {
+      label: typeNames[game.type] || game.type,
+      playHref: `/play/${game.id}`
     })
     const small = document.createElement('small')
     small.textContent = `${game.plays || 0} plays`
-    const share = document.createElement('button')
-    share.type = 'button'
-    share.className = 'outline'
-    share.textContent = 'Copy link'
     share.addEventListener('click', async () => {
-      const url = `${location.origin}/g/${game.id}`
+      const url = `${location.origin}/r/${game.id}`
       try {
         await navigator.clipboard.writeText(url)
-        toast('Game link copied')
+        toast('Link copied')
       } catch {
-        window.prompt('Copy link', url)
+        window.prompt('Share link', url)
       }
     })
-    bottom.append(small, play, share)
+    bottom.append(small)
     $('gallery').append(card)
   }
 }
@@ -396,7 +420,8 @@ async function refreshAccount() {
 
 async function refreshMode() {
   const status = await api('/ai/status')
-  $('gen-mode').textContent = status.notice
+  const names = { gemini: 'Gemini', openai: 'OpenAI', xai: 'xAI' }
+  $('gen-mode').textContent = names[status.provider] || 'Template'
 }
 
 function openAuth(mode) {
@@ -457,9 +482,19 @@ $('auth-form').addEventListener('submit', async (event) => {
   }
 })
 
-for (const id of ['name', 'description', 'type', 'duration', 'accent', 'token']) {
+for (const id of ['name', 'description', 'type', 'duration', 'accent']) {
   $(id).addEventListener('input', preview)
   $(id).addEventListener('change', preview)
+}
+$('difficulty').addEventListener('change', () => {
+  applyDifficulty()
+  preview()
+})
+for (const chip of document.querySelectorAll('.idea')) {
+  chip.addEventListener('click', () => {
+    $('prompt').value = chip.dataset.prompt || ''
+    $('prompt').focus()
+  })
 }
 
 $('generate').addEventListener('click', async () => {
@@ -483,15 +518,14 @@ $('generate').addEventListener('click', async () => {
         openAuth('login')
       }
     }
-    $('tier-note').textContent = result.tierReason || ''
     const tags = result.tags || []
-    const held = result.safety?.flagged ? ` Held for review (${result.safety.reason}).` : ''
-    $('tag-line').textContent = tags.length ? `Tags: ${tags.join(', ')}.${held}` : held.trim()
+    $('tag-line').textContent = tags.join(' · ')
+    if (result.safety?.flagged) setStatus('Held for review.')
     lastGeneration = result.game?.generation || 'manual'
     opened = null
-    fill({ ...result.game, spec: result.spec, tokenInterest: false })
-    $('gen-mode').textContent = result.notice
-    toast(previewNote || result.notice)
+    fill({ ...result.game, spec: result.spec })
+    showEditor()
+    toast(previewNote || 'Ready to play.')
     refreshOwnerButtons()
   } catch (error) {
     if (error.status === 401) openAuth('login')
@@ -578,6 +612,7 @@ $('new-game').addEventListener('click', () => {
   freeformPoints = null
   lastGeneration = 'manual'
   history.pushState({}, '', '/')
+  showAsk()
   preview()
   refreshOwnerButtons()
   setStatus('')
@@ -606,10 +641,10 @@ window.addEventListener('message', (event) => {
 $('tier').addEventListener('change', () => {
   const choice = $('tier').value
   $('tier-note').textContent = choice === 'freeform'
-    ? 'The next generation will be a sandboxed HTML game.'
+    ? 'The next idea becomes a sandbox game.'
     : choice === 'spec'
-      ? 'The next generation will be an arcade spec.'
-      : 'Auto uses an arcade spec when the idea fits, and a sandbox game otherwise.'
+      ? 'The next idea becomes a built-in game.'
+      : 'Auto picks a built-in game when the idea fits, and a sandbox game otherwise.'
 })
 
 $('submit-score').addEventListener('click', async () => {
