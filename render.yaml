@@ -29,6 +29,8 @@ services:
         sync: false
       - key: USERCONTENT_ORIGIN
         sync: false
+      - key: ALLOW_SAME_SITE_USERCONTENT
+        value: "false"
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
@@ -62,5 +64,7 @@ services:
           envVarKey: PUBLIC_BASE_URL
       - key: USERCONTENT_ORIGIN
         sync: false
+      - key: ALLOW_SAME_SITE_USERCONTENT
+        value: "false"
       - key: SEED_ON_EMPTY
         value: "false"

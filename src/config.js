@@ -1,3 +1,5 @@
+import net from 'node:net'
+import psl from 'psl'
 import { httpError } from './errors.js'
 import { VERSION } from './version.js'
 
@@ -17,6 +19,7 @@ export function loadConfig(env = process.env) {
   const warnings = []
 
   const usercontentOrigin = cleanOrigin(env.USERCONTENT_ORIGIN)
+  const publicBaseUrl = cleanOrigin(env.PUBLIC_BASE_URL)
   if (nodeEnv === 'production') {
     if (!sessionFromEnv) throw new Error('SESSION_SECRET is required in production')
     if (!databaseFromEnv) throw new Error('DATABASE_URL is required in production')
@@ -24,6 +27,8 @@ export function loadConfig(env = process.env) {
       throw new Error('Production DATABASE_URL must be a postgres:// or postgresql:// connection string')
     }
     if (!usercontentOrigin) throw new Error('USERCONTENT_ORIGIN is required in production')
+    if (!publicBaseUrl) throw new Error('PUBLIC_BASE_URL is required in production')
+    if (env.ALLOW_SAME_SITE_USERCONTENT !== 'true') assertSeparateSandbox(publicBaseUrl, usercontentOrigin)
   }
 
   let databaseUrl = databaseFromEnv
@@ -68,7 +73,7 @@ export function loadConfig(env = process.env) {
     aiDailyGlobal: intEnv(env.AI_DAILY_LIMIT_GLOBAL, 200),
     rateWindowMs: 60_000,
     passwordScryptN: intEnv(env.PASSWORD_SCRYPT_N, 16384),
-    publicBaseUrl: cleanOrigin(env.PUBLIC_BASE_URL),
+    publicBaseUrl,
     xSiteHandle: cleanHandle(env.X_SITE_HANDLE),
     usercontentOrigin: sandboxOrigin,
     usercontentPort: intEnv(env.USERCONTENT_PORT, portOf(sandboxOrigin, 43921)),
@@ -76,6 +81,31 @@ export function loadConfig(env = process.env) {
     mainOrigins: [],
     warnings,
     env
+  }
+}
+
+function hostOf(origin) {
+  return new URL(origin).hostname.replace(/\.$/, '').toLowerCase()
+}
+
+// eTLD+1. IP addresses are not names; psl parses 127.0.0.1 as "0.1".
+export function registrableDomain(host) {
+  const name = String(host || '').replace(/\.$/, '').toLowerCase()
+  if (!name || net.isIP(name)) return ''
+  const domain = psl.get(name)
+  return typeof domain === 'string' ? domain.toLowerCase() : ''
+}
+
+function assertSeparateSandbox(appOrigin, sandboxOrigin) {
+  const appHost = hostOf(appOrigin)
+  const sandboxHost = hostOf(sandboxOrigin)
+  const remedy = 'Use a separate registrable domain for the sandbox, for example https://playgroundusercontent.com. Set ALLOW_SAME_SITE_USERCONTENT=true to boot with this weaker same-site layout.'
+  if (appHost === sandboxHost) {
+    throw new Error(`USERCONTENT_ORIGIN host "${sandboxHost}" is the same host as PUBLIC_BASE_URL. ${remedy}`)
+  }
+  const shared = registrableDomain(appHost)
+  if (shared && shared === registrableDomain(sandboxHost)) {
+    throw new Error(`USERCONTENT_ORIGIN host "${sandboxHost}" shares the registrable domain "${shared}" with PUBLIC_BASE_URL host "${appHost}". ${remedy}`)
   }
 }
 

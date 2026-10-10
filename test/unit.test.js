@@ -16,7 +16,7 @@ import { createSimulation } from '../public/arcade-sim.js'
 import { checkPlausible, plausibilityFor } from '../src/plausibility.js'
 import { posterPng, POSTER_SIZE } from '../src/poster.js'
 import { aiStatus, geminiRequest, openAiRequest, resolveProvider } from '../src/ai/providers.js'
-import { loadConfig } from '../src/config.js'
+import { loadConfig, registrableDomain } from '../src/config.js'
 import { databaseKind, openDatabase } from '../src/db.js'
 import { redact } from '../src/log.js'
 import { migrate } from '../src/migrate.js'
@@ -70,17 +70,81 @@ test('config refuses a production boot without Postgres and a session secret', (
     SESSION_SECRET: 'prod-secret',
     DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground'
   }), /USERCONTENT_ORIGIN/)
-  const prod = loadConfig({
+  assert.throws(() => loadConfig({
     NODE_ENV: 'production',
     SESSION_SECRET: 'prod-secret',
     DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground',
     USERCONTENT_ORIGIN: 'https://usercontent.example'
+  }), /PUBLIC_BASE_URL/)
+  const prod = loadConfig({
+    NODE_ENV: 'production',
+    SESSION_SECRET: 'prod-secret',
+    DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground',
+    PUBLIC_BASE_URL: 'https://play.example.com',
+    USERCONTENT_ORIGIN: 'https://usercontent.example'
   })
+  assert.equal(prod.publicBaseUrl, 'https://play.example.com')
   assert.equal(prod.usercontentOrigin, 'https://usercontent.example')
   assert.equal(prod.cookieSecure, true)
   assert.equal(prod.seedOnEmpty, false)
   assert.equal(databaseKind(prod.databaseUrl), 'postgres')
   assert.equal(databaseKind('pglite:memory'), 'pglite')
+})
+
+test('production refuses a sandbox on the same host or registrable domain', () => {
+  assert.equal(registrableDomain('sandbox.example.co.uk'), 'example.co.uk')
+  assert.equal(registrableDomain('foo.alice.github.io'), 'alice.github.io')
+  assert.equal(registrableDomain('127.0.0.1'), '')
+  const base = {
+    NODE_ENV: 'production',
+    SESSION_SECRET: 'prod-secret',
+    DATABASE_URL: 'postgres://playground:playground@localhost:5432/playground',
+    PUBLIC_BASE_URL: 'https://play.example.com'
+  }
+  assert.throws(() => loadConfig({ ...base, USERCONTENT_ORIGIN: 'https://play.example.com' }), /same host/)
+  assert.throws(() => loadConfig({ ...base, USERCONTENT_ORIGIN: 'https://play.example.com:8443' }), /same host/)
+  assert.throws(() => loadConfig({ ...base, USERCONTENT_ORIGIN: 'https://usercontent.play.example.com' }), /registrable domain "example.com"/)
+  assert.throws(() => loadConfig({
+    ...base,
+    PUBLIC_BASE_URL: 'https://play.example.co.uk',
+    USERCONTENT_ORIGIN: 'https://sandbox.example.co.uk'
+  }), /registrable domain "example.co.uk"/)
+  assert.throws(() => loadConfig({
+    ...base,
+    PUBLIC_BASE_URL: 'https://alice.github.io',
+    USERCONTENT_ORIGIN: 'https://foo.alice.github.io'
+  }), /registrable domain "alice.github.io"/)
+  const separate = loadConfig({ ...base, USERCONTENT_ORIGIN: 'https://playgroundusercontent.com' })
+  assert.equal(separate.usercontentOrigin, 'https://playgroundusercontent.com')
+  const pages = loadConfig({
+    ...base,
+    PUBLIC_BASE_URL: 'https://alice.github.io',
+    USERCONTENT_ORIGIN: 'https://bob.github.io'
+  })
+  assert.equal(pages.usercontentOrigin, 'https://bob.github.io')
+  const ips = loadConfig({
+    ...base,
+    PUBLIC_BASE_URL: 'https://203.0.113.10',
+    USERCONTENT_ORIGIN: 'https://203.0.113.20'
+  })
+  assert.equal(ips.usercontentOrigin, 'https://203.0.113.20')
+  const allowed = loadConfig({
+    ...base,
+    USERCONTENT_ORIGIN: 'https://usercontent.play.example.com',
+    ALLOW_SAME_SITE_USERCONTENT: 'true'
+  })
+  assert.equal(allowed.usercontentOrigin, 'https://usercontent.play.example.com')
+  assert.throws(() => loadConfig({
+    ...base,
+    USERCONTENT_ORIGIN: 'https://usercontent.play.example.com',
+    ALLOW_SAME_SITE_USERCONTENT: '1'
+  }), /ALLOW_SAME_SITE_USERCONTENT/)
+  const dev = loadConfig({
+    NODE_ENV: 'development',
+    PUBLIC_BASE_URL: 'https://play.example.com',
+    USERCONTENT_ORIGIN: 'https://usercontent.play.example.com'
+  })
+  assert.equal(dev.usercontentOrigin, 'https://usercontent.play.example.com')
 })
 
 test('logs redact secrets', () => {
