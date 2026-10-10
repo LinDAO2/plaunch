@@ -1,0 +1,11 @@
+.play-body{min-height:100vh}
+.play-shell{max-width:480px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+.play-shell h1{font-size:clamp(28px,8vw,40px);letter-spacing:-1.2px;margin:8px 0;line-height:1.05}
+.play-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.play-shell .game{height:min(68vh,520px);margin-top:12px}
+.play-links{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:18px}
+.play-links a{color:#cbb8ff}
+.play-body .dodge-controls{gap:24px;width:calc(100% - 36px);justify-content:space-between;padding:0 8px;bottom:96px}
+.play-body .dodge-controls button{min-width:72px;min-height:48px;font-size:22px;touch-action:manipulation}
+.play-body .big-button,.play-body .outline{touch-action:manipulation}
+#play-error:not([hidden]){color:#ffb4c6}

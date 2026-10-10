@@ -1,0 +1,143 @@
+import { HttpError } from '../errors.js'
+import { cleanText } from '../validate.js'
+import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
+import { aiStatus, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
+import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
+
+export { aiStatus }
+
+export const SYSTEM_PROMPT = `You design one tiny browser game and return GameSpecV1 JSON only.
+Rules:
+- version is "1"
+- runtime is one of tap, reaction, guess, dodge
+- scoring.direction is "lower" for reaction and "higher" for tap, guess, and dodge
+- duration is an integer from 5 to 60
+- accent is a #RRGGBB color
+- safety.audience is "general"
+- Do not include JavaScript, HTML, URLs, or executable code
+- Do not wrap the JSON in markdown`
+
+export function parseModelJson(raw) {
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 12000) {
+    throw new Error('Model output is empty or too large')
+  }
+  let text = raw.trim()
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
+  }
+  let value
+  try {
+    value = JSON.parse(text)
+  } catch {
+    throw new Error('Model output is not valid JSON')
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Model output must be a JSON object')
+  }
+  return value
+}
+
+async function callProvider(provider, messages, fetchImpl) {
+  const request = provider.id === 'gemini' ? geminiRequest(provider, messages) : openAiRequest(provider, messages)
+  let response
+  try {
+    response = await fetchImpl(request.url, {
+      method: 'POST',
+      headers: request.headers,
+      body: JSON.stringify(request.body),
+      signal: AbortSignal.timeout(20_000)
+    })
+  } catch (err) {
+    const error = new HttpError(502, err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
+    error.retry = true
+    throw error
+  }
+  const text = await response.text()
+  if (text.length > 20_000) {
+    const error = new HttpError(502, 'AI response too large', 'ai_provider_error')
+    error.retry = false
+    throw error
+  }
+  if (!response.ok) {
+    const rejected = response.status === 401 || response.status === 403
+    const error = new HttpError(502, rejected ? 'AI provider rejected the API key' : 'AI provider request failed', 'ai_provider_error')
+    error.retry = !rejected && response.status !== 400
+    throw error
+  }
+  let payload
+  try {
+    payload = JSON.parse(text)
+  } catch {
+    const error = new HttpError(502, 'AI provider returned invalid JSON', 'ai_provider_error')
+    error.retry = true
+    throw error
+  }
+  const content = provider.id === 'gemini' ? geminiText(payload) : openAiText(payload)
+  if (!content) {
+    const error = new HttpError(502, 'AI provider returned an empty response', 'ai_provider_error')
+    error.retry = true
+    throw error
+  }
+  return content
+}
+
+function templateResult(prompt) {
+  const game = generateTemplate(prompt)
+  return {
+    mode: 'template',
+    provider: null,
+    model: null,
+    game,
+    spec: specFromGame(game),
+    notice: game.notice || TEMPLATE_NOTICE
+  }
+}
+
+export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }) {
+  const status = aiStatus(env)
+  if (status.mode !== 'ai') return templateResult(prompt)
+  const provider = resolveProvider(env)
+  const idea = cleanText(prompt, 600)
+  if (idea.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: `Player idea:\n${idea}` }
+  ]
+  let lastError = 'AI provider failed'
+  let code = 'ai_invalid_output'
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let raw
+    try {
+      raw = await callProvider(provider, messages, fetchImpl)
+    } catch (err) {
+      lastError = err.message
+      code = err.code || 'ai_provider_error'
+      if (err.retry === false || attempt === 3) throw new HttpError(502, lastError, code)
+      continue
+    }
+    try {
+      const spec = validateGameSpec(parseModelJson(raw))
+      const game = {
+        ...gameFromSpec(spec),
+        generation: `ai:${provider.id}`,
+        notice: `Generated with ${provider.id} (${provider.model}) as validated GameSpec v1. Model output is never executed as code.`
+      }
+      return {
+        mode: 'ai',
+        provider: provider.id,
+        model: provider.model,
+        game,
+        spec,
+        notice: game.notice
+      }
+    } catch (err) {
+      lastError = err.message
+      code = 'ai_invalid_output'
+      messages.push({
+        role: 'user',
+        content: `Invalid output: ${err.message}. Return one GameSpecV1 JSON object and no code.`
+      })
+    }
+  }
+  throw new HttpError(502, `AI provider returned invalid game spec: ${lastError}`, code)
+}

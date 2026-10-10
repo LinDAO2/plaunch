@@ -1,0 +1,13 @@
+node_modules
+.git
+.env
+.env.*
+data
+uploads
+agent-tools
+test
+playwright-report
+test-results
+*.log
+README.md
+GROK_HANDOFF.md

@@ -1,24 +1,458 @@
-const $=id=>document.getElementById(id);let current=null,games=[],timer=null,timeout=null,playing=false,phase='',points=0,remaining=10,secret=0,startedAt=0,lastScore=null,dodgeFrame=null,dodgeKeys=new Set(),obstacles=[],dodgeX=50,dodgeTick=0;
-function toast(msg){$('toast').textContent=msg;$('toast').hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').hidden=true,4000)}
-async function api(path,method='GET',payload){const res=await fetch('/api'+path,{method,headers:{'content-type':'application/json'},body:payload?JSON.stringify(payload):undefined});const out=await res.json();if(!res.ok)throw Error(out.error||'Request failed');return out}
-const typeNames={tap:'TAP CHALLENGE',reaction:'REACTION TEST',guess:'NUMBER GUESS',dodge:'METEOR DODGE'};
-const editor=()=>({name:$('name').value.trim(),description:$('description').value.trim(),type:$('type').value,duration:Number($('duration').value),accent:$('accent').value,tokenInterest:$('token').checked});
-function fill(g){$('name').value=g.name;$('description').value=g.description;$('type').value=g.type;$('duration').value=String(g.duration);if(!$('duration').value)$('duration').value='15';$('accent').value=g.accent;$('token').checked=!!g.tokenInterest;preview()}
-function clear(){clearInterval(timer);clearTimeout(timeout);cancelAnimationFrame(dodgeFrame);dodgeKeys.clear();playing=false;phase='';points=0;lastScore=null;remaining=Number($('duration').value);$('score').textContent='Score: 0';$('timer').textContent=`Time: ${remaining}s`;$('game-label').textContent='READY, PLAYER ONE';$('display').textContent='0';$('play').textContent='Start game';$('play').hidden=false;$('field').replaceChildren();$('submit-score').disabled=true}
-function preview(){clear();const g=editor();current=null;$('preview-name').textContent=g.name||'Untitled Game';$('preview-description').textContent=g.description;$('mechanic').textContent=typeNames[g.type];$('game').style.borderColor=g.accent;$('display').textContent=({tap:'0',reaction:'⚡',guess:'?',dodge:'☄'})[g.type];$('leaders').textContent='Publish or open a game to see scores.';$('leaderboard-scope').textContent='Preview mode'}
-function finish(value,label){playing=false;phase='done';clearInterval(timer);clearTimeout(timeout);cancelAnimationFrame(dodgeFrame);$('field').replaceChildren();$('display').textContent=String(value);$('game-label').textContent=label;$('play').hidden=false;$('play').textContent='Play again';lastScore=points;$('submit-score').disabled=!current;}
-function run(){const g=current||editor();if(g.type==='tap'){if(!playing){clear();playing=true;remaining=g.duration;$('play').textContent='TAP!';$('game-label').textContent='GO GO GO';timer=setInterval(()=>{remaining--;$('timer').textContent=`Time: ${remaining}s`;if(remaining<=0)finish(points+' 🎉','TIME UP')},1000)}else{points++;$('score').textContent=`Score: ${points}`;$('display').textContent=points}}
-else if(g.type==='reaction'){if(phase==='wait'){clearTimeout(timeout);finish('⚠','TOO EARLY');lastScore=null;$('submit-score').disabled=true}else if(phase==='ready'){const ms=Math.max(1,Math.round(performance.now()-startedAt));points=Math.max(0,5000-ms);$('score').textContent=`Reaction: ${ms}ms`;finish(`${ms}ms`,'NICE REFLEX')}else{clear();phase='wait';$('display').textContent='…';$('game-label').textContent='WAIT FOR THE SIGNAL';$('play').textContent='Wait…';timeout=setTimeout(()=>{phase='ready';startedAt=performance.now();$('display').textContent='GO!';$('game-label').textContent='CLICK NOW';$('play').textContent='CLICK!'},1500+Math.random()*2300)}}
-else if(g.type==='guess'){if(phase!=='guess'){clear();phase='guess';secret=1+Math.floor(Math.random()*10);$('game-label').textContent='GUESS 1–10';$('display').textContent='?';$('play').textContent='Enter guess';$('timer').textContent='No timer'}else{const raw=window.prompt('Choose a number from 1 to 10');if(raw===null)return;const n=Number(raw);if(!Number.isInteger(n)||n<1||n>10)return toast('Enter a whole number from 1 to 10');points++;$('score').textContent=`Attempts: ${points}`;if(n===secret){points=Math.max(10,100-points*10);finish('🎉','YOU GUESSED IT')}else $('display').textContent=n<secret?'↑ HIGHER':'↓ LOWER'}}
-else if(g.type==='dodge'){clear();playing=true;points=0;remaining=g.duration;dodgeX=50;dodgeTick=0;obstacles=[];$('display').textContent='';$('play').hidden=true;$('game-label').textContent='DODGE THE METEORS';$('field').innerHTML='<div class="dodge-player"></div><div class="dodge-controls"><button data-move="left" aria-label="Move left">←</button><button data-move="right" aria-label="Move right">→</button></div>';const player=$('field').querySelector('.dodge-player');const move=dir=>{dodgeX=Math.min(94,Math.max(6,dodgeX+dir*9));player.style.left=`calc(${dodgeX}% - 21px)`};$('field').style.pointerEvents='auto';$('field').querySelectorAll('[data-move]').forEach(b=>b.addEventListener('pointerdown',()=>move(b.dataset.move==='left'?-1:1)));timer=setInterval(()=>{remaining--;$('timer').textContent=`Time: ${remaining}s`;if(remaining<=0){$('field').style.pointerEvents='none';finish('🏆','YOU SURVIVED')}},1000);let prev=performance.now();const frame=now=>{if(!playing)return;const dt=Math.min(45,now-prev);prev=now;dodgeTick+=dt;if(dodgeKeys.has('ArrowLeft')||dodgeKeys.has('a'))move(-.15*dt);if(dodgeKeys.has('ArrowRight')||dodgeKeys.has('d'))move(.15*dt);if(dodgeTick>650){dodgeTick=0;const x=8+Math.random()*84;const el=document.createElement('div');el.className='meteor';$('field').append(el);obstacles.push({x,y:-10,el})}for(const o of obstacles){o.y+=dt*.055;o.el.style.left=`calc(${o.x}% - 16px)`;o.el.style.top=o.y+'%';if(o.y>72&&o.y<87&&Math.abs(o.x-dodgeX)<8){$('field').style.pointerEvents='none';finish(points,'CRASHED!');return}}obstacles=obstacles.filter(o=>{if(o.y<=105)return true;o.el.remove();points+=10;$('score').textContent=`Score: ${points}`;return false});dodgeFrame=requestAnimationFrame(frame)};dodgeFrame=requestAnimationFrame(frame)}}
-$('play').addEventListener('click',run);document.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;if(['ArrowLeft','ArrowRight','a','d'].includes(e.key)){dodgeKeys.add(e.key);if(playing)e.preventDefault()}});document.addEventListener('keyup',e=>dodgeKeys.delete(e.key));
-for(const id of ['name','description','type','duration','accent','token'])$(id).addEventListener('input',preview);
-$('generate').onclick=async()=>{try{$('generate').disabled=true;const {game,notice}=await api('/generate','POST',{prompt:$('prompt').value});fill(game);toast(notice)}catch(e){toast(e.message)}finally{$('generate').disabled=false}};
-$('publish').onclick=async()=>{try{$('publish').disabled=true;const {game}=await api('/games','POST',editor());current=game;history.pushState({},'',`/g/${game.id}`);$('status').textContent=`Published: ${location.origin}/g/${game.id}`;toast('Game published! Share the page URL.');await loadGames();await showGame(game)}catch(e){toast(e.message)}finally{$('publish').disabled=false}};
-async function showGame(g){fill(g);current=g;history.pushState({},'',`/g/${g.id}`);$('leaderboard-scope').textContent='Top scores';$('studio').scrollIntoView({behavior:'smooth',block:'start'});await Promise.all([loadScores(),api(`/games/${g.id}/play`,'POST').catch(()=>{})])}
-async function loadScores(){if(!current)return;try{const {scores}=await api(`/games/${current.id}/scores`);$('leaders').replaceChildren();if(!scores.length){$('leaders').textContent='No scores yet. Be the first!';return}for(const score of scores){const div=document.createElement('div');div.className='leader-row';const a=document.createElement('span'),b=document.createElement('b');a.textContent=`#${score.rank} ${score.name}`;b.textContent=score.points;div.append(a,b);$('leaders').append(div)}}catch(e){toast(e.message)}}
-$('submit-score').onclick=async()=>{if(!current||lastScore===null)return;try{await api(`/games/${current.id}/scores`,'POST',{name:$('player').value||'Anonymous',points:lastScore});$('submit-score').disabled=true;toast('Score submitted!');await loadScores()}catch(e){toast(e.message)}};
-async function loadGames(){const out=await api('/games');games=out.games;render()}
-function render(){const q=$('search').value.trim().toLowerCase(),sort=$('sort').value;const list=games.filter(g=>(g.name+' '+g.description).toLowerCase().includes(q)).sort((a,b)=>sort==='popular'?b.plays-a.plays:b.createdAt.localeCompare(a.createdAt));$('gallery').replaceChildren();if(!list.length){$('gallery').textContent='No games match your search.';return}for(const g of list){const card=document.createElement('article');card.className='card';card.style.borderTop=`3px solid ${g.accent}`;const tag=document.createElement('div');tag.className='mini';tag.textContent=typeNames[g.type]+(g.tokenInterest?' · TOKEN INTEREST':'');const title=document.createElement('h3');title.textContent=g.name;const desc=document.createElement('p');desc.textContent=g.description;const bottom=document.createElement('div');bottom.className='card-bottom';const small=document.createElement('small');small.textContent=`${g.plays||0} plays`;const button=document.createElement('button');button.textContent='Play →';button.onclick=()=>showGame(g);const share=document.createElement('button');share.textContent='↗';share.title='Copy link';share.onclick=async()=>{const url=`${location.origin}/g/${g.id}`;try{await navigator.clipboard.writeText(url);toast('Game link copied')}catch{window.prompt('Copy link',url)}};bottom.append(small,button,share);card.append(tag,title,desc,bottom);$('gallery').append(card)}}
-$('search').oninput=render;$('sort').onchange=render;window.addEventListener('popstate',()=>location.reload());
-(async()=>{try{await loadGames();const match=location.pathname.match(/^\/g\/([a-z0-9-]+)$/);if(match){const {game}=await api(`/games/${match[1]}`);await showGame(game)}else preview()}catch(e){toast(e.message);preview()}})();
+import { api, ensureCsrf, setCsrf } from '/client-api.js'
+import { controlHint, createRuntime, typeNames } from '/mechanics.js'
+
+const $ = (id) => document.getElementById(id)
+let me = null
+let current = null
+let opened = null
+let games = []
+let lastSpec = null
+let lastGeneration = 'manual'
+let authMode = 'login'
+
+const runtime = createRuntime({
+  root: $('game'),
+  label: $('game-label'),
+  display: $('display'),
+  field: $('field'),
+  play: $('play'),
+  score: $('score'),
+  timer: $('timer'),
+  guess: $('guess-input')
+}, {
+  onToast: toast,
+  onPlayStarted() {
+    if (!current) return
+    api(`/games/${current.id}/events`, 'POST', { type: 'play_started', eventId: crypto.randomUUID() }).then(() => {
+      const found = games.find((game) => game.id === current.id)
+      if (found) found.plays += 1
+      render()
+    }).catch(() => {})
+  },
+  onFinish({ points }) {
+    $('submit-score').disabled = points === null || !current
+    if (!current || points === null) return
+    api(`/games/${current.id}/events`, 'POST', { type: 'play_completed', eventId: crypto.randomUUID() }).catch(() => {})
+  }
+})
+
+function toast(msg) {
+  $('toast').textContent = msg
+  $('toast').hidden = false
+  clearTimeout(toast.t)
+  toast.t = setTimeout(() => { $('toast').hidden = true }, 4000)
+}
+
+function setStatus(message, isError = false) {
+  $('status').textContent = message
+  if (message) $('status').dataset.state = isError ? 'error' : 'ok'
+  else delete $('status').dataset.state
+}
+
+function editor() {
+  return {
+    name: $('name').value.trim(),
+    description: $('description').value.trim(),
+    type: $('type').value,
+    duration: Number($('duration').value),
+    accent: $('accent').value,
+    tokenInterest: $('token').checked
+  }
+}
+
+function ensureDuration(value) {
+  const select = $('duration')
+  const v = String(value)
+  if (![...select.options].some((option) => option.value === v)) {
+    const option = document.createElement('option')
+    option.value = v
+    option.textContent = `${v} seconds`
+    select.append(option)
+  }
+  select.value = v
+}
+
+function syncSpec(spec, game) {
+  if (!spec) return undefined
+  return {
+    ...spec,
+    name: game.name,
+    description: game.description,
+    runtime: game.type,
+    duration: game.duration,
+    accent: game.accent,
+    scoring: { ...(spec.scoring || {}), direction: game.type === 'reaction' ? 'lower' : 'higher' }
+  }
+}
+
+function payload() {
+  const game = editor()
+  const spec = syncSpec(lastSpec, game)
+  const body = { ...game, generation: lastGeneration || 'manual' }
+  if (spec) body.spec = spec
+  return body
+}
+
+function preview() {
+  const game = editor()
+  runtime.setGame({ ...game, spec: lastSpec })
+  current = null
+  $('preview-name').textContent = game.name || 'Untitled Game'
+  $('preview-description').textContent = game.description
+  $('mechanic').textContent = typeNames[game.type] || game.type
+  $('controls-hint').textContent = controlHint({ ...game, spec: lastSpec })
+  $('leaders').textContent = 'Publish or open a game to see scores.'
+  $('leaderboard-scope').textContent = 'Preview mode'
+  $('submit-score').disabled = true
+}
+
+function fill(game) {
+  $('name').value = game.name
+  $('description').value = game.description || ''
+  $('type').value = game.type
+  ensureDuration(game.duration)
+  $('accent').value = game.accent
+  $('token').checked = !!game.tokenInterest
+  lastSpec = game.spec || lastSpec
+  preview()
+}
+
+function refreshOwnerButtons() {
+  const isOwner = !!(me && opened && opened.ownerId && opened.ownerId === me.id)
+  $('update').hidden = !isOwner
+  $('archive').hidden = !isOwner || opened.status === 'archived'
+  $('report-toggle').hidden = !opened
+}
+
+async function loadScores() {
+  if (!current) return
+  const { scores } = await api(`/games/${current.id}/scores`)
+  $('leaders').replaceChildren()
+  if (!scores.length) {
+    $('leaders').textContent = 'No scores yet. Be the first!'
+    return
+  }
+  for (const score of scores) {
+    const row = document.createElement('div')
+    row.className = 'leader-row'
+    const name = document.createElement('span')
+    const value = document.createElement('b')
+    const flag = document.createElement('span')
+    name.textContent = `#${score.rank} ${score.name}`
+    value.textContent = score.mechanic === 'reaction' ? `${score.points} ms` : String(score.points)
+    flag.className = 'unverified'
+    flag.textContent = 'unverified'
+    row.append(name, value, flag)
+    $('leaders').append(row)
+  }
+}
+
+async function showGame(summary) {
+  const { game } = await api(`/games/${summary.id}`)
+  opened = game
+  lastSpec = game.spec || null
+  lastGeneration = game.generation || 'manual'
+  fill(game)
+  current = game
+  history.pushState({}, '', `/g/${game.id}`)
+  $('leaderboard-scope').textContent = game.type === 'reaction' ? 'Fastest reaction · unverified' : 'Top scores · unverified'
+  $('studio').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  refreshOwnerButtons()
+  await loadScores()
+  api(`/games/${game.id}/events`, 'POST', { type: 'game_viewed', eventId: crypto.randomUUID() }).catch(() => {})
+}
+
+function render() {
+  const q = $('search').value.trim().toLowerCase()
+  const sort = $('sort').value
+  const list = games.filter((game) => (game.name + ' ' + game.description).toLowerCase().includes(q))
+    .sort((a, b) => sort === 'popular' ? b.plays - a.plays : b.createdAt.localeCompare(a.createdAt))
+  $('gallery').replaceChildren()
+  if (!list.length) {
+    $('gallery').textContent = games.length ? 'No games match your search.' : 'No published games yet.'
+    return
+  }
+  for (const game of list) {
+    const card = document.createElement('article')
+    card.className = 'card'
+    card.style.borderTop = `3px solid ${game.accent}`
+    const tag = document.createElement('div')
+    tag.className = 'mini'
+    tag.textContent = (typeNames[game.type] || game.type) + (game.tokenInterest ? ' · TOKEN INTEREST' : '')
+    const title = document.createElement('h3')
+    title.textContent = game.name
+    const desc = document.createElement('p')
+    desc.textContent = game.description
+    const bottom = document.createElement('div')
+    bottom.className = 'card-bottom'
+    const small = document.createElement('small')
+    small.textContent = `${game.plays || 0} plays`
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.textContent = 'Play →'
+    button.addEventListener('click', () => { showGame(game).catch((error) => toast(error.message)) })
+    const share = document.createElement('button')
+    share.type = 'button'
+    share.textContent = '↗'
+    share.title = 'Copy link'
+    share.addEventListener('click', async () => {
+      const url = `${location.origin}/g/${game.id}`
+      try {
+        await navigator.clipboard.writeText(url)
+        toast('Game link copied')
+      } catch {
+        window.prompt('Copy link', url)
+      }
+    })
+    bottom.append(small, button, share)
+    card.append(tag, title, desc, bottom)
+    $('gallery').append(card)
+  }
+}
+
+async function loadGames() {
+  const out = await api('/games')
+  games = out.games
+  render()
+}
+
+async function loadMine() {
+  if (!me) {
+    $('mine').hidden = true
+    return
+  }
+  const { games: mine } = await api('/me/games')
+  $('mine').hidden = false
+  $('mine-list').replaceChildren()
+  if (!mine.length) {
+    $('mine-list').textContent = 'You have not published a game yet.'
+    return
+  }
+  for (const game of mine) {
+    const row = document.createElement('button')
+    row.type = 'button'
+    row.className = 'mine-row'
+    row.textContent = `${game.name} · ${game.status}`
+    row.addEventListener('click', () => { showGame(game).catch((error) => toast(error.message)) })
+    $('mine-list').append(row)
+  }
+}
+
+async function refreshAccount() {
+  const { user } = await api('/auth/me')
+  me = user
+  $('account').textContent = user ? (user.displayName || user.email) : 'Sign in'
+  await loadMine()
+  refreshOwnerButtons()
+}
+
+async function refreshMode() {
+  const status = await api('/ai/status')
+  $('gen-mode').textContent = status.notice
+}
+
+function openAuth(mode) {
+  authMode = mode
+  $('auth-title').textContent = mode === 'register' ? 'Create account' : 'Sign in'
+  $('auth-name-label').hidden = mode !== 'register'
+  $('auth-switch').textContent = mode === 'register' ? 'Have an account? Sign in' : 'Need an account? Register'
+  $('auth-password').autocomplete = mode === 'register' ? 'new-password' : 'current-password'
+  $('auth-error').textContent = ''
+  $('auth-dialog').hidden = false
+  $('auth-email').focus()
+}
+
+$('account').addEventListener('click', async () => {
+  if (!me) {
+    openAuth('login')
+    return
+  }
+  try {
+    await api('/auth/logout', 'POST', {})
+    setCsrf('')
+    await ensureCsrf()
+    me = null
+    opened = null
+    current = null
+    await refreshAccount()
+    refreshOwnerButtons()
+    toast('Signed out')
+  } catch (error) {
+    toast(error.message)
+  }
+})
+
+$('auth-switch').addEventListener('click', () => openAuth(authMode === 'register' ? 'login' : 'register'))
+$('auth-cancel').addEventListener('click', () => { $('auth-dialog').hidden = true })
+$('auth-form').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  $('auth-error').textContent = ''
+  const path = authMode === 'register' ? '/auth/register' : '/auth/login'
+  const body = { email: $('auth-email').value.trim(), password: $('auth-password').value }
+  if (authMode === 'register') body.displayName = $('auth-name').value
+  try {
+    $('auth-submit').disabled = true
+    await api(path, 'POST', body)
+    $('auth-dialog').hidden = true
+    $('auth-password').value = ''
+    await refreshAccount()
+    toast(authMode === 'register' ? 'Account created' : 'Signed in')
+  } catch (error) {
+    $('auth-error').textContent = error.message
+  } finally {
+    $('auth-submit').disabled = false
+  }
+})
+
+for (const id of ['name', 'description', 'type', 'duration', 'accent', 'token']) {
+  $(id).addEventListener('input', preview)
+  $(id).addEventListener('change', preview)
+}
+
+$('generate').addEventListener('click', async () => {
+  try {
+    $('generate').disabled = true
+    const result = await api('/ai/generate', 'POST', { prompt: $('prompt').value })
+    lastSpec = result.spec || null
+    lastGeneration = result.game?.generation || 'manual'
+    opened = null
+    fill({ ...result.game, spec: result.spec, tokenInterest: false })
+    $('gen-mode').textContent = result.notice
+    toast(result.notice)
+    refreshOwnerButtons()
+  } catch (error) {
+    if (error.status === 401) openAuth('login')
+    setStatus(error.message, true)
+    toast(error.message)
+  } finally {
+    $('generate').disabled = false
+  }
+})
+
+$('publish').addEventListener('click', async () => {
+  if (!me) {
+    toast('Sign in to publish')
+    openAuth('register')
+    return
+  }
+  try {
+    $('publish').disabled = true
+    const { game } = await api('/games', 'POST', payload())
+    setStatus(`Published: ${location.origin}/g/${game.id}`)
+    toast('Game published. Share the page URL.')
+    await loadGames()
+    await loadMine()
+    await showGame(game)
+  } catch (error) {
+    setStatus(error.message, true)
+    toast(error.message)
+  } finally {
+    $('publish').disabled = false
+  }
+})
+
+$('update').addEventListener('click', async () => {
+  if (!opened) return
+  try {
+    $('update').disabled = true
+    const { game } = await api(`/games/${opened.id}`, 'PATCH', payload())
+    setStatus(`Saved ${game.name}`)
+    toast('Game updated')
+    await loadGames()
+    await loadMine()
+    await showGame(game)
+  } catch (error) {
+    setStatus(error.message, true)
+    toast(error.message)
+  } finally {
+    $('update').disabled = false
+  }
+})
+
+$('archive').addEventListener('click', async () => {
+  if (!opened) return
+  try {
+    $('archive').disabled = true
+    await api(`/games/${opened.id}/archive`, 'POST', {})
+    toast('Game archived')
+    opened = null
+    current = null
+    setStatus('Archived. It is hidden from Discover.')
+    await loadGames()
+    await loadMine()
+    refreshOwnerButtons()
+    preview()
+  } catch (error) {
+    toast(error.message)
+  } finally {
+    $('archive').disabled = false
+  }
+})
+
+$('new-game').addEventListener('click', () => {
+  opened = null
+  current = null
+  lastSpec = null
+  lastGeneration = 'manual'
+  history.pushState({}, '', '/')
+  preview()
+  refreshOwnerButtons()
+  setStatus('')
+})
+
+$('submit-score').addEventListener('click', async () => {
+  const points = runtime.getLastScore()
+  if (!current || points === null) return
+  try {
+    await api(`/games/${current.id}/scores`, 'POST', {
+      name: $('player').value || 'Anonymous',
+      points,
+      mechanic: current.type
+    })
+    $('submit-score').disabled = true
+    toast('Score submitted. It is stored as unverified.')
+    await loadScores()
+  } catch (error) {
+    toast(error.message)
+  }
+})
+
+$('report-toggle').addEventListener('click', () => { $('report-box').hidden = !$('report-box').hidden })
+$('report-send').addEventListener('click', async () => {
+  if (!opened) return
+  try {
+    await api('/abuse-reports', 'POST', {
+      gameId: opened.id,
+      reason: $('report-reason').value,
+      details: $('report-details').value
+    })
+    $('report-details').value = ''
+    $('report-box').hidden = true
+    toast('Report sent. Thank you.')
+  } catch (error) {
+    toast(error.message)
+  }
+})
+
+$('search').addEventListener('input', render)
+$('sort').addEventListener('change', render)
+window.addEventListener('popstate', () => location.reload())
+
+async function boot() {
+  $('gallery').textContent = 'Loading games…'
+  try {
+    await ensureCsrf()
+    await refreshMode()
+    await refreshAccount()
+    await loadGames()
+    const match = location.pathname.match(/^\/g\/([a-z0-9-]+)$/)
+    if (match) await showGame({ id: match[1] })
+    else preview()
+  } catch (error) {
+    toast(error.message)
+    $('gallery').textContent = 'Could not load games. Refresh to try again.'
+    preview()
+  }
+}
+
+boot()

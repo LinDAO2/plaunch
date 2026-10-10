@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+data/
+*.log
+playwright-report/
+test-results/
+uploads/
+agent-tools/
+.DS_Store

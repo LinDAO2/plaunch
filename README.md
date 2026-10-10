@@ -1,45 +1,84 @@
-# Playground — game launchpad v0.2
+# Playground — game launchpad v0.3
 
-Playable, multi-user **prototype** built with Node.js and plain HTML/CSS/JS. No API keys and no dependencies to install.
+Playable mini-games for sharing on the web, with creator accounts and a validated AI spec scaffold. The four mechanics from v0.2 still run in the browser: tap, reaction, number guess, and meteor dodge.
 
-## Start
+This is a development build. Scores are stored as **unverified**. Token interest is still only a checkbox: there is no wallet, minting, or chain code. Rosebud is not integrated.
+
+## Requirements
+
+- Node.js 20 or newer (CI runs on Node 22)
+- Optional: Docker, for local Postgres
+
+## Run locally
 
 ```bash
-node --version  # Node 20+
+npm install
 npm start
 ```
 
-Open http://localhost:3000. To use a different port: `PORT=8080 npm start`.
+Open http://localhost:3000.
 
-## What's new
+With no `DATABASE_URL`, development mode uses file-backed [PGlite](https://pglite.dev/) at `./data/pglite`. That data survives restarts and is gitignored. Production refuses to boot on PGlite.
 
-- Prompt-to-game **template matcher** for four mechanics: tap, reaction, guessing, and meteor dodge. This is **not AI model generation**.
-- Creator studio and mobile-friendly preview.
-- Real server-side publishing with shareable `/g/<slug>` URLs.
-- Browsable catalog, search, most-played sorting and basic play counters.
-- Per-game server-side leaderboard; scores are client-submitted, **not verified**.
-- JSON-file persistence in `data/db.json`, seeded with four example games.
-- Optional token-interest flag, **no actual token issuance**.
-- Baseline request limits, body limits, input validation, no third-party scripts, restrictive Content Security Policy.
+### Postgres
+
+```bash
+docker compose up -d
+cp .env.example .env
+# edit SESSION_SECRET, then:
+export DATABASE_URL=postgres://playground:playground@localhost:5432/playground
+export SESSION_SECRET="$(openssl rand -hex 32)"
+npm run migrate
+npm run seed
+npm start
+```
+
+The server applies migrations on startup. `npm run seed` is safe to repeat; existing ids are left alone. In development, an empty database is seeded automatically unless `SEED_ON_EMPTY=false`.
 
 ## Test
 
-Start the server and run:
-
 ```bash
-curl http://localhost:3000/api/health
-curl http://localhost:3000/api/games
-curl -X POST http://localhost:3000/api/generate -H 'content-type: application/json' -d '{"prompt":"space dodge falling meteors"}'
+npm install
+npx playwright install chromium
+npm test
 ```
 
-## Next workstreams
+`npm test` runs unit tests, API tests for every route, and a Chromium smoke test of the studio and `/play/:slug` flow. Tests use in-memory PGlite, not Docker.
 
-- **AI engine:** authenticated, metered server endpoint to an LLM; strict validated game schema (avoid arbitrary generated JS), more game primitives, versioned prompts and an isolated preview.
-- **Identity & safety:** real account and creator ownership, moderation, reporting, gameplay scoring validation/anti-cheat, per-user throttles.
-- **Scale:** Postgres, durable hosting, storage/CDN, analytics, migrations and tests.
-- **X sharing:** rich OG meta/social card endpoint; verify current X-supported embedded game experiences rather than assuming an arbitrary web game runs inside X.
-- **Token:** separate reviewed smart contracts and legal/product diligence, chain choice, fees, risk disclosures, anti-sybil controls; not enabled yet.
+## AI generation
 
-## Limitations
+`POST /api/ai/generate` picks a provider from the environment:
 
-This is a development prototype. No authentication, anti-cheat, production database, AI provider, payments, wallet, token creation, automated social posting, or public deployment. Publishing works across visitors **only when the server is running and accessible**; localhost is not a publicly shared host. Do not use this build in production without security review.
+| Provider | Key | Default model | API |
+| --- | --- | --- | --- |
+| Gemini | `GEMINI_API_KEY` | `gemini-3.8-flash` (`GEMINI_MODEL`) | `models.generateContent` with `responseMimeType: application/json` and `responseJsonSchema` |
+| xAI | `XAI_API_KEY` | `grok-3` | OpenAI-compatible `POST /chat/completions` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` | OpenAI-compatible `POST /chat/completions` |
+
+`AI_PROVIDER=auto` uses the first configured key in that order. With no key, the endpoint uses the built-in template matcher and the studio says **Template mode**. Keys stay on the server. Model output must match GameSpec v1; invalid JSON is retried up to three times and is never executed.
+
+`POST /api/generate` remains the template matcher even when a key is set.
+
+Rosebud has no generation API and its terms prohibit automated use, so there is no Rosebud adapter.
+
+## Routes
+
+- `GET /` studio and discover
+- `GET /g/:slug` studio opened on a published game
+- `GET /play/:slug` chrome-less, mobile-first guest play page (touch and keyboard)
+- `GET /r/:slug` reserved share URL. It does **not** emit `twitter:card=player` yet
+- `GET /api/health` includes database status
+
+`/play` and `/r` send `frame-ancestors 'self' https://x.com https://*.x.com https://twitter.com https://*.twitter.com` and do not send `X-Frame-Options`, so a later X Player Card can frame them. The planned card is `twitter:player` → `/play/:id` at 480×480. That card is not implemented.
+
+Anonymous visitors can play and submit unverified scores. Creating, editing, publishing, and archiving require the owning account (email, password, HttpOnly session cookie, CSRF header).
+
+## Scripts
+
+- `npm start` — migrate, optionally seed, listen
+- `npm run dev` — restart on file changes
+- `npm run migrate` — apply `migrations/`
+- `npm run seed` — insert the four example games
+- `npm test` — unit, API, and browser tests
+
+See `.env.example` for every variable. Do not commit `.env` or `data/`.

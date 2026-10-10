@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0b12">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/play.css">
+</head>
+<body class="play-body">
+<main class="play-shell">
+<p class="eyebrow">PLAYGROUND</p>
+<div class="play-top">
+<h1 id="preview-name">__NAME__</h1>
+<span class="chip" id="mechanic">__MECHANIC__</span>
+</div>
+<p id="preview-description">__DESCRIPTION__</p>
+<p id="controls-hint" class="hint"></p>
+<p id="play-error" class="hint" hidden></p>
+<div class="game" id="game" style="border-color:__ACCENT__">
+<span class="game-label" id="game-label">READY, PLAYER ONE</span>
+<strong id="display">0</strong>
+<div id="field" class="field"></div>
+<input id="guess-input" class="guess-input" inputmode="numeric" maxlength="2" hidden placeholder="1–10" aria-label="Guess">
+<button class="primary big-button" id="play" type="button">Start game</button>
+<div class="game-bar"><span id="score">Score: 0</span><span id="timer">Time: 10s</span></div>
+</div>
+<div class="leaderboard">
+<div class="leaderboard-head"><h3>Leaderboard</h3><span id="leaderboard-scope">Unverified scores</span></div>
+<div id="leaders" class="leaders">Loading scores…</div>
+<div class="submit-score"><input id="player" maxlength="22" placeholder="Your player name" autocomplete="nickname"><button id="submit-score" class="outline" type="button" disabled>Submit score</button></div>
+<p class="hint">Scores are unverified and ranked per mechanic. Reaction games rank a faster time first.</p>
+</div>
+<div id="report-box" hidden>
+<label for="report-reason">Report this game</label>
+<select id="report-reason">
+<option value="spam">Spam</option>
+<option value="harassment">Harassment</option>
+<option value="illegal">Illegal content</option>
+<option value="other">Other</option>
+</select>
+<textarea id="report-details" maxlength="500" placeholder="What happened?"></textarea>
+<button id="report-send" class="outline" type="button">Send report</button>
+</div>
+<div class="play-links">
+<button id="report-toggle" class="outline" type="button">Report</button>
+<a id="studio-link" href="/g/__SLUG__">Open in studio</a>
+</div>
+</main>
+<div id="toast" role="status" class="toast" hidden></div>
+<script type="module" src="/play.js"></script>
+</body>
+</html>
