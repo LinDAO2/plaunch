@@ -13,6 +13,13 @@
 .dash-table td{padding:12px 8px;border-top:1px solid #ffffff14;color:#e7e0f4}
 .dash-table a{color:#f3e9ff;font-weight:700}
 @media(max-width:540px){.top nav a.dash-link{display:inline}}
+@media(max-width:700px){
+.dash-table{min-width:0}
+.dash-table thead{display:none}
+.dash-table tr{display:block;border:1px solid #33293f;border-radius:14px;margin:0 0 12px;padding:6px 10px}
+.dash-table td{display:flex;justify-content:space-between;gap:12px;border-top:0;padding:8px 4px}
+.dash-table td::before{content:attr(data-label);color:#b79bff;font-size:11px;letter-spacing:1px}
+}
 .auth-dialog{position:fixed;inset:0;background:#07060cb8;display:flex;align-items:center;justify-content:center;z-index:20;padding:18px}
 .auth-card{width:min(420px,100%);background:#16131e;border:1px solid #33293f;border-radius:18px;padding:22px}
 .auth-card h2{margin:0 0 8px}
