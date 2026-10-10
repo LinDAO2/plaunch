@@ -7,6 +7,7 @@ import { aiStatus, generateGame } from './ai/generate.js'
 import { validateGameSpec } from './ai/gamespec.js'
 import { HttpError } from './errors.js'
 import { renderPlayPage, renderSharePage } from './html.js'
+import { posterPng } from './poster.js'
 import { assertCsrf, ensureCsrf, readCookies, readJson, rememberCookie, sendHtml, sendJson, serializeCookie } from './http.js'
 import { log } from './log.js'
 import { hashPassword, verifyPassword } from './passwords.js'
@@ -27,6 +28,7 @@ import {
   listPublishedGames,
   listScores,
   publicGame,
+  openRound,
   rankedForGame,
   recordEvent,
   specForSave,
@@ -52,12 +54,15 @@ const FILES = new Map([
   ['/mechanics.js', 'mechanics.js'],
   ['/client-api.js', 'client-api.js'],
   ['/play.js', 'play.js'],
-  ['/play.css', 'play.css']
+  ['/play.css', 'play.css'],
+  ['/arcade-sim.js', 'arcade-sim.js'],
+  ['/arcade-view.js', 'arcade-view.js']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8'
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png'
 }
 const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'seed'])
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -329,7 +334,9 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
     if (method === 'POST' && (sub === 'play' || sub === 'events')) {
       const event = sub === 'play' ? { type: 'play_started', eventId: null } : validateEvent(await readJson(req))
       const result = await recordEvent(db, { gameId: id, eventType: event.type, eventId: event.eventId })
-      return sendJson(res, 200, { plays: result.plays, type: event.type, duplicate: result.duplicate }, ctx)
+      const body = { plays: result.plays, type: event.type, duplicate: result.duplicate }
+      if (result.roundToken) body.roundToken = result.roundToken
+      return sendJson(res, 200, body, ctx)
     }
 
     if (method === 'GET' && sub === 'scores') {
@@ -347,9 +354,14 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
         throw new HttpError(400, 'Score mechanic does not match this game', 'validation_error')
       }
       const bounds = assertMechanicScore(game.type, input.points, game.duration)
-      await addScore(db, game, { ...input, ...bounds })
+      let assurance = 'unverified'
+      if (input.roundToken) {
+        await openRound(db, game, input.roundToken, input.points)
+        assurance = 'checked'
+      }
+      await addScore(db, game, { ...input, ...bounds, assurance })
       const scores = rankedForGame(await listScores(db, id), game.type)
-      return sendJson(res, 201, { scores, verified: false }, ctx)
+      return sendJson(res, 201, { scores, verified: false, assurance }, ctx)
     }
   }
 
@@ -362,15 +374,27 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl }) {
   if (method === 'GET' && playMatch) {
     const game = await publishedOrNull(db, playMatch[1])
     if (!game) return sendHtml(res, 404, renderMissing('Game not found'), ctx, 'embed')
-    return sendHtml(res, 200, await renderPlayPage(game), ctx, 'embed')
+    const embed = url.searchParams.get('embed') === '1'
+    return sendHtml(res, 200, await renderPlayPage(game, { embed }), ctx, embed ? 'player' : 'embed')
   }
 
   const shareMatch = pathname.match(/^\/r\/([a-z0-9-]+)$/)
   if (method === 'GET' && shareMatch) {
     const game = await publishedOrNull(db, shareMatch[1])
     if (!game) return sendHtml(res, 404, renderMissing('Game not found'), ctx, 'embed')
-    const origin = `${config.cookieSecure ? 'https' : 'http'}://${req.headers.host || 'localhost'}`
-    return sendHtml(res, 200, renderSharePage(game, origin), ctx, 'embed')
+    const scores = rankedForGame(await listScores(db, game.id), game.type)
+    return sendHtml(res, 200, renderSharePage(game, {
+      origin: requestOrigin(config, req),
+      site: config.xSiteHandle,
+      scores
+    }), ctx, 'embed')
+  }
+
+  const posterMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)\/poster\.png$/)
+  if (method === 'GET' && posterMatch) {
+    const game = await publishedOrNull(db, posterMatch[1])
+    if (!game) return sendJson(res, 404, { error: 'Game not found', code: 'not_found' }, ctx)
+    return sendImage(res, posterPng(game), ctx)
   }
 
   if (method === 'GET' && FILES.has(pathname)) {
@@ -392,6 +416,31 @@ async function publishedOrNull(db, id) {
   const game = await getGameRow(db, id)
   if (!game || game.status !== 'published') return null
   return game
+}
+
+function requestOrigin(config, req) {
+  if (config.publicBaseUrl) return config.publicBaseUrl
+  const host = req.headers.host || 'localhost'
+  const proto = config.cookieSecure ? 'https' : 'http'
+  try {
+    return new URL(`${proto}://${host}`).origin
+  } catch {
+    return 'http://localhost'
+  }
+}
+
+function sendImage(res, bytes, ctx) {
+  const headers = {
+    'content-type': 'image/png',
+    'cache-control': 'public, max-age=3600',
+    'x-content-type-options': 'nosniff',
+    'content-length': String(bytes.length)
+  }
+  if (ctx?.cookies?.length) headers['set-cookie'] = ctx.cookies
+  if (ctx?.requestId) headers['x-request-id'] = ctx.requestId
+  res.writeHead(200, headers)
+  res.end(bytes)
+  return 200
 }
 
 function sendJsonRaw(res, status, bytes, ctx, ext) {

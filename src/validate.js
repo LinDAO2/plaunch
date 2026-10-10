@@ -1,6 +1,6 @@
 import { HttpError } from './errors.js'
 
-export const MECHANICS = new Set(['tap', 'reaction', 'guess', 'dodge'])
+export const MECHANICS = new Set(['tap', 'reaction', 'guess', 'dodge', 'arcade'])
 
 export function cleanText(value, max) {
   if (typeof value !== 'string') return ''
@@ -97,7 +97,13 @@ export function validateScoreInput(input) {
   const points = Number(input.points)
   if (!Number.isInteger(points)) throw new HttpError(400, 'Invalid score', 'validation_error')
   const mechanic = input.mechanic === undefined ? null : input.mechanic
-  return { name, points, mechanic }
+  let roundToken = null
+  if (input.roundToken !== undefined && input.roundToken !== null && input.roundToken !== '') {
+    if (typeof input.roundToken !== 'string') throw new HttpError(400, 'Invalid round token', 'validation_error')
+    roundToken = input.roundToken.trim()
+    if (!/^[A-Za-z0-9_-]{20,80}$/.test(roundToken)) throw new HttpError(400, 'Invalid round token', 'validation_error')
+  }
+  return { name, points, mechanic, roundToken }
 }
 
 export function assertMechanicScore(mechanic, points, duration) {
@@ -113,6 +119,11 @@ export function assertMechanicScore(mechanic, points, duration) {
     const max = Math.max(1, duration) * 30
     if (points < 0 || points > max) throw new HttpError(400, 'Tap score is outside the allowed range', 'validation_error')
     return { ranking: 'higher', unit: 'taps' }
+  }
+  if (mechanic === 'arcade') {
+    const max = Math.max(1, duration) * 200
+    if (points < 0 || points > max) throw new HttpError(400, 'Arcade score is outside the allowed range', 'validation_error')
+    return { ranking: 'higher', unit: 'pts' }
   }
   const max = Math.max(1, duration) * 50
   if (points < 0 || points > max) throw new HttpError(400, 'Dodge score is outside the allowed range', 'validation_error')

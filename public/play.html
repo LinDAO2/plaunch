@@ -8,7 +8,10 @@
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/play.css">
 </head>
-<body class="play-body">
+<body class="__BODY_CLASS__">
+<div id="embed-gate" class="embed-gate" __GATE_ATTR__>
+<button id="embed-play" class="primary big-button" type="button">Play</button>
+</div>
 <main class="play-shell">
 <p class="eyebrow">PLAYGROUND</p>
 <div class="play-top">
@@ -27,10 +30,10 @@
 <div class="game-bar"><span id="score">Score: 0</span><span id="timer">Time: 10s</span></div>
 </div>
 <div class="leaderboard">
-<div class="leaderboard-head"><h3>Leaderboard</h3><span id="leaderboard-scope">Unverified scores</span></div>
+<div class="leaderboard-head"><h3>Leaderboard</h3><span id="leaderboard-scope">Top 20</span></div>
 <div id="leaders" class="leaders">Loading scores…</div>
 <div class="submit-score"><input id="player" maxlength="22" placeholder="Your player name" autocomplete="nickname"><button id="submit-score" class="outline" type="button" disabled>Submit score</button></div>
-<p class="hint">Scores are unverified and ranked per mechanic. Reaction games rank a faster time first.</p>
+<p class="hint">Top 20. Checked scores passed a round token, a minimum time, and a score-rate check.</p>
 </div>
 <div id="report-box" hidden>
 <label for="report-reason">Report this game</label>

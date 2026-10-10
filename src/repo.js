@@ -1,5 +1,6 @@
-import { randomUUID, createHash } from 'node:crypto'
+import { randomUUID, createHash, randomBytes } from 'node:crypto'
 import { HttpError } from './errors.js'
+import { checkPlausible, plausibilityFor } from './plausibility.js'
 import { specFromGame } from './ai/gamespec.js'
 import { rankScores } from './scores.js'
 import { slugify } from './validate.js'
@@ -177,30 +178,55 @@ export async function recordEvent(db, { gameId, eventType, eventId }) {
       const dup = await tx.query('select 1 from plays where game_id = $1 and event_id = $2', [gameId, eventId])
       if (dup.rows.length) return { plays: game.plays, duplicate: true }
     }
+    const roundToken = eventType === 'play_started' ? randomBytes(24).toString('base64url') : null
     try {
-      await tx.query('insert into plays (game_id, event_type, event_id) values ($1, $2, $3)', [gameId, eventType, eventId])
+      await tx.query(
+        'insert into plays (game_id, event_type, event_id, round_token_hash) values ($1, $2, $3, $4)',
+        [gameId, eventType, eventId, roundToken ? hashToken(roundToken) : null]
+      )
     } catch (err) {
-      if (err.code === '23505') return { plays: game.plays, duplicate: true }
+      if (err.code === '23505') return { plays: game.plays, duplicate: true, roundToken: null }
       throw err
     }
-    if (eventType !== 'play_started') return { plays: game.plays, duplicate: false }
+    if (eventType !== 'play_started') return { plays: game.plays, duplicate: false, roundToken: null }
     const updated = await tx.query('update games set plays = plays + 1, updated_at = now() where id = $1 returning plays', [gameId])
-    return { plays: Number(updated.rows[0].plays), duplicate: false }
+    return { plays: Number(updated.rows[0].plays), duplicate: false, roundToken }
+  })
+}
+
+export async function openRound(db, game, token, points) {
+  const hash = hashToken(token)
+  return db.transaction(async (tx) => {
+    const found = await tx.query(
+      `select id, created_at, consumed_at from plays
+       where game_id = $1 and event_type = 'play_started' and round_token_hash = $2
+       limit 1`,
+      [game.id, hash]
+    )
+    const row = found.rows[0]
+    if (!row) throw new HttpError(400, 'Round token is not valid for this game', 'validation_error')
+    if (row.consumed_at) throw new HttpError(400, 'Round token was already used', 'validation_error')
+    const elapsedMs = Date.now() - new Date(row.created_at).getTime()
+    const verdict = checkPlausible(plausibilityFor(game), points, elapsedMs)
+    if (!verdict.ok) throw new HttpError(400, verdict.message, 'validation_error')
+    await tx.query('update plays set consumed_at = now() where id = $1', [row.id])
+    return { assurance: 'checked', elapsedMs }
   })
 }
 
 export async function addScore(db, game, score) {
+  const assurance = score.assurance === 'checked' ? 'checked' : 'unverified'
   const inserted = await db.query(
-    `insert into scores (game_id, player_name, points, mechanic, ranking, unit, verified)
-     values ($1, $2, $3, $4, $5, $6, false)`,
-    [game.id, score.name, score.points, game.type, score.ranking, score.unit]
+    `insert into scores (game_id, player_name, points, mechanic, ranking, unit, verified, assurance)
+     values ($1, $2, $3, $4, $5, $6, false, $7)`,
+    [game.id, score.name, score.points, game.type, score.ranking, score.unit, assurance]
   )
   return inserted.rowCount
 }
 
 export async function listScores(db, gameId) {
   const result = await db.query(
-    'select player_name, points, mechanic, ranking, unit, verified, created_at from scores where game_id = $1',
+    'select player_name, points, mechanic, ranking, unit, verified, assurance, created_at from scores where game_id = $1',
     [gameId]
   )
   return result.rows.map((row) => ({
@@ -210,6 +236,7 @@ export async function listScores(db, gameId) {
     ranking: row.ranking,
     unit: row.unit,
     verified: row.verified === true,
+    assurance: row.assurance === 'checked' ? 'checked' : 'unverified',
     createdAt: iso(row.created_at)
   }))
 }

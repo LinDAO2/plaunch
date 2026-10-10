@@ -4,7 +4,7 @@ export function rankScores(scores, mechanic) {
     const diff = ranking === 'lower' ? a.points - b.points : b.points - a.points
     if (diff) return diff
     return String(a.createdAt).localeCompare(String(b.createdAt))
-  }).slice(0, 15).map((score, index) => ({
+  }).slice(0, 20).map((score, index) => ({
     rank: index + 1,
     name: score.name,
     points: score.points,
@@ -12,6 +12,7 @@ export function rankScores(scores, mechanic) {
     mechanic,
     ranking,
     unit: score.unit,
-    verified: false
+    verified: false,
+    assurance: score.assurance === 'checked' ? 'checked' : 'unverified'
   }))
 }

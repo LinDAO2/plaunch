@@ -9,7 +9,9 @@ describe('http api', { concurrency: false }, () => {
   let game
 
   before(async () => {
-    server = await startServer()
+    server = await startServer({
+      env: { PUBLIC_BASE_URL: 'https://play.example', X_SITE_HANDLE: 'playground' }
+    })
     client = createClient(server.base)
     await client.prime()
   })
@@ -22,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.3.0')
+    assert.equal(res.data.version, '0.4.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -41,7 +43,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/games')
     assert.equal(res.status, 200)
     const ids = res.data.games.map((item) => item.id)
-    assert.deepEqual(ids.sort(), ['click-frenzy', 'lightning-reflex', 'lucky-seven', 'meteor-dodge'])
+    assert.deepEqual(ids.sort(), ['click-frenzy', 'homing-gems', 'lane-harvest', 'lightning-reflex', 'lucky-seven', 'meteor-dodge', 'meteor-rain', 'zigzag-orbs'])
     assert.equal(res.data.games.every((item) => item.plays === 0), true)
   })
 
@@ -270,9 +272,89 @@ describe('http api', { concurrency: false }, () => {
     const share = await client.request('GET', '/r/meteor-dodge')
     assert.equal(share.status, 200)
     assert.match(share.headers.get('content-security-policy'), /https:\/\/x\.com/)
-    assert.match(share.text, /\/play\/meteor-dodge/)
-    assert.equal(share.text.includes('twitter:player'), false)
-    assert.equal(share.text.includes('twitter:card'), false)
+    assert.match(share.text, /href="\/play\/meteor-dodge"/)
+    assert.match(share.text, /name="twitter:card" content="player"/)
+    assert.match(share.text, /name="twitter:site" content="@playground"/)
+    assert.match(share.text, /name="twitter:player" content="https:\/\/play\.example\/play\/meteor-dodge\?embed=1"/)
+    assert.match(share.text, /name="twitter:player:width" content="480"/)
+    assert.match(share.text, /name="twitter:player:height" content="480"/)
+    assert.match(share.text, /name="twitter:image" content="https:\/\/play\.example\/api\/games\/meteor-dodge\/poster\.png"/)
+    assert.match(share.text, /property="og:image"/)
+    assert.match(share.text, /Top 20/)
+    const quoted = await client.request('POST', '/api/games', {
+      name: 'Say "hi"',
+      description: 'Rock & roll',
+      type: 'tap',
+      duration: 10,
+      accent: '#a88bff'
+    })
+    assert.equal(quoted.status, 201)
+    const card = await client.request('GET', `/r/${quoted.data.game.id}`)
+    assert.equal(card.text.includes('content="Say "hi""'), false)
+    assert.match(card.text, /content="Say &quot;hi&quot;"/)
+    assert.match(card.text, /Rock &amp; roll/)
+    const embed = await client.request('GET', '/play/meteor-dodge?embed=1')
+    assert.equal(embed.status, 200)
+    assert.match(embed.headers.get('content-security-policy'), /frame-ancestors https:\/\/x\.com https:\/\/\*\.x\.com https:\/\/twitter\.com https:\/\/\*\.twitter\.com/)
+    assert.equal(embed.headers.get('content-security-policy').includes("frame-ancestors 'self'"), false)
+    assert.equal(embed.headers.get('x-frame-options'), null)
+    assert.match(embed.text, /class="play-body embed"/)
+    assert.match(embed.text, />Play</)
+    const poster = await fetch(server.base + '/api/games/meteor-dodge/poster.png')
+    assert.equal(poster.status, 200)
+    assert.match(poster.headers.get('content-type'), /image\/png/)
+    const bytes = Buffer.from(await poster.arrayBuffer())
+    assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+    assert.equal(bytes.readUInt32BE(16), 1200)
+    assert.equal(bytes.readUInt32BE(20), 1200)
+    const missingPoster = await client.request('GET', '/api/games/missing-game/poster.png')
+    assert.equal(missingPoster.status, 404)
+  })
+
+  test('round tokens mark plausible scores checked', async () => {
+    const started = await client.request('POST', '/api/games/meteor-dodge/events', {
+      type: 'play_started',
+      eventId: `round${Date.now()}ok`
+    })
+    assert.equal(started.status, 200)
+    assert.match(started.data.roundToken, /^[A-Za-z0-9_-]{20,80}$/)
+    const early = await client.request('POST', '/api/games/meteor-dodge/scores', {
+      name: 'Ada',
+      points: 10,
+      mechanic: 'dodge',
+      roundToken: started.data.roundToken
+    })
+    assert.equal(early.status, 400)
+    await server.db.query(
+      `update plays set created_at = now() - interval '2 seconds'
+       where game_id = 'meteor-dodge' and round_token_hash is not null and consumed_at is null`
+    )
+    const wild = await client.request('POST', '/api/games/meteor-dodge/scores', {
+      name: 'Ada',
+      points: 400,
+      mechanic: 'dodge',
+      roundToken: started.data.roundToken
+    })
+    assert.equal(wild.status, 400)
+    const checked = await client.request('POST', '/api/games/meteor-dodge/scores', {
+      name: 'Ada',
+      points: 10,
+      mechanic: 'dodge',
+      roundToken: started.data.roundToken
+    })
+    assert.equal(checked.status, 201)
+    assert.equal(checked.data.verified, false)
+    assert.equal(checked.data.assurance, 'checked')
+    assert.equal(checked.data.scores.some((score) => score.assurance === 'checked' && score.points === 10), true)
+    const reuse = await client.request('POST', '/api/games/meteor-dodge/scores', {
+      name: 'Ada',
+      points: 10,
+      mechanic: 'dodge',
+      roundToken: started.data.roundToken
+    })
+    assert.equal(reuse.status, 400)
+    const board = await client.request('GET', '/r/meteor-dodge')
+    assert.match(board.text, /checked/)
   })
 
   test('POST /api/abuse-reports', async () => {

@@ -1,17 +1,23 @@
+import { EXAMPLE_GAMES } from './arcade/examples.js'
 import { specFromGame } from './ai/gamespec.js'
 
-const EXAMPLES = [
+const CLASSICS = [
   { id: 'click-frenzy', name: 'Click Frenzy', description: 'How fast can you tap in 10 seconds?', type: 'tap', duration: 10, accent: '#a88bff', createdAt: '2026-10-09T00:00:00Z' },
   { id: 'lightning-reflex', name: 'Lightning Reflex', description: 'React the moment the signal turns green.', type: 'reaction', duration: 10, accent: '#4adeb9', createdAt: '2026-10-09T00:00:00Z' },
   { id: 'lucky-seven', name: 'Lucky Seven', description: 'Find the secret number from 1 to 10.', type: 'guess', duration: 10, accent: '#ffbd70', createdAt: '2026-10-09T00:00:00Z' },
   { id: 'meteor-dodge', name: 'Meteor Dodge', description: 'Move left and right to dodge falling meteors.', type: 'dodge', duration: 20, accent: '#ff779e', createdAt: '2026-10-09T00:00:00Z' }
 ]
 
+const EXAMPLES = [
+  ...CLASSICS.map((game) => ({ ...game, spec: specFromGame(game, { theme: game.type }) })),
+  ...EXAMPLE_GAMES.map((game) => ({ ...game, createdAt: '2026-10-10T00:00:00Z' }))
+]
+
 export async function seed(db) {
   let inserted = 0
   await db.transaction(async (tx) => {
     for (const game of EXAMPLES) {
-      const spec = specFromGame(game, { theme: game.type })
+      const spec = game.spec
       const result = await tx.query(
         `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at)
          values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', $7::jsonb, $8, $8, $8)

@@ -3,7 +3,9 @@ import { controlHint, createRuntime, typeNames } from '/mechanics.js'
 
 const $ = (id) => document.getElementById(id)
 const slug = (location.pathname.match(/^\/play\/([a-z0-9-]+)$/) || [])[1]
+const embed = new URLSearchParams(location.search).get('embed') === '1'
 let current = null
+let roundToken = null
 
 function toast(msg) {
   const el = $('toast')
@@ -26,7 +28,10 @@ const runtime = createRuntime({
   onToast: toast,
   onPlayStarted() {
     if (!current) return
-    api(`/games/${current.id}/events`, 'POST', { type: 'play_started', eventId: crypto.randomUUID() }).catch(() => {})
+    roundToken = null
+    api(`/games/${current.id}/events`, 'POST', { type: 'play_started', eventId: crypto.randomUUID() })
+      .then((result) => { roundToken = result.roundToken || null })
+      .catch(() => {})
   },
   onFinish({ points }) {
     $('submit-score').disabled = points === null
@@ -42,7 +47,7 @@ function showError(message) {
 
 async function loadScores() {
   const { scores, mechanic } = await api(`/games/${current.id}/scores`)
-  $('leaderboard-scope').textContent = mechanic === 'reaction' ? 'Fastest reaction · unverified' : 'Top scores · unverified'
+  $('leaderboard-scope').textContent = mechanic === 'reaction' ? 'Fastest reaction · top 20' : 'Top 20 scores'
   $('leaders').replaceChildren()
   if (!scores.length) {
     $('leaders').textContent = 'No scores yet. Be the first!'
@@ -56,8 +61,9 @@ async function loadScores() {
     const flag = document.createElement('span')
     name.textContent = `#${score.rank} ${score.name}`
     value.textContent = score.mechanic === 'reaction' ? `${score.points} ms` : String(score.points)
-    flag.className = 'unverified'
-    flag.textContent = 'unverified'
+    const assurance = score.assurance === 'checked' ? 'checked' : 'unverified'
+    flag.className = assurance
+    flag.textContent = assurance
     row.append(name, value, flag)
     $('leaders').append(row)
   }
@@ -67,13 +73,16 @@ $('submit-score').addEventListener('click', async () => {
   const points = runtime.getLastScore()
   if (!current || points === null) return
   try {
-    await api(`/games/${current.id}/scores`, 'POST', {
+    const body = {
       name: $('player').value || 'Anonymous',
       points,
       mechanic: current.type
-    })
+    }
+    if (roundToken) body.roundToken = roundToken
+    const saved = await api(`/games/${current.id}/scores`, 'POST', body)
+    roundToken = null
     $('submit-score').disabled = true
-    toast('Score submitted. It is stored as unverified.')
+    toast(saved.assurance === 'checked' ? 'Score checked and posted.' : 'Score submitted. It is stored as unverified.')
     await loadScores()
   } catch (error) {
     toast(error.message)
@@ -95,6 +104,11 @@ $('report-send').addEventListener('click', async () => {
   } catch (error) {
     toast(error.message)
   }
+})
+
+$('embed-play').addEventListener('click', () => {
+  $('embed-gate').hidden = true
+  $('play').click()
 })
 
 async function boot() {

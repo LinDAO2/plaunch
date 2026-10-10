@@ -4,8 +4,12 @@ import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { EXAMPLE_GAMES } from '../src/arcade/examples.js'
 import { generateGame, parseModelJson, SYSTEM_PROMPT } from '../src/ai/generate.js'
 import { geminiResponseSchema, validateGameSpec } from '../src/ai/gamespec.js'
+import { createSimulation } from '../public/arcade-sim.js'
+import { checkPlausible, plausibilityFor } from '../src/plausibility.js'
+import { posterPng, POSTER_SIZE } from '../src/poster.js'
 import { aiStatus, geminiRequest, openAiRequest, resolveProvider } from '../src/ai/providers.js'
 import { loadConfig } from '../src/config.js'
 import { databaseKind, openDatabase } from '../src/db.js'
@@ -86,9 +90,13 @@ test('GameSpecV1 accepts a valid spec and rejects executable output', () => {
   assert.equal(schema.includes('"$ref"'), false)
   assert.equal(schema.includes('"oneOf"'), false)
   assert.equal(schema.includes('"anyOf"'), false)
-  assert.equal(schema.includes('"pattern"'), false)
+  assert.equal(schema.includes('"pattern":"'), false)
+  assert.equal(schema.includes('"minLength"'), false)
+  assert.match(schema, /"1\.1"/)
+  assert.match(schema, /arcade/)
   assert.match(SYSTEM_PROMPT, /GameSpecV1/)
   assert.match(SYSTEM_PROMPT, /JavaScript/)
+  assert.match(SYSTEM_PROMPT, /1\.1/)
 })
 
 test('provider selection prefers Gemini, then xAI, then OpenAI', () => {
@@ -200,13 +208,153 @@ test('model output is data, never evaluated', () => {
   }
 })
 
+test('rankScores keeps the top 20 and a checked flag', () => {
+  const scores = Array.from({ length: 21 }, (_, index) => ({
+    name: `P${index}`,
+    points: index,
+    createdAt: '2026-10-10T00:00:00.000Z',
+    assurance: index === 20 ? 'checked' : 'unverified'
+  }))
+  const ranked = rankScores(scores, 'tap')
+  assert.equal(ranked.length, 20)
+  assert.equal(ranked[0].points, 20)
+  assert.equal(ranked[0].assurance, 'checked')
+  assert.equal(ranked[0].verified, false)
+  assert.equal(ranked[19].assurance, 'unverified')
+})
+
+test('arcade examples validate and diverge across seeded ticks', () => {
+  assert.ok(EXAMPLE_GAMES.length >= 3)
+  const signatures = new Set()
+  for (const game of EXAMPLE_GAMES) {
+    const spec = validateGameSpec(game.spec)
+    assert.equal(spec.version, '1.1')
+    assert.equal(spec.runtime, 'arcade')
+    const once = runSpec(spec, 42, 80)
+    const twice = runSpec(spec, 42, 80)
+    assert.deepEqual(once, twice)
+    const other = runSpec(spec, 99, 80)
+    assert.notDeepEqual(once.entities, other.entities)
+    signatures.add(`${spec.spawn.pattern}:${spec.movement}:${spec.controls.scheme}:${spec.rules.win}`)
+  }
+  assert.equal(signatures.size, EXAMPLE_GAMES.length)
+  const rain = EXAMPLE_GAMES.find((game) => game.id === 'meteor-rain').spec
+  const steady = createSimulation(validateGameSpec({ ...rain, spawn: { ...rain.spawn, pattern: 'lanes' } }), 2)
+  let first = null
+  for (let i = 0; i < 40; i++) {
+    const snap = steady.tick(50, {})
+    if (!snap.entities.length) continue
+    if (!first) first = snap.entities[0]
+    else if (snap.entities[0].y > first.y) {
+      assert.equal(snap.entities[0].x, first.x)
+      break
+    }
+  }
+  const zig = EXAMPLE_GAMES.find((game) => game.id === 'zigzag-orbs').spec
+  const weave = createSimulation(zig, 2)
+  let zigSeen = null
+  let zigMoved = false
+  for (let i = 0; i < 40; i++) {
+    const snap = weave.tick(50, {})
+    const entity = snap.entities[0]
+    if (!entity) continue
+    if (zigSeen && entity.y > zigSeen.y && entity.x !== zigSeen.x) zigMoved = true
+    zigSeen = entity
+  }
+  assert.equal(zigMoved, true)
+  const homing = validateGameSpec({
+    ...rain,
+    movement: 'homing',
+    spawn: { rate: 1.4, pattern: 'lanes' },
+    entities: [rain.entities[0]]
+  })
+  const hunter = createSimulation(homing, 1)
+  hunter.setPlayerX(90)
+  let startX = null
+  let homed = false
+  for (let i = 0; i < 50; i++) {
+    const snap = hunter.tick(50, {})
+    const entity = snap.entities[0]
+    if (!entity) continue
+    if (startX === null) startX = entity.x
+    if (entity.x > startX + 2) homed = true
+  }
+  assert.equal(homed, true)
+})
+
+test('arcade sim honors taps, combos, lives, and win rules', () => {
+  const harvest = EXAMPLE_GAMES.find((game) => game.id === 'lane-harvest').spec
+  const berries = validateGameSpec({
+    ...harvest,
+    entities: [harvest.entities[0]],
+    spawn: { rate: 2, pattern: 'waves' },
+    movement: 'straight',
+    rules: { ...harvest.rules, win: 'score', targetScore: 100 },
+    scoreRules: { pointsPerEntity: 10, comboMultiplier: 3 }
+  })
+  const picker = createSimulation(berries, 4)
+  let scored = picker.snapshot()
+  for (let i = 0; i < 80 && scored.score < 60; i++) {
+    scored = picker.tick(50, {})
+    const taps = scored.entities.filter((entity) => entity.y > -2).map((entity) => ({ x: entity.x, y: entity.y }))
+    if (taps.length >= 3) scored = picker.tick(50, { taps })
+  }
+  assert.ok(scored.score >= 60, `combo score was ${scored.score}`)
+  const rain = EXAMPLE_GAMES.find((game) => game.id === 'meteor-rain').spec
+  const dodge = createSimulation(validateGameSpec({ ...rain, entities: [rain.entities[0]] }), 1)
+  let hit = false
+  for (let i = 0; i < 120; i++) {
+    const before = dodge.snapshot()
+    const hazard = before.entities.find((entity) => entity.kind === 'hazard')
+    if (hazard) dodge.setPlayerX(hazard.x)
+    const snap = dodge.tick(50, {})
+    if (snap.lives < 3) {
+      hit = true
+      break
+    }
+  }
+  assert.equal(hit, true)
+  const survivor = validateGameSpec({
+    ...rain,
+    duration: 5,
+    spawn: { rate: 0.8, pattern: 'lanes' },
+    rules: { win: 'survive', seconds: 5, lives: 3, targetScore: 40 }
+  })
+  const lasting = createSimulation(survivor, 1)
+  lasting.setPlayerX(6)
+  let end = lasting.snapshot()
+  for (let i = 0; i < 110; i++) end = lasting.tick(50, {})
+  assert.equal(end.over, true)
+  assert.equal(end.won, true)
+})
+
+test('poster png and score plausibility', () => {
+  const png = posterPng({ id: 'meteor-dodge', name: 'Meteor Dodge', accent: '#ff779e', type: 'dodge', updatedAt: 't' })
+  assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+  assert.equal(png.readUInt32BE(16), POSTER_SIZE)
+  assert.equal(png.readUInt32BE(20), POSTER_SIZE)
+  const other = posterPng({ id: 'lane-harvest', name: 'Lane Harvest', accent: '#4adeb9', type: 'arcade', updatedAt: 't' })
+  assert.notEqual(png.equals(other), true)
+  const tap = plausibilityFor({ type: 'tap', duration: 10 })
+  assert.equal(checkPlausible(tap, 4, 2000).ok, true)
+  assert.equal(checkPlausible(tap, 4, 100).ok, false)
+  assert.equal(checkPlausible(tap, 400, 2000).ok, false)
+})
+
+function runSpec(spec, seed, ticks) {
+  const sim = createSimulation(spec, seed)
+  let snap = sim.snapshot()
+  for (let i = 0; i < ticks; i++) snap = sim.tick(50, {})
+  return snap
+}
+
 test('file-backed PGlite data survives a restart', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'playground-pg-'))
   try {
     const first = await openDatabase(`pglite://${dir}`)
     await migrate(first)
     const seeded = await seedIfEmpty(first)
-    assert.equal(seeded, 4)
+    assert.equal(seeded, 8)
     await first.query(`update games set plays = 4 where id = 'click-frenzy'`)
     await first.close()
     const second = await openDatabase(`pglite://${dir}`)

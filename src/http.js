@@ -3,10 +3,12 @@ import { HttpError } from './errors.js'
 
 const BASE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'"
 
-// /play and /r must stay frameable by X later. Do not add X-Frame-Options or COOP there.
+// /play and /r stay frameable by this site and by X. The embed=1 player drops 'self'.
 const EMBED_ANCESTORS = "frame-ancestors 'self' https://x.com https://*.x.com https://twitter.com https://*.twitter.com"
+const PLAYER_ANCESTORS = "frame-ancestors https://x.com https://*.x.com https://twitter.com https://*.twitter.com"
 
 export function contentSecurityPolicy(kind) {
+  if (kind === 'player') return `${BASE_CSP}; ${PLAYER_ANCESTORS}`
   if (kind === 'embed') return `${BASE_CSP}; ${EMBED_ANCESTORS}`
   return `${BASE_CSP}; frame-ancestors 'none'`
 }
@@ -20,7 +22,7 @@ export function documentHeaders(kind) {
     'permissions-policy': 'camera=(), microphone=(), geolocation=()',
     'content-security-policy': contentSecurityPolicy(kind)
   }
-  if (kind !== 'embed') {
+  if (kind !== 'embed' && kind !== 'player') {
     headers['x-frame-options'] = 'DENY'
     headers['cross-origin-opener-policy'] = 'same-origin'
   }

@@ -8,12 +8,21 @@ export { aiStatus }
 
 export const SYSTEM_PROMPT = `You design one tiny browser game and return GameSpecV1 JSON only.
 Rules:
-- version is "1"
-- runtime is one of tap, reaction, guess, dodge
-- scoring.direction is "lower" for reaction and "higher" for tap, guess, and dodge
+- version is "1.1"
+- runtime is "arcade"
+- scoring.direction is "higher"
 - duration is an integer from 5 to 60
 - accent is a #RRGGBB color
 - safety.audience is "general"
+- entities use kind target, hazard, or collectible, plus an emoji sprite, points, and speed
+- spawn.pattern is rain, waves, burst, or lanes. burst means a random cluster
+- movement is straight, zigzag, homing, or bounce
+- controls.scheme is drag, tap, or keys
+- rules.win is survive, score, or lives, with seconds, lives, and targetScore
+- scoreRules includes pointsPerEntity and comboMultiplier
+- palette is 2 to 4 hex colors
+- player.sprite is an emoji
+- Make the theme, sprites, pattern, movement, and win rule specific to the prompt
 - Do not include JavaScript, HTML, URLs, or executable code
 - Do not wrap the JSON in markdown`
 

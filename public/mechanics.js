@@ -1,4 +1,6 @@
-export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE' }
+import { mountArcade } from '/arcade-view.js'
+
+export const typeNames = { tap: 'TAP CHALLENGE', reaction: 'REACTION TEST', guess: 'NUMBER GUESS', dodge: 'METEOR DODGE', arcade: 'ARCADE' }
 
 export function controlHint(game) {
   if (game?.spec?.controls?.keyboard && game?.spec?.controls?.touch) {
@@ -21,6 +23,7 @@ export function createRuntime(els, hooks = {}) {
   let startedAt = 0
   let lastScore = null
   let dodgeFrame = null
+  let arcade = null
   let obstacles = []
   let dodgeX = 50
   let dodgeTick = 0
@@ -38,6 +41,8 @@ export function createRuntime(els, hooks = {}) {
     clearInterval(timer)
     clearTimeout(timeout)
     cancelAnimationFrame(dodgeFrame)
+    arcade?.stop()
+    arcade = null
     dodgeKeys.clear()
     playing = false
     phase = ''
@@ -71,6 +76,8 @@ export function createRuntime(els, hooks = {}) {
     clearInterval(timer)
     clearTimeout(timeout)
     cancelAnimationFrame(dodgeFrame)
+    arcade?.stop()
+    arcade = null
     els.field.replaceChildren()
     els.field.style.pointerEvents = 'none'
     if (els.guess) els.guess.hidden = true
@@ -91,6 +98,34 @@ export function createRuntime(els, hooks = {}) {
 
   function run() {
     const g = game
+    if (g.type === 'arcade') {
+      clear()
+      playing = true
+      els.display.textContent = ''
+      els.play.hidden = true
+      els.label.textContent = 'ARCADE'
+      emitStart()
+      const spec = g.spec?.runtime === 'arcade' ? g.spec : null
+      if (!spec) {
+        finish('!', 'NO ARCADE SPEC', { keepScore: false })
+        return
+      }
+      arcade = mountArcade(els.field, spec, {
+        keys: dodgeKeys,
+        onScore(snap) {
+          points = snap.score
+          els.score.textContent = `Score: ${points}`
+          const left = Math.max(0, Math.ceil(((Number(g.duration) || 20) * 1000 - snap.time) / 1000))
+          els.timer.textContent = `Time: ${left}s`
+        },
+        onEnd(snap) {
+          points = snap.score
+          els.score.textContent = `Score: ${points}`
+          finish(snap.won ? '🏆' : String(snap.score), snap.won ? 'YOU WIN' : 'GAME OVER')
+        }
+      })
+      return
+    }
     if (g.type === 'tap') {
       if (!playing) {
         clear()

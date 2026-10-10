@@ -4,6 +4,7 @@ import { controlHint, createRuntime, typeNames } from '/mechanics.js'
 const $ = (id) => document.getElementById(id)
 let me = null
 let current = null
+let roundToken = null
 let opened = null
 let games = []
 let lastSpec = null
@@ -23,7 +24,9 @@ const runtime = createRuntime({
   onToast: toast,
   onPlayStarted() {
     if (!current) return
-    api(`/games/${current.id}/events`, 'POST', { type: 'play_started', eventId: crypto.randomUUID() }).then(() => {
+    roundToken = null
+    api(`/games/${current.id}/events`, 'POST', { type: 'play_started', eventId: crypto.randomUUID() }).then((result) => {
+      roundToken = result?.roundToken || null
       const found = games.find((game) => game.id === current.id)
       if (found) found.plays += 1
       render()
@@ -104,6 +107,8 @@ function preview() {
   $('leaders').textContent = 'Publish or open a game to see scores.'
   $('leaderboard-scope').textContent = 'Preview mode'
   $('submit-score').disabled = true
+  const share = $('share-x')
+  if (share) share.hidden = true
 }
 
 function fill(game) {
@@ -140,8 +145,9 @@ async function loadScores() {
     const flag = document.createElement('span')
     name.textContent = `#${score.rank} ${score.name}`
     value.textContent = score.mechanic === 'reaction' ? `${score.points} ms` : String(score.points)
-    flag.className = 'unverified'
-    flag.textContent = 'unverified'
+    const assurance = score.assurance === 'checked' ? 'checked' : 'unverified'
+    flag.className = assurance
+    flag.textContent = assurance
     row.append(name, value, flag)
     $('leaders').append(row)
   }
@@ -155,7 +161,20 @@ async function showGame(summary) {
   fill(game)
   current = game
   history.pushState({}, '', `/g/${game.id}`)
-  $('leaderboard-scope').textContent = game.type === 'reaction' ? 'Fastest reaction · unverified' : 'Top scores · unverified'
+  $('leaderboard-scope').textContent = game.type === 'reaction' ? 'Fastest reaction · top 20' : 'Top 20 scores'
+  const share = $('share-x')
+  if (share) {
+    if (game.status === 'published') {
+      const intent = new URL('https://x.com/intent/post')
+      const blurb = game.description ? `Play ${game.name} — ${game.description}` : `Play ${game.name} on Playground`
+      intent.searchParams.set('text', blurb.slice(0, 240))
+      intent.searchParams.set('url', `${location.origin}/r/${game.id}`)
+      share.href = intent.toString()
+      share.hidden = false
+    } else {
+      share.hidden = true
+    }
+  }
   $('studio').scrollIntoView({ behavior: 'smooth', block: 'start' })
   refreshOwnerButtons()
   await loadScores()
@@ -404,13 +423,16 @@ $('submit-score').addEventListener('click', async () => {
   const points = runtime.getLastScore()
   if (!current || points === null) return
   try {
-    await api(`/games/${current.id}/scores`, 'POST', {
+    const body = {
       name: $('player').value || 'Anonymous',
       points,
       mechanic: current.type
-    })
+    }
+    if (roundToken) body.roundToken = roundToken
+    const saved = await api(`/games/${current.id}/scores`, 'POST', body)
+    roundToken = null
     $('submit-score').disabled = true
-    toast('Score submitted. It is stored as unverified.')
+    toast(saved.assurance === 'checked' ? 'Score checked and posted.' : 'Score submitted. It is stored as unverified.')
     await loadScores()
   } catch (error) {
     toast(error.message)

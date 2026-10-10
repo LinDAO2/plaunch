@@ -1,4 +1,5 @@
 import { httpError } from './errors.js'
+import { VERSION } from './version.js'
 
 const WEEK_SECONDS = 60 * 60 * 24 * 7
 
@@ -45,7 +46,7 @@ export function loadConfig(env = process.env) {
     : env.SEED_ON_EMPTY === 'true'
 
   return {
-    version: '0.3.0',
+    version: VERSION,
     nodeEnv,
     port: intEnv(env.PORT, 3000),
     databaseUrl,
@@ -58,9 +59,29 @@ export function loadConfig(env = process.env) {
     aiRateLimitMax: intEnv(env.AI_RATE_LIMIT_MAX, 20),
     rateWindowMs: 60_000,
     passwordScryptN: intEnv(env.PASSWORD_SCRYPT_N, 16384),
+    publicBaseUrl: cleanOrigin(env.PUBLIC_BASE_URL),
+    xSiteHandle: cleanHandle(env.X_SITE_HANDLE),
     warnings,
     env
   }
+}
+
+function cleanOrigin(value) {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    return url.origin
+  } catch {
+    return ''
+  }
+}
+
+function cleanHandle(value) {
+  if (!value) return ''
+  const handle = String(value).trim().replace(/^@/, '')
+  if (!/^[A-Za-z0-9_]{1,15}$/.test(handle)) return ''
+  return `@${handle}`
 }
 
 export function assertConfig(config) {

@@ -11,6 +11,7 @@
 .guess-input{position:relative;z-index:3;width:140px;text-align:center;margin:8px 0;background:#0e0d15;color:#fff;border:1px solid #a187e8;border-radius:10px;padding:10px}
 .mode-label{margin-top:10px}
 .unverified{color:#b6a56a;font-size:10px;margin-left:8px}
+.checked{color:#8ddec0;font-size:10px;margin-left:8px}
 .mine-list{display:flex;flex-direction:column;gap:8px}
 .mine-row{background:#241c31;color:#f4ecff;border:1px solid #4c3d63;border-radius:10px;padding:10px 12px;text-align:left}
 #report-box{margin-top:12px}

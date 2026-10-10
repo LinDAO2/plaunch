@@ -14,7 +14,7 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy') && document.body.innerText.includes('0 plays'))
     await page.waitForFunction(() => /Template mode/i.test(document.querySelector('#gen-mode')?.textContent || ''))
     const mechanics = await page.locator('#type option').allTextContents()
-    assert.deepEqual(mechanics, ['Tap challenge', 'Reaction test', 'Number guess', 'Meteor dodge'])
+    assert.deepEqual(mechanics, ['Tap challenge', 'Reaction test', 'Number guess', 'Meteor dodge', 'Arcade'])
 
     await page.selectOption('#type', 'reaction')
     await page.click('#play')
@@ -41,6 +41,10 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     const status = await page.locator('#status').innerText()
     const slug = status.match(/\/g\/([a-z0-9-]+)/)[1]
     assert.equal(slug, 'cosmic-rush')
+    await page.waitForFunction(() => {
+      const link = document.querySelector('#share-x')
+      return link && !link.hidden && link.href.includes('https://x.com/intent/post') && decodeURIComponent(link.href).includes('/r/cosmic-rush')
+    })
 
     await page.click('#play')
     await page.waitForFunction(() => document.querySelector('#game-label')?.textContent.includes('DODGE'))
@@ -54,6 +58,18 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await page.click('#play')
     await page.click('#play')
     await page.waitForFunction(() => document.querySelector('#score')?.textContent.includes('1'))
+    await page.setViewportSize({ width: 480, height: 480 })
+    await page.goto(`${server.base}/play/meteor-dodge?embed=1`, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('#embed-play', { state: 'visible' })
+    assert.equal((await page.locator('#embed-play').innerText()).trim(), 'Play')
+    const frame = await page.evaluate(() => ({
+      w: document.documentElement.scrollWidth,
+      h: document.documentElement.scrollHeight
+    }))
+    assert.ok(frame.w <= 480, `embed width ${frame.w}`)
+    assert.ok(frame.h <= 480, `embed height ${frame.h}`)
+    await page.click('#embed-play')
+    await page.waitForFunction(() => document.querySelector('#embed-gate')?.hidden === true)
     assert.deepEqual(errors, [])
   } finally {
     await browser.close()
