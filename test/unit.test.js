@@ -27,6 +27,7 @@ import { specsAreDistinct } from '../src/ai/distinct.js'
 import { SAMPLE_SPECS } from '../src/ai/samples.js'
 import { rankScores } from '../src/scores.js'
 import { seedIfEmpty } from '../src/seed.js'
+import { resolveArtifactsDir } from '../testing/helpers.js'
 import { generateTemplate } from '../src/template.js'
 import { slugify } from '../src/validate.js'
 import { validSpec } from '../testing/helpers.js'
@@ -754,6 +755,46 @@ test('gemini safety classification runs only when the blocklist is clean and a k
   const offline = await classifySafety({ text: 'a sunny garden tap', env: {}, fetchImpl })
   assert.equal(offline.flagged, false)
   assert.equal(calls, 1)
+})
+
+test('screenshot artifacts use the first directory mkdir accepts', async () => {
+  const calls = []
+  const mkdirImpl = async (dir) => {
+    calls.push(dir)
+    if (dir === '/blocked' || dir === '/opt/cursor/artifacts') {
+      const error = new Error('EACCES')
+      error.code = 'EACCES'
+      throw error
+    }
+  }
+  const fallback = await resolveArtifactsDir({
+    env: { ARTIFACTS_DIR: '/blocked' },
+    cwd: '/work',
+    mkdirImpl
+  })
+  assert.equal(fallback, path.join('/work', 'artifacts'))
+  assert.deepEqual(calls, ['/blocked', '/opt/cursor/artifacts', path.join('/work', 'artifacts')])
+
+  calls.length = 0
+  const preferred = await resolveArtifactsDir({
+    env: { ARTIFACTS_DIR: '/custom/out' },
+    cwd: '/work',
+    mkdirImpl
+  })
+  assert.equal(preferred, '/custom/out')
+  assert.deepEqual(calls, ['/custom/out'])
+
+  calls.length = 0
+  const vm = await resolveArtifactsDir({ env: { ARTIFACTS_DIR: '   ' }, cwd: '/work', mkdirImpl: async (dir) => { calls.push(dir) } })
+  assert.equal(vm, '/opt/cursor/artifacts')
+  assert.deepEqual(calls, ['/opt/cursor/artifacts'])
+
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'pg-artifacts-'))
+  try {
+    assert.equal(await resolveArtifactsDir({ env: { ARTIFACTS_DIR: dir }, cwd: '/work' }), dir)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('usercontent injects the WebRTC prelude before game code', async () => {

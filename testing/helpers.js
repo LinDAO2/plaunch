@@ -1,5 +1,7 @@
 import http from 'node:http'
 import { once } from 'node:events'
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { openDatabase } from '../src/db.js'
@@ -89,6 +91,25 @@ export function createClient(base) {
       return request('GET', '/api/auth/csrf')
     }
   }
+}
+
+export async function resolveArtifactsDir({ env = process.env, cwd = process.cwd(), mkdirImpl = mkdir } = {}) {
+  const fromEnv = typeof env.ARTIFACTS_DIR === 'string' ? env.ARTIFACTS_DIR.trim() : ''
+  const candidates = [
+    ...(fromEnv ? [fromEnv] : []),
+    '/opt/cursor/artifacts',
+    path.join(cwd, 'artifacts')
+  ]
+  let lastError
+  for (const dir of candidates) {
+    try {
+      await mkdirImpl(dir, { recursive: true })
+      return dir
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
 }
 
 export const validSpec = {

@@ -7,5 +7,6 @@ data/
 playwright-report/
 test-results/
 uploads/
+artifacts/
 agent-tools/
 .DS_Store

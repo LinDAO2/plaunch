@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import { test } from 'node:test'
-import { startServer } from '../testing/helpers.js'
+import { resolveArtifactsDir, startServer } from '../testing/helpers.js'
 
 test('studio and play smoke', { timeout: 120000 }, async () => {
   const { chromium } = await import('playwright')
@@ -115,9 +116,8 @@ test('freeform games on /play receive pointer and keyboard input and fit the fra
 
 test('discover and moderation fit a 375px screen', { timeout: 120000 }, async () => {
   const { chromium } = await import('playwright')
-  const { mkdir } = await import('node:fs/promises')
   const { createClient } = await import('../testing/helpers.js')
-  await mkdir('/opt/cursor/artifacts', { recursive: true })
+  const artifacts = await resolveArtifactsDir()
   const server = await startServer({ env: { ADMIN_EMAILS: 'mod@example.com' } })
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
   try {
@@ -137,7 +137,7 @@ test('discover and moderation fit a 375px screen', { timeout: 120000 }, async ()
     await page.goto(server.base + '/discover', { waitUntil: 'domcontentloaded' })
     await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy'))
     assert.equal(await fits(), true)
-    await page.screenshot({ path: '/opt/cursor/artifacts/discover_375.png', fullPage: true })
+    await page.screenshot({ path: path.join(artifacts, 'discover_375.png'), fullPage: true })
     await page.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
     await page.waitForFunction(() => document.body.innerText.includes('Click Frenzy'))
     assert.equal(await fits(), true)
@@ -156,7 +156,7 @@ test('discover and moderation fit a 375px screen', { timeout: 120000 }, async ()
     await page.waitForFunction(() => document.body.innerText.includes('After dark') && document.body.innerText.includes('Too many popups'))
     assert.equal(await fits(), true)
     await page.locator('#admin-games').scrollIntoViewIfNeeded()
-    await page.screenshot({ path: '/opt/cursor/artifacts/moderation_375.png', fullPage: true })
+    await page.screenshot({ path: path.join(artifacts, 'moderation_375.png'), fullPage: true })
     const privacy = await page.goto(server.base + '/privacy', { waitUntil: 'domcontentloaded' })
     assert.equal(privacy.status(), 200)
     assert.match(await page.locator('.draft-banner').innerText(), /DRAFT — needs legal review/)
