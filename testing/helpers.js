@@ -18,6 +18,7 @@ export function testConfig(overrides = {}) {
     RATE_LIMIT_MAX: '10000',
     AUTH_RATE_LIMIT_MAX: '10000',
     AI_RATE_LIMIT_MAX: '10000',
+    PUBLISH_RATE_LIMIT_MAX: '10000',
     PASSWORD_SCRYPT_N: '4096',
     SEED_ON_EMPTY: 'false',
     COOKIE_SECURE: 'false',

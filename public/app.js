@@ -1,4 +1,4 @@
-import { api, ensureCsrf, setCsrf } from '/client-api.js'
+import { api, ensureCsrf, setCsrf, xSignIn } from '/client-api.js'
 import { gameCard } from '/cards.js'
 import { mountWorld } from '/blocks-view.js'
 import { ensureWorldSpec } from '/blocks/spec.js'
@@ -460,10 +460,15 @@ async function loadMine() {
   }
 }
 
+function accountLabel(user) {
+  if (user && !user.guest) return user.displayName || user.email
+  return 'Save your games'
+}
+
 async function refreshAccount() {
   const { user } = await api('/auth/me')
   me = user
-  $('account').textContent = user ? (user.displayName || user.email) : 'Sign in'
+  $('account').textContent = accountLabel(user)
   const adminLink = $('admin-link')
   if (adminLink) adminLink.hidden = !(user && user.admin)
   await loadMine()
@@ -478,9 +483,11 @@ async function refreshMode() {
 
 function openAuth(mode) {
   authMode = mode
-  $('auth-title').textContent = mode === 'register' ? 'Create account' : 'Sign in'
+  $('auth-title').textContent = mode === 'register' ? 'Create account' : 'Save your games'
   $('auth-name-label').hidden = mode !== 'register'
-  $('auth-switch').textContent = mode === 'register' ? 'Have an account? Sign in' : 'Need an account? Register'
+  $('auth-switch').textContent = mode === 'register' ? 'Have an account? Use email' : 'Need an account? Register'
+  const xButton = $('auth-x')
+  if (xButton) xButton.hidden = !xSignIn
   $('auth-password').autocomplete = mode === 'register' ? 'new-password' : 'current-password'
   $('auth-error').textContent = ''
   $('auth-dialog').hidden = false
@@ -488,7 +495,7 @@ function openAuth(mode) {
 }
 
 $('account').addEventListener('click', async () => {
-  if (!me) {
+  if (!me || me.guest) {
     openAuth('login')
     return
   }
@@ -508,6 +515,7 @@ $('account').addEventListener('click', async () => {
 })
 
 $('auth-switch').addEventListener('click', () => openAuth(authMode === 'register' ? 'login' : 'register'))
+$('auth-x').addEventListener('click', () => { location.href = '/api/auth/x/start' })
 $('auth-cancel').addEventListener('click', () => { $('auth-dialog').hidden = true })
 $('auth-form').addEventListener('submit', async (event) => {
   event.preventDefault()
@@ -558,17 +566,10 @@ $('generate').addEventListener('click', async () => {
     lastSpec = result.spec || null
     previewUrl = ''
     freeformPoints = null
-    let previewNote = ''
     if (lastTier === 'freeform') {
       result.game.type = 'arcade'
-      try {
-        const previewed = await api('/freeform/preview', 'POST', { html: result.html })
-        previewUrl = previewed.url
-      } catch (error) {
-        if (error.status !== 401) throw error
-        previewNote = 'Sign in to preview this sandbox game.'
-        openAuth('login')
-      }
+      const previewed = await api('/freeform/preview', 'POST', { html: result.html })
+      previewUrl = previewed.url
     }
     const tags = result.tags || []
     $('tag-line').textContent = tags.join(' · ')
@@ -577,10 +578,9 @@ $('generate').addEventListener('click', async () => {
     opened = null
     fill({ ...result.game, spec: result.spec })
     showEditor()
-    toast(previewNote || 'Ready to play.')
+    toast('Ready to play.')
     refreshOwnerButtons()
   } catch (error) {
-    if (error.status === 401) openAuth('login')
     setStatus(error.message, true)
     toast(error.message)
   } finally {
@@ -589,11 +589,6 @@ $('generate').addEventListener('click', async () => {
 })
 
 $('publish').addEventListener('click', async () => {
-  if (!me) {
-    toast('Sign in to publish')
-    openAuth('register')
-    return
-  }
   try {
     $('publish').disabled = true
     const { game } = await api('/games', 'POST', payload())
@@ -756,6 +751,7 @@ async function boot() {
     const match = location.pathname.match(/^\/g\/([a-z0-9-]+)$/)
     if (match) await showGame({ id: match[1] })
     else preview()
+    if (new URLSearchParams(location.search).get('save') === '1' && (!me || me.guest)) openAuth('login')
   } catch (error) {
     toast(error.message)
     $('gallery').textContent = 'Could not load games. Refresh to try again.'

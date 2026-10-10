@@ -1,10 +1,12 @@
-# Playground — game launchpad v0.9.0
+# Playground — game launchpad v0.9.1
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
 Ideas that do not fit that arcade spec use the freeform tier: one self-contained HTML document, served from `USERCONTENT_ORIGIN`, inside an iframe with `sandbox="allow-scripts"`. The studio picks the tier automatically and the creator can override it. Freeform games still cannot open a network connection.
 
 Blocks is a first-party voxel runtime (`world` in GameSpec v1.2). Two featured worlds, Blocks: Grassland and Blocks: Candy Moon, share one map per slug over a same-origin WebSocket. Guests play without an account. `WORLD_GUEST_CAP` limits anonymous sockets per IP. A moderator can reset a world from the moderation page.
+
+Creating a game does not ask for an account. The first visit sets an HttpOnly guest cookie and a guest user row. That browser can generate, preview, publish, edit, and archive its own games. Email login stays available as "Save your games" and moves those games onto the account. `AI_DAILY_LIMIT_PER_GUEST` caps generation per guest and per IP. A per-IP publish limit, the safety hold, and moderator bans still apply. Sign in with X stays off unless `X_CLIENT_ID` and `X_CLIENT_SECRET` are set, and the OAuth exchange is not implemented yet.
 
 This is a development build. Leaderboards rank **checked** scores by default. Scores without a valid round token stay **unverified** and show on a separate tab. That is not a claim of human verification. Token interest is still only a checkbox: there is no wallet, minting, or chain code. Rosebud is not integrated.
 
@@ -61,7 +63,7 @@ npm test
 
 `AI_PROVIDER=auto` uses the first configured key in that order. With no key, the endpoint uses the built-in template matcher and the studio says **Template mode**. Keys stay on the server. Model output must match GameSpec v1 or v1.1. Invalid JSON is retried up to three times and is never executed. A provider 429 is not retried. `GEMINI_THINKING_LEVEL` defaults to `low` on Gemini 3 models, and `AI_TIMEOUT_MS` defaults to 60000.
 
-Signed-in AI generation is capped per UTC day by `AI_DAILY_LIMIT_PER_USER` (default 20) and `AI_DAILY_LIMIT_GLOBAL` (default 200). Over the cap, the route returns 429 with `ai_daily_limit`.
+AI generation is capped per UTC day. Accounts use `AI_DAILY_LIMIT_PER_USER` (default 20). Guests use `AI_DAILY_LIMIT_PER_GUEST` (default 10) for that guest and again for the IP. Everyone shares `AI_DAILY_LIMIT_GLOBAL` (default 200). Over the cap, the route returns 429 with `ai_daily_limit`.
 
 `POST /api/generate` remains the template matcher even when a key is set.
 
@@ -71,7 +73,7 @@ Signed-in AI generation is capped per UTC day by `AI_DAILY_LIMIT_PER_USER` (defa
 
 Freeform HTML is stored on the game and served only by the usercontent listener (`GET /g/:slug` and short-lived `GET /preview/:token`). Its CSP is `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'`, with `frame-ancestors` for the app origin, x.com, and twitter.com. Scores come back only as `postMessage` `{ type: "playground-score", points }`. The parent accepts that shape from the iframe, and only when `event.origin` is `"null"`.
 
-Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production requires `PUBLIC_BASE_URL` and `USERCONTENT_ORIGIN`, and it refuses to boot when those hosts match or share a registrable domain. A separate domain such as `playgroundusercontent.com` is the layout to use. `ALLOW_SAME_SITE_USERCONTENT=true` is the explicit opt-in for a subdomain. Auto tier prefers a freeform game when the idea needs its own rules, physics, or levels, and keeps the arcade spec for a simple tap, dodge, reaction, guess, or arcade game. An idea the keyword check cannot place is sent to the model when a key is set. `POST /api/freeform/preview` requires a signed-in creator and counts toward the AI rate limit. `/play/:slug?embed=1` and `/r/:slug` use the same 480×480 player for freeform games. The parent hides its timer and shows the best score; the game draws its own HUD.
+Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production requires `PUBLIC_BASE_URL` and `USERCONTENT_ORIGIN`, and it refuses to boot when those hosts match or share a registrable domain. A separate domain such as `playgroundusercontent.com` is the layout to use. `ALLOW_SAME_SITE_USERCONTENT=true` is the explicit opt-in for a subdomain. Auto tier prefers a freeform game when the idea needs its own rules, physics, or levels, and keeps the arcade spec for a simple tap, dodge, reaction, guess, or arcade game. An idea the keyword check cannot place is sent to the model when a key is set. `POST /api/freeform/preview` requires a creator (the guest cookie or an account) and counts toward the AI rate limit. `/play/:slug?embed=1` and `/r/:slug` use the same 480×480 player for freeform games. The parent hides its timer and shows the best score; the game draws its own HUD.
 
 Discover is at `/discover`. Trending ranks unique `play_started` events from the last 24 hours. The same session and IP hash counts once, a burst of three starts inside two minutes is left out, and the creator's own signed-in plays are left out. New is chronological. Featured is set by a moderator.
 
@@ -86,7 +88,7 @@ Rosebud has no generation API and its terms prohibit automated use, so there is 
 ## Routes
 
 - `GET /` studio and discover
-- `GET /studio/dashboard` creator dashboard for the signed-in account
+- `GET /studio/dashboard` creator dashboard for this browser's guest, or for the signed-in account
 - `GET /g/:slug` studio opened on a published game
 - `GET /play/:slug` chrome-less, mobile-first guest play page (touch and keyboard)
 - `GET /play/:slug?embed=1` 480×480 player with a Play overlay. Frame ancestors are X and Twitter only

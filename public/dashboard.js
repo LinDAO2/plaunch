@@ -54,16 +54,8 @@ async function boot() {
   try {
     await ensureCsrf()
     const me = await api('/auth/me')
-    if (!me.user) {
-      status.hidden = true
-      error.hidden = false
-      error.textContent = 'Sign in from the studio to see your games.'
-      const link = document.createElement('a')
-      link.href = '/#studio'
-      link.textContent = ' Go to the studio'
-      error.append(link)
-      return
-    }
+    const note = document.getElementById('dash-cookie')
+    if (note) note.hidden = !(me.user && me.user.guest)
     const { games } = await api('/me/dashboard')
     render(games)
   } catch (err) {
@@ -71,9 +63,7 @@ async function boot() {
     wrap.hidden = true
     empty.hidden = true
     error.hidden = false
-    error.textContent = err.status === 401
-      ? 'Sign in from the studio to see your games.'
-      : 'Could not load the dashboard. Refresh to try again.'
+    error.textContent = 'Could not load the dashboard. Refresh to try again.'
   }
 }
 

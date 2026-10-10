@@ -184,6 +184,9 @@ test('redesign pages fit a desktop', { timeout: 180000 }, async () => {
     await desktop.waitForFunction(() => document.body.innerText.includes('Make a game from one sentence') && document.body.innerText.includes('Click Frenzy'))
     assert.equal(await desktop.evaluate(() => getComputedStyle(document.body).backgroundImage), 'none')
     assert.equal(await desktop.evaluate(() => /arcade spec|provider key|token interest/i.test(document.body.innerText)), false)
+    assert.equal(await desktop.evaluate(() => /sign in/i.test(document.querySelector('header').innerText)), false)
+    assert.match(await desktop.locator('#account').innerText(), /Save your games/)
+    await shot(desktop, 'create-no-signin.png')
     const fold = await desktop.evaluate(() => {
       const ask = document.querySelector('#ask').getBoundingClientRect()
       const wall = document.querySelector('#discover').getBoundingClientRect()

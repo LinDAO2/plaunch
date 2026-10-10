@@ -1,4 +1,5 @@
 let csrfToken = ''
+export let xSignIn = false
 
 export function setCsrf(token) {
   csrfToken = token || ''
@@ -10,6 +11,7 @@ export async function ensureCsrf() {
   const data = await res.json().catch(() => ({}))
   if (!res.ok || !data.csrfToken) throw new Error(data.error || 'Could not start a safe session')
   csrfToken = data.csrfToken
+  xSignIn = Boolean(data.xSignIn)
   return csrfToken
 }
 

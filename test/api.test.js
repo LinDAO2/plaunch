@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '0.9.0')
+    assert.equal(res.data.version, '0.9.1')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -36,7 +36,8 @@ describe('http api', { concurrency: false }, () => {
     assert.match(csrf.data.csrfToken, /^[A-Za-z0-9_-]{20,}$/)
     const me = await client.request('GET', '/api/auth/me')
     assert.equal(me.status, 200)
-    assert.equal(me.data.user, null)
+    assert.equal(me.data.user.guest, true)
+    assert.equal(me.data.user.email, null)
   })
 
   test('GET /api/games returns the seeded catalog', async () => {
@@ -72,11 +73,7 @@ describe('http api', { concurrency: false }, () => {
     assert.equal(res.data.html, null)
   })
 
-  test('write routes reject missing auth and missing CSRF', async () => {
-    const anonymous = await client.request('POST', '/api/games', {
-      name: 'Nope Game', description: 'nope', type: 'tap', duration: 10, accent: '#aabbcc'
-    })
-    assert.equal(anonymous.status, 401)
+  test('write routes reject a missing CSRF token', async () => {
     const forged = await client.request('POST', '/api/games', {
       name: 'Nope Game', description: 'nope', type: 'tap', duration: 10, accent: '#aabbcc'
     }, { csrf: false })
@@ -368,7 +365,9 @@ describe('http api', { concurrency: false }, () => {
   test('creator dashboard counts views, plays, completions, shares, and the top checked score', async () => {
     const anon = createClient(server.base)
     await anon.prime()
-    assert.equal((await anon.request('GET', '/api/me/dashboard')).status, 401)
+    const guestDash = await anon.request('GET', '/api/me/dashboard')
+    assert.equal(guestDash.status, 200)
+    assert.deepEqual(guestDash.data.games, [])
     const page = await client.request('GET', '/studio/dashboard')
     assert.equal(page.status, 200)
     assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/)
@@ -466,8 +465,8 @@ describe('http api', { concurrency: false }, () => {
 
     const anon = createClient(server.base)
     await anon.prime()
-    const denied = await anon.request('POST', '/api/freeform/preview', { html: generated.data.html })
-    assert.equal(denied.status, 401)
+    const previewAsGuest = await anon.request('POST', '/api/freeform/preview', { html: generated.data.html })
+    assert.equal(previewAsGuest.status, 200)
 
     const preview = await client.request('POST', '/api/freeform/preview', { html: generated.data.html })
     assert.equal(preview.status, 200)
@@ -543,11 +542,12 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       const client = createClient(server.base)
       await client.prime()
       const anon = await client.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })
-      assert.equal(anon.status, 401)
-      assert.equal(calls, 0)
+      assert.equal(anon.status, 200)
+      assert.equal(anon.data.mode, 'ai')
+      assert.equal(calls, 1)
       const legacy = await client.request('POST', '/api/generate', { prompt: 'a space dodge game please' })
       assert.equal(legacy.data.mode, 'template')
-      assert.equal(calls, 0)
+      assert.equal(calls, 1)
       await client.request('POST', '/api/auth/register', { email: 'ai@example.com', password: 'test-password-123', displayName: 'Ai' })
       const res = await client.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })
       assert.equal(res.status, 200)
@@ -555,7 +555,7 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       assert.equal(res.data.provider, 'gemini')
       assert.equal(res.data.model, 'gemini-3.8-flash')
       assert.equal(res.data.spec.runtime, 'dodge')
-      assert.equal(calls, 1)
+      assert.equal(calls, 2)
       const status = await client.request('GET', '/api/ai/status')
       assert.equal(status.data.mode, 'ai')
       assert.equal(JSON.stringify(status.data).includes('route-test-key'), false)
@@ -649,14 +649,13 @@ describe('ai route and rate limit', { concurrency: false }, () => {
     }
   })
 
-  test('freeform preview requires a signed-in creator and shares the AI rate limit', async () => {
-    // The anonymous 401 still counts toward the per-IP AI bucket.
+  test('freeform preview works for a guest and shares the AI rate limit', async () => {
     const limited = await startServer({ env: { AI_RATE_LIMIT_MAX: '3' }, seed: false })
     try {
       const html = '<!DOCTYPE html><html><body><canvas id="c"></canvas><script>parent.postMessage({type:"playground-score",points:1},"*")</script></body></html>'
       const anon = createClient(limited.base)
       await anon.prime()
-      assert.equal((await anon.request('POST', '/api/freeform/preview', { html })).status, 401)
+      assert.equal((await anon.request('POST', '/api/freeform/preview', { html })).status, 200)
       const user = createClient(limited.base)
       await user.prime()
       assert.equal((await user.request('POST', '/api/auth/register', {
@@ -805,6 +804,153 @@ describe('discover and moderation', { concurrency: false }, () => {
       assert.equal(held.data.game.status, 'pending')
       assert.equal(held.data.game.flagReason, 'hate')
       assert.equal(calls, 1)
+    } finally {
+      await server.close()
+    }
+  })
+})
+
+describe('guest creators', { concurrency: false }, () => {
+  test('a guest can publish, edit, and archive, and another guest cannot', async () => {
+    const server = await startServer({ seed: false })
+    try {
+      const guest = createClient(server.base)
+      await guest.prime()
+      const me = await guest.request('GET', '/api/auth/me')
+      assert.equal(me.data.user.guest, true)
+      const created = await guest.request('POST', '/api/games', {
+        name: 'Guest Garden', description: 'Tap the leaves', type: 'tap', duration: 10, accent: '#4adeb9'
+      })
+      assert.equal(created.status, 201)
+      assert.equal(created.data.game.ownerId, me.data.user.id)
+      const id = created.data.game.id
+      const edited = await guest.request('PATCH', `/api/games/${id}`, {
+        name: 'Guest Garden', description: 'Tap the leaves faster', type: 'tap', duration: 15, accent: '#4adeb9'
+      })
+      assert.equal(edited.status, 200)
+      assert.equal(edited.data.game.duration, 15)
+      const other = createClient(server.base)
+      await other.prime()
+      assert.equal((await other.request('PATCH', `/api/games/${id}`, {
+        name: 'Stolen', description: 'no', type: 'tap', duration: 10, accent: '#112233'
+      })).status, 403)
+      assert.equal((await other.request('POST', `/api/games/${id}/archive`, {})).status, 403)
+      const archived = await guest.request('POST', `/api/games/${id}/archive`, {})
+      assert.equal(archived.status, 200)
+      assert.equal(archived.data.game.status, 'archived')
+    } finally {
+      await server.close()
+    }
+  })
+
+  test('signing in merges the guest games into the account', async () => {
+    const server = await startServer({ seed: false })
+    try {
+      const guest = createClient(server.base)
+      await guest.prime()
+      const created = await guest.request('POST', '/api/games', {
+        name: 'Carry Over', description: 'Keep this', type: 'tap', duration: 10, accent: '#112233'
+      })
+      const id = created.data.game.id
+      const account = await guest.request('POST', '/api/auth/register', {
+        email: 'keeper@example.com', password: 'test-password-123', displayName: 'Keeper'
+      })
+      assert.equal(account.status, 201)
+      assert.equal(account.data.user.guest, false)
+      const dash = await guest.request('GET', '/api/me/dashboard')
+      assert.equal(dash.data.games.some((game) => game.id === id), true)
+      const later = createClient(server.base)
+      await later.prime()
+      const extra = await later.request('POST', '/api/games', {
+        name: 'Second Browser', description: 'Also keep', type: 'guess', duration: 10, accent: '#445566'
+      })
+      const login = await later.request('POST', '/api/auth/login', {
+        email: 'keeper@example.com', password: 'test-password-123'
+      })
+      assert.equal(login.status, 200)
+      assert.equal(login.data.user.id, account.data.user.id)
+      const ids = (await later.request('GET', '/api/me/games')).data.games.map((game) => game.id)
+      assert.equal(ids.includes(id), true)
+      assert.equal(ids.includes(extra.data.game.id), true)
+    } finally {
+      await server.close()
+    }
+  })
+
+  test('guest and network generation caps return 429', async () => {
+    let calls = 0
+    const server = await startServer({
+      env: {
+        AI_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'guest-cap-key',
+        AI_DAILY_LIMIT_PER_GUEST: '1',
+        AI_DAILY_LIMIT_PER_USER: '20',
+        AI_DAILY_LIMIT_GLOBAL: '20'
+      },
+      seed: false,
+      fetchImpl: async () => {
+        calls += 1
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(validSpec) }] } }] }), { status: 200 })
+      }
+    })
+    try {
+      const first = createClient(server.base)
+      const second = createClient(server.base)
+      await first.prime()
+      await second.prime()
+      assert.equal((await first.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })).status, 200)
+      const again = await first.request('POST', '/api/ai/generate', { prompt: 'a garden tap game please' })
+      assert.equal(again.status, 429)
+      assert.equal(again.data.code, 'ai_daily_limit')
+      assert.match(again.data.error, /this browser/)
+      const other = await second.request('POST', '/api/ai/generate', { prompt: 'a quiet reaction game please' })
+      assert.equal(other.status, 429)
+      assert.equal(other.data.code, 'ai_daily_limit')
+      assert.match(other.data.error, /this network/)
+      assert.equal(calls, 1)
+    } finally {
+      await server.close()
+    }
+  })
+
+  test('banning a guest blocks that id and new guests from the same network', async () => {
+    const server = await startServer({ env: { ADMIN_EMAILS: 'mod@example.com' }, seed: false })
+    try {
+      const mod = createClient(server.base)
+      await mod.prime()
+      await mod.request('POST', '/api/auth/register', {
+        email: 'mod@example.com', password: 'test-password-123', displayName: 'Mod'
+      })
+      const guest = createClient(server.base)
+      await guest.prime()
+      const me = await guest.request('GET', '/api/auth/me')
+      assert.equal((await mod.request('POST', `/api/admin/users/${me.data.user.id}/ban`, {})).status, 200)
+      const blocked = await guest.request('POST', '/api/games', {
+        name: 'After Ban', description: 'nope', type: 'tap', duration: 10, accent: '#112233'
+      })
+      assert.equal(blocked.status, 403)
+      assert.equal(blocked.data.code, 'banned')
+      const fresh = createClient(server.base)
+      await fresh.prime()
+      const again = await fresh.request('POST', '/api/games', {
+        name: 'New Cookie', description: 'nope', type: 'tap', duration: 10, accent: '#112233'
+      })
+      assert.equal(again.status, 403)
+      assert.equal(again.data.code, 'banned')
+    } finally {
+      await server.close()
+    }
+  })
+
+  test('sign in with X stays disabled when the client id is unset', async () => {
+    const server = await startServer({ seed: false })
+    try {
+      const client = createClient(server.base)
+      const status = await client.request('GET', '/api/auth/csrf')
+      assert.equal(status.data.xSignIn, false)
+      const start = await client.request('GET', '/api/auth/x/start')
+      assert.equal(start.status, 404)
+      assert.match(start.data.error, /not configured/)
     } finally {
       await server.close()
     }

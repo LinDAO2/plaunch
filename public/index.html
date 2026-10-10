@@ -16,7 +16,6 @@
 <a href="#ask">Create</a>
 <a class="dash-link" href="/studio/dashboard">Dashboard</a>
 <a id="admin-link" href="/admin" hidden>Moderation</a>
-<button id="account" class="outline account-btn" type="button">Sign in</button>
 </nav>
 </header>
 <main class="shell">
@@ -127,11 +126,11 @@
 </div>
 </section>
 </div>
-<footer class="site-foot"><span>Playground</span><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+<footer class="site-foot"><span>Playground</span><nav><button id="account" class="text-btn" type="button">Save your games</button><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
 </main>
 <div id="auth-dialog" class="auth-dialog" hidden>
 <form id="auth-form" class="auth-card">
-<h2 id="auth-title">Sign in</h2>
+<h2 id="auth-title">Save your games</h2>
 <label for="auth-email">Email</label>
 <input id="auth-email" type="email" autocomplete="username" required>
 <label for="auth-password">Password</label>
@@ -143,6 +142,7 @@
 <p id="auth-error" class="hint" role="alert"></p>
 <button id="auth-submit" class="primary block" type="submit">Continue</button>
 <button id="auth-switch" class="outline block" type="button">Need an account? Register</button>
+<button id="auth-x" class="outline block" type="button" hidden>Sign in with X</button>
 <button id="auth-cancel" class="outline block" type="button">Close</button>
 </form>
 </div>

@@ -272,30 +272,37 @@ function utcDay() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export async function consumeAiCredit(db, userId, userLimit, globalLimit) {
+async function takeDaily(tx, scope, day, limit) {
+  const result = await tx.query(
+    `insert into ai_daily (scope, day, total) values ($1, $2::date, 1)
+     on conflict (scope, day) do update set total = ai_daily.total + 1
+     where ai_daily.total < $3
+     returning total`,
+    [scope, day, limit]
+  )
+  return result.rows[0] ? Number(result.rows[0].total) : 0
+}
+
+export async function consumeAiCredit(db, { userId, guest, ipHash, userLimit, guestLimit, globalLimit }) {
   const day = utcDay()
   return db.transaction(async (tx) => {
-    const mine = await tx.query(
-      `insert into ai_daily (scope, day, total) values ($1, $2::date, 1)
-       on conflict (scope, day) do update set total = ai_daily.total + 1
-       where ai_daily.total < $3
-       returning total`,
-      [`user:${userId}`, day, userLimit]
-    )
-    if (!mine.rows.length) {
-      throw new HttpError(429, `Daily generation limit reached for this account (${userLimit}). Try again tomorrow.`, 'ai_daily_limit')
+    const mine = await takeDaily(tx, guest ? `guest:${userId}` : `user:${userId}`, day, guest ? guestLimit : userLimit)
+    if (!mine) {
+      const who = guest ? 'browser' : 'account'
+      const limit = guest ? guestLimit : userLimit
+      throw new HttpError(429, `Daily generation limit reached for this ${who} (${limit}). Try again tomorrow.`, 'ai_daily_limit')
     }
-    const everyone = await tx.query(
-      `insert into ai_daily (scope, day, total) values ('global', $1::date, 1)
-       on conflict (scope, day) do update set total = ai_daily.total + 1
-       where ai_daily.total < $2
-       returning total`,
-      [day, globalLimit]
-    )
-    if (!everyone.rows.length) {
+    if (guest) {
+      const network = await takeDaily(tx, `ip:${ipHash}`, day, guestLimit)
+      if (!network) {
+        throw new HttpError(429, `Daily generation limit reached for this network (${guestLimit}). Try again tomorrow.`, 'ai_daily_limit')
+      }
+    }
+    const everyone = await takeDaily(tx, 'global', day, globalLimit)
+    if (!everyone) {
       throw new HttpError(429, 'Daily generation limit reached for everyone. Try again tomorrow.', 'ai_daily_limit')
     }
-    return { user: Number(mine.rows[0].total), global: Number(everyone.rows[0].total) }
+    return { user: mine, global: everyone }
   })
 }
 
@@ -495,14 +502,17 @@ export async function banUser(db, { userId, actorId }) {
   if (!userId) throw new HttpError(404, 'User not found', 'not_found')
   if (userId === actorId) throw new HttpError(400, 'You cannot ban your own account', 'validation_error')
   return db.transaction(async (tx) => {
-    const found = await tx.query('select id, email, banned_at from users where id = $1 for update', [userId])
+    const found = await tx.query('select id, email, banned_at, ip_hash from users where id = $1 for update', [userId])
     const row = found.rows[0]
     if (!row) throw new HttpError(404, 'User not found', 'not_found')
     if (!row.banned_at) {
       await tx.query('update users set banned_at = now(), updated_at = now() where id = $1', [userId])
     }
+    if (row.ip_hash) {
+      await tx.query('insert into ip_bans (ip_hash) values ($1) on conflict (ip_hash) do nothing', [row.ip_hash])
+    }
     await tx.query('delete from sessions where user_id = $1', [userId])
-    await writeAudit(tx, { actorId, action: 'user.ban', targetType: 'user', targetId: userId, detail: { email: row.email } })
+    await writeAudit(tx, { actorId, action: 'user.ban', targetType: 'user', targetId: userId, detail: { email: row.email || '', ipHash: row.ip_hash || '' } })
     return { id: row.id, email: row.email, banned: true }
   })
 }
@@ -598,25 +608,80 @@ export async function createAbuseReport(db, { gameId, userId, reason, details })
   return { id: row.id, status: row.status, createdAt: iso(row.created_at) }
 }
 
-export async function createUser(db, { email, passwordHash, displayName }) {
+function mapAccount(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    email: row.email || null,
+    displayName: row.display_name,
+    kind: row.kind || 'account',
+    bannedAt: row.banned_at || null,
+    ipHash: row.ip_hash || null,
+    passwordHash: row.password_hash
+  }
+}
+
+export async function createUser(db, { email, passwordHash, displayName, ipHash = null }) {
   try {
     const result = await db.query(
-      `insert into users (email, password_hash, display_name) values ($1, $2, $3) returning id, email, display_name`,
-      [email, passwordHash, displayName]
+      `insert into users (email, password_hash, display_name, kind, ip_hash)
+       values ($1, $2, $3, 'account', $4)
+       returning id, email, display_name, kind, banned_at, ip_hash`,
+      [email, passwordHash, displayName, ipHash]
     )
-    const row = result.rows[0]
-    return { id: row.id, email: row.email, displayName: row.display_name }
+    return mapAccount(result.rows[0])
   } catch (err) {
     if (err.code === '23505') throw new HttpError(409, 'An account with that email already exists', 'conflict')
     throw err
   }
 }
 
+export async function createGuest(db, { token, ipHash }) {
+  const result = await db.query(
+    `insert into users (email, password_hash, display_name, kind, guest_token_hash, ip_hash)
+     values (null, null, 'Guest', 'guest', $1, $2)
+     returning id, email, display_name, kind, banned_at, ip_hash`,
+    [hashToken(token), ipHash]
+  )
+  return mapAccount(result.rows[0])
+}
+
+export async function findGuestByToken(db, token) {
+  if (!token || token.length < 20) return null
+  const result = await db.query(
+    `select id, email, display_name, kind, banned_at, ip_hash
+     from users where guest_token_hash = $1 and kind = 'guest'`,
+    [hashToken(token)]
+  )
+  return mapAccount(result.rows[0])
+}
+
+export async function isIpBanned(db, ipHash) {
+  if (!ipHash) return false
+  const result = await db.query('select 1 as ok from ip_bans where ip_hash = $1', [ipHash])
+  return result.rows.length > 0
+}
+
+export async function mergeGuestIntoAccount(db, guestId, accountId) {
+  if (!guestId || !accountId || guestId === accountId) return
+  await db.transaction(async (tx) => {
+    await tx.query('update games set owner_id = $1 where owner_id = $2', [accountId, guestId])
+    await tx.query('update game_versions set created_by = $1 where created_by = $2', [accountId, guestId])
+    await tx.query('update freeform_previews set owner_id = $1 where owner_id = $2', [accountId, guestId])
+    await tx.query('update abuse_reports set reporter_user_id = $1 where reporter_user_id = $2', [accountId, guestId])
+    await tx.query('update plays set user_id = $1 where user_id = $2', [accountId, guestId])
+    await tx.query('update audit_log set actor_id = $1 where actor_id = $2', [accountId, guestId])
+    await tx.query('delete from sessions where user_id = $1', [guestId])
+    await tx.query('delete from users where id = $1 and kind = $2', [guestId, 'guest'])
+  })
+}
+
 export async function findUserByEmail(db, email) {
-  const result = await db.query('select id, email, display_name, password_hash, banned_at from users where lower(email) = lower($1)', [email])
-  const row = result.rows[0]
-  if (!row) return null
-  return { id: row.id, email: row.email, displayName: row.display_name, passwordHash: row.password_hash, bannedAt: row.banned_at || null }
+  const result = await db.query(
+    'select id, email, display_name, password_hash, banned_at, kind, ip_hash from users where lower(email) = lower($1)',
+    [email]
+  )
+  return mapAccount(result.rows[0])
 }
 
 export async function createSession(db, userId, token, ttlSeconds) {
@@ -632,14 +697,14 @@ export async function deleteSession(db, token) {
 export async function findUserBySession(db, token) {
   if (!token) return null
   const result = await db.query(
-    `select u.id, u.email, u.display_name, u.banned_at
+    `select u.id, u.email, u.display_name, u.banned_at, u.kind, u.ip_hash
      from sessions s join users u on u.id = s.user_id
      where s.token_hash = $1 and s.expires_at > now()`,
     [hashToken(token)]
   )
   const row = result.rows[0]
   if (!row || row.banned_at) return null
-  return { id: row.id, email: row.email, displayName: row.display_name }
+  return mapAccount(row)
 }
 
 export async function savePreview(db, html, ownerId) {

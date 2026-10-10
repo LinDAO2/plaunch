@@ -21,14 +21,18 @@ import {
   consumeAiCredit,
   createAbuseReport,
   createGame,
+  createGuest,
   createSession,
   createUser,
   dashboardFor,
   deleteSession,
   discoverGames,
   featureGame,
+  findGuestByToken,
   findUserByEmail,
   findUserBySession,
+  isIpBanned,
+  mergeGuestIntoAccount,
   getGameRow,
   incrementShares,
   listAssets,
@@ -47,6 +51,7 @@ import {
   submitScore,
   updateGame
 } from './repo.js'
+import { xAuthCallback, xAuthEnabled, xAuthStart } from './auth/x.js'
 import { listWorldStats } from './blocks/store.js'
 import { splitBoards } from './scores.js'
 import { TEMPLATE_NOTICE, generateTemplate } from './template.js'
@@ -127,7 +132,83 @@ function requireAdmin(config, user) {
 }
 
 function userPayload(config, user) {
-  return { id: user.id, email: user.email, displayName: user.displayName, admin: isAdmin(config, user) }
+  const guest = user.kind === 'guest'
+  return {
+    id: user.id,
+    email: guest ? null : user.email,
+    displayName: user.displayName,
+    admin: isAdmin(config, user),
+    guest
+  }
+}
+
+function clientIp(req) {
+  return String(req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '')
+}
+
+function hashIp(req, config) {
+  return createHash('sha256').update(`${config.sessionSecret}|${clientIp(req)}`).digest('hex')
+}
+
+function issueGuestCookie(ctx, token) {
+  rememberCookie(ctx, serializeCookie('pg_guest', token, {
+    httpOnly: true,
+    maxAge: ctx.config.sessionTtlSeconds,
+    secure: ctx.config.cookieSecure
+  }))
+}
+
+function clearGuestCookie(ctx) {
+  rememberCookie(ctx, serializeCookie('pg_guest', '', {
+    httpOnly: true,
+    maxAge: 0,
+    secure: ctx.config.cookieSecure
+  }))
+}
+
+async function actorFromRequest(req, db) {
+  const cookies = readCookies(req)
+  const sessionUser = await findUserBySession(db, cookies.pg_session || '')
+  if (sessionUser) return sessionUser
+  const guest = await findGuestByToken(db, cookies.pg_guest || '')
+  if (!guest || guest.bannedAt) return null
+  return guest
+}
+
+async function ensureGuest(req, ctx, db) {
+  const cookies = readCookies(req)
+  if (cookies.pg_session && await findUserBySession(db, cookies.pg_session)) return null
+  const existing = await findGuestByToken(db, cookies.pg_guest || '')
+  if (existing) return existing.bannedAt ? null : existing
+  const ipHash = hashIp(req, ctx.config)
+  if (await isIpBanned(db, ipHash)) return null
+  const token = randomBytes(32).toString('base64url')
+  const guest = await createGuest(db, { token, ipHash })
+  issueGuestCookie(ctx, token)
+  return guest
+}
+
+async function requireCreator(req, ctx, db) {
+  const cookies = readCookies(req)
+  const sessionUser = await findUserBySession(db, cookies.pg_session || '')
+  if (sessionUser) return sessionUser
+  if (await isIpBanned(db, hashIp(req, ctx.config))) {
+    throw new HttpError(403, 'This network is banned', 'banned')
+  }
+  const guest = await findGuestByToken(db, cookies.pg_guest || '')
+  if (guest?.bannedAt) throw new HttpError(403, 'This guest is banned', 'banned')
+  if (guest) return guest
+  const created = await ensureGuest(req, ctx, db)
+  if (!created) throw new HttpError(403, 'This network is banned', 'banned')
+  return created
+}
+
+async function attachGuestMerge(req, ctx, db, account) {
+  const guest = await findGuestByToken(db, readCookies(req).pg_guest || '')
+  if (guest && !guest.bannedAt && guest.id !== account.id) {
+    await mergeGuestIntoAccount(db, guest.id, account.id)
+  }
+  clearGuestCookie(ctx)
 }
 
 const ACTOR_PATTERN = /^[A-Za-z0-9_-]{20,80}$/
@@ -282,8 +363,9 @@ export function createApp({ db, config, fetchImpl, hub = null } = {}) {
     try {
       const url = new URL(req.url || '/', 'http://localhost')
       ensureCsrf(req, ctx)
-      if (!limits.allow(req, url.pathname)) {
-        status = sendJson(res, 429, { error: 'Too many requests', code: 'rate_limited' }, ctx, { 'retry-after': '60' })
+      const gate = limits.allow(req, url.pathname)
+      if (!gate.ok) {
+        status = sendJson(res, 429, { error: gate.error, code: gate.code }, ctx, { 'retry-after': '60' })
         return
       }
       if (UNSAFE.has(req.method || 'GET')) assertCsrf(req)
@@ -322,21 +404,32 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   }
 
   if (method === 'GET' && pathname === '/api/auth/csrf') {
-    return sendJson(res, 200, { csrfToken: ensureCsrf(req, ctx) }, ctx)
+    await ensureGuest(req, ctx, db)
+    return sendJson(res, 200, { csrfToken: ensureCsrf(req, ctx), xSignIn: xAuthEnabled(config.env) }, ctx)
   }
 
   if (method === 'GET' && pathname === '/api/auth/me') {
-    const user = await currentUser(req, db)
-    return sendJson(res, 200, { user: user ? userPayload(config, user) : null }, ctx)
+    const user = await actorFromRequest(req, db)
+    return sendJson(res, 200, { user: user ? userPayload(config, user) : null, xSignIn: xAuthEnabled(config.env) }, ctx)
+  }
+
+  if (method === 'GET' && pathname === '/api/auth/x/start') {
+    xAuthStart(config.env)
+  }
+
+  if (method === 'GET' && pathname === '/api/auth/x/callback') {
+    xAuthCallback(config.env)
   }
 
   if (method === 'POST' && pathname === '/api/auth/register') {
+    if (await isIpBanned(db, hashIp(req, config))) throw new HttpError(403, 'This network is banned', 'banned')
     const body = await readJson(req)
     const email = validateEmail(body.email)
     const password = validatePassword(body.password)
     const displayName = validateDisplayName(body.displayName, email)
     const passwordHash = await hashPassword(password, { N: config.passwordScryptN })
-    const user = await createUser(db, { email, passwordHash, displayName })
+    const user = await createUser(db, { email, passwordHash, displayName, ipHash: hashIp(req, config) })
+    await attachGuestMerge(req, ctx, db, user)
     const token = randomBytes(32).toString('base64url')
     await createSession(db, user.id, token, config.sessionTtlSeconds)
     const csrf = issueSession(ctx, token)
@@ -352,6 +445,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     if (!user) await verifyPassword(password, await dummyHash(config))
     if (!user || !ok) throw new HttpError(401, 'Invalid email or password', 'unauthorized')
     if (user.bannedAt) throw new HttpError(403, 'This account is banned', 'banned')
+    await attachGuestMerge(req, ctx, db, user)
     const token = randomBytes(32).toString('base64url')
     await createSession(db, user.id, token, config.sessionTtlSeconds)
     const csrf = issueSession(ctx, token)
@@ -370,8 +464,18 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
 
   if (method === 'POST' && pathname === '/api/ai/generate') {
     const body = await readJson(req)
-    const user = aiStatus(config.env).mode === 'ai' ? requireUser(await currentUser(req, db)) : null
-    if (user) await consumeAiCredit(db, user.id, config.aiDailyUser, config.aiDailyGlobal)
+    const ai = aiStatus(config.env).mode === 'ai'
+    const user = ai ? await requireCreator(req, ctx, db) : null
+    if (user) {
+      await consumeAiCredit(db, {
+        userId: user.id,
+        guest: user.kind === 'guest',
+        ipHash: hashIp(req, config),
+        userLimit: config.aiDailyUser,
+        guestLimit: config.aiDailyGuest,
+        globalLimit: config.aiDailyGlobal
+      })
+    }
     const result = await generateIdea({ prompt: body.prompt, tier: body.tier, env: config.env, fetchImpl })
     const tags = tagsFor({
       prompt: body.prompt,
@@ -397,7 +501,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   }
 
   if (method === 'POST' && pathname === '/api/freeform/preview') {
-    const user = requireUser(await currentUser(req, db))
+    const user = await requireCreator(req, ctx, db)
     const body = await readJson(req, HTML_LIMIT)
     const checked = assertFreeform(body.html)
     if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
@@ -428,19 +532,19 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   }
 
   if (method === 'GET' && pathname === '/api/me/games') {
-    const user = requireUser(await currentUser(req, db))
+    const user = await requireCreator(req, ctx, db)
     const games = await listOwnedGames(db, user.id)
     return sendJson(res, 200, { games: games.map((game) => present(config, game, { canEdit: true, includeSpec: false })) }, ctx)
   }
 
   if (method === 'GET' && pathname === '/api/me/dashboard') {
-    const user = requireUser(await currentUser(req, db))
+    const user = await requireCreator(req, ctx, db)
     const games = await dashboardFor(db, user.id)
     return sendJson(res, 200, { games }, ctx)
   }
 
   if (method === 'POST' && pathname === '/api/games') {
-    const user = requireUser(await currentUser(req, db))
+    const user = await requireCreator(req, ctx, db)
     const body = await readJson(req, HTML_LIMIT)
     const { fields, spec } = fieldsForSave(body, null)
     const verdict = await stampListing(fields, body, null, config.env, fetchImpl)
@@ -508,7 +612,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     if (method === 'GET' && !sub) {
       const game = await getGameRow(db, id)
       if (!game) throw new HttpError(404, 'Game not found', 'not_found')
-      const user = await currentUser(req, db)
+      const user = await actorFromRequest(req, db)
       const owner = user?.id === game.ownerId
       if (game.status !== 'published' && !owner) throw new HttpError(404, 'Game not found', 'not_found')
       const assets = await listAssets(db, id)
@@ -516,7 +620,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     }
 
     if (method === 'PATCH' && !sub) {
-      const user = requireUser(await currentUser(req, db))
+      const user = await requireCreator(req, ctx, db)
       const existing = await getGameRow(db, id)
       if (!existing) throw new HttpError(404, 'Game not found', 'not_found')
       const body = await readJson(req, HTML_LIMIT)
@@ -529,14 +633,14 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     }
 
     if (method === 'POST' && sub === 'archive') {
-      const user = requireUser(await currentUser(req, db))
+      const user = await requireCreator(req, ctx, db)
       const { game } = await archiveGame(db, id, user.id)
       return sendJson(res, 200, { game: present(config, game, { canEdit: true }) }, ctx)
     }
 
     if (method === 'POST' && (sub === 'play' || sub === 'events')) {
       const event = sub === 'play' ? { type: 'play_started', eventId: null } : validateEvent(await readJson(req))
-      const user = await currentUser(req, db)
+      const user = await actorFromRequest(req, db)
       const result = await recordEvent(db, {
         gameId: id,
         eventType: event.type,
