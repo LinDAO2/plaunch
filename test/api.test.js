@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '1.1.0')
+    assert.equal(res.data.version, '1.1.1')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -44,8 +44,48 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/games')
     assert.equal(res.status, 200)
     const ids = res.data.games.map((item) => item.id)
-    assert.deepEqual(ids.sort(), ['blocks-candy-moon', 'blocks-grassland', 'brick-bounce', 'click-frenzy', 'grid-snake', 'homing-gems', 'lane-harvest', 'lane-racer', 'lightning-reflex', 'lucky-seven', 'meteor-dodge', 'meteor-rain', 'mole-garden', 'shadow-chase', 'stack-blocks', 'tile-2048', 'tower-bounce', 'zigzag-orbs'])
+    assert.deepEqual(ids.sort(), ['block-drop', 'blocks-candy-moon', 'blocks-grassland', 'breakout', 'brick-bounce', 'click-frenzy', 'endless-runner', 'flap', 'grid-snake', 'homing-gems', 'jump-up', 'lane-harvest', 'lane-racer', 'lightning-reflex', 'lucky-seven', 'match-3', 'maze-chomper', 'merge-tiles', 'meteor-dodge', 'meteor-rain', 'mole-garden', 'platformer', 'shadow-chase', 'snake', 'space-shooter', 'stack-blocks', 'tile-2048', 'tower-bounce', 'word-guess', 'zigzag-orbs'])
+    const names = res.data.games.map((item) => item.name)
+    assert.equal(names.includes('Ada Run') || names.includes('Zip Run') || names.includes('Dot Run'), false)
+    const guess = res.data.games.find((item) => item.id === 'word-guess')
+    assert.equal(guess.poster, 'shot')
+    assert.equal(guess.remix, true)
+    assert.deepEqual(guess.tags, ['puzzle', 'guess'])
+    assert.equal(res.data.games.find((item) => item.id === 'click-frenzy').poster, 'live')
+    assert.equal(res.data.games.find((item) => item.id === 'tile-2048').poster, 'shot')
     assert.equal(res.data.games.every((item) => item.plays === 0), true)
+  })
+
+  test('template remix and captured posters', async () => {
+    const remixed = await client.request('POST', '/api/games/word-guess/remix', {})
+    assert.equal(remixed.status, 201, remixed.data?.error)
+    assert.equal(remixed.data.game.generation, 'rule-based-template')
+    assert.equal(remixed.data.game.canEdit, true)
+    assert.match(remixed.data.game.html, /playground-template: word-guess/)
+    assert.notEqual(remixed.data.game.id, 'word-guess')
+    const blocked = await client.request('POST', '/api/games/tile-2048/remix', {})
+    assert.equal(blocked.status, 404)
+    const shot = await fetch(`${server.base}/api/games/word-guess/poster.png`)
+    const buf = Buffer.from(await shot.arrayBuffer())
+    assert.equal(buf.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+    assert.notEqual(buf.readUInt32BE(16), 1200)
+    assert.equal(shot.headers.get('cache-control'), 'public, max-age=86400')
+    const card = await fetch(`${server.base}/api/games/click-frenzy/poster.png`)
+    const cardBuf = Buffer.from(await card.arrayBuffer())
+    assert.equal(cardBuf.readUInt32BE(16), 1200)
+    assert.equal(card.headers.get('cache-control'), 'no-store')
+  })
+
+  test('test servers stay on an isolated memory database', async () => {
+    const isolated = await startServer({ env: { DATABASE_URL: 'pglite:///tmp/playground-v11' } })
+    try {
+      assert.equal(isolated.config.databaseUrl, 'pglite:memory')
+      const names = await isolated.db.query('select name from games')
+      assert.equal(names.rows.some((row) => row.name === 'Ada Run'), false)
+      assert.equal(names.rows.some((row) => row.name === 'Word Guess'), true)
+    } finally {
+      await isolated.close()
+    }
   })
 
   test('POST /api/generate stays on the template matcher', async () => {

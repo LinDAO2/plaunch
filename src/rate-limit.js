@@ -36,7 +36,7 @@ export function createRateLimiter(config) {
           return blocked('rate_limited', 'Too many requests')
         }
       }
-      if (req.method === 'POST' && (pathname === '/api/games' || pathname === '/api/import')) {
+      if (req.method === 'POST' && (pathname === '/api/games' || pathname === '/api/import' || /^\/api\/games\/[a-z0-9-]+\/remix$/.test(pathname))) {
         const max = config.publishRateLimitMax || 12
         if (!hit(publishHits, ip, max, now, config.rateWindowMs)) {
           return blocked('publish_rate_limited', 'Too many games published from this network. Try again in a minute.')

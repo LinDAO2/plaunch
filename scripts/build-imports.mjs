@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { captureGame, launchCaptureBrowser, serveCapture } from '../src/capture-browser.js'
 import { bundleFiles, inspectImport } from '../src/imports/bundle.js'
 import { CURATED } from '../src/imports/catalog.js'
 import { wantsKeyboard, wrapDocument } from '../src/imports/wrapper.js'
@@ -185,6 +186,9 @@ const BUILDERS = {
   ))
 }
 
+const postersOnly = process.argv.includes('--posters')
+
+if (!postersOnly) {
 for (const entry of CURATED) {
   const built = await BUILDERS[entry.id]()
   const bundled = bundleFiles(built.files, { entry: built.entry })
@@ -211,4 +215,29 @@ for (const entry of CURATED) {
     license: entry.credit.license
   }, null, 2) + '\n')
   console.log(entry.id, Buffer.byteLength(html))
+}
+}
+
+const posterDir = path.join(process.cwd(), 'public', 'posters')
+const pages = new Map()
+for (const entry of CURATED) {
+  pages.set(`/${entry.id}`, await readFile(path.join(OUT, entry.id, 'game.html')))
+}
+const browser = await launchCaptureBrowser()
+if (!browser) {
+  console.error('Playwright is not available. Import posters were not captured.')
+  process.exit(postersOnly ? 1 : 0)
+}
+const server = serveCapture(pages)
+const port = await server.listen()
+await mkdir(posterDir, { recursive: true })
+try {
+  for (const entry of CURATED) {
+    const png = await captureGame(browser, `http://127.0.0.1:${port}/${entry.id}`, entry.id)
+    await writeFile(path.join(posterDir, `${entry.id}.png`), png)
+    console.log('poster', entry.id, png.length)
+  }
+} finally {
+  await browser.close()
+  await server.close()
 }

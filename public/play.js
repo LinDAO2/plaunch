@@ -242,6 +242,18 @@ async function boot() {
     $('mechanic').textContent = typeNames[game.type] || game.type
     renderHint($('controls-hint'), game)
     $('studio-link').href = `/g/${game.id}`
+    if (game.remix) {
+      $('studio-link').textContent = 'Remix'
+      $('studio-link').addEventListener('click', async (event) => {
+        event.preventDefault()
+        try {
+          const result = await api(`/games/${game.id}/remix`, 'POST', {})
+          location.href = `/g/${result.game.id}`
+        } catch (error) {
+          toast(error.message || 'Could not remix this game.')
+        }
+      })
+    }
     if (game.type === 'world') {
       document.body.classList.add('world-play')
       const fresh = $('play').cloneNode(true)

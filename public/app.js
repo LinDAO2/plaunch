@@ -377,6 +377,8 @@ async function showGame(summary) {
   lastTier = game.tier === 'freeform' ? 'freeform' : 'spec'
   lastHtml = game.html || null
   lastTemplate = readTemplate(game.html)
+  const remixRow = $('remix-row')
+  if (remixRow) remixRow.hidden = !(game.remix && !game.canEdit)
   styleTurn = 0
   previewUrl = game.sandboxUrl || ''
   freeformPoints = null
@@ -584,6 +586,18 @@ for (const chip of document.querySelectorAll('.idea')) {
     $('prompt').focus()
   })
 }
+
+$('remix')?.addEventListener('click', async () => {
+  if (!opened?.id) return
+  try {
+    $('remix').disabled = true
+    const result = await api(`/games/${opened.id}/remix`, 'POST', {})
+    location.href = `/g/${result.game.id}`
+  } catch (error) {
+    toast(error.message || 'Could not remix this game.')
+    $('remix').disabled = false
+  }
+})
 
 $('restyle')?.addEventListener('click', async () => {
   if (!lastTemplate || !lastHtml) return

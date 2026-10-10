@@ -155,6 +155,18 @@ function loop(now) {
   frame = requestAnimationFrame(loop)
 }
 
+function posterView(game) {
+  if (game.poster === 'shot' || game.poster === 'card') {
+    const img = document.createElement('img')
+    img.className = 'poster-shot'
+    img.alt = ''
+    img.setAttribute('aria-hidden', 'true')
+    img.src = `/api/games/${game.id}/poster.png`
+    return img
+  }
+  return livePoster(game)
+}
+
 export function livePoster(game) {
   const canvas = document.createElement('canvas')
   canvas.className = 'live-poster'
@@ -184,7 +196,7 @@ export function gameCard(game, { label, playHref }) {
   link.href = playHref || `/play/${game.id}`
   const frameEl = document.createElement('div')
   frameEl.className = 'card-frame'
-  frameEl.append(livePoster(game))
+  frameEl.append(posterView(game))
   const body = document.createElement('div')
   body.className = 'card-body'
   const kind = document.createElement('p')

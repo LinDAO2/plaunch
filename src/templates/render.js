@@ -60,6 +60,11 @@ boot();
 `
 }
 
+export function templateMarker(html) {
+  const match = String(html || '').match(/<!-- playground-template:\s*([a-z0-9-]+)\s*\|/)
+  return match ? match[1] : ''
+}
+
 export function renderAll() {
   return Object.fromEntries(TEMPLATES.map((spec) => [spec.id, renderTemplate(spec)]))
 }

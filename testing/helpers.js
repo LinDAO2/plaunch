@@ -11,10 +11,11 @@ import { seedIfEmpty } from '../src/seed.js'
 import { createUsercontentApp } from '../src/usercontent.js'
 
 export function testConfig(overrides = {}) {
-  return loadConfig({
+  const env = { ...overrides }
+  delete env.DATABASE_URL
+  const config = loadConfig({
     NODE_ENV: 'test',
     SESSION_SECRET: 'test-session-secret-0123456789',
-    DATABASE_URL: 'pglite:memory',
     RATE_LIMIT_MAX: '10000',
     AUTH_RATE_LIMIT_MAX: '10000',
     AI_RATE_LIMIT_MAX: '10000',
@@ -22,13 +23,18 @@ export function testConfig(overrides = {}) {
     PASSWORD_SCRYPT_N: '4096',
     SEED_ON_EMPTY: 'false',
     COOKIE_SECURE: 'false',
-    ...overrides
+    ...env,
+    NODE_ENV: 'test',
+    DATABASE_URL: 'pglite:memory'
   })
+  config.databaseUrl = 'pglite:memory'
+  config.nodeEnv = 'test'
+  return config
 }
 
 export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
   const config = testConfig(env)
-  const db = await openDatabase('pglite:memory')
+  const db = await openDatabase(config.databaseUrl)
   await migrate(db)
   if (seed) await seedIfEmpty(db)
   const hub = createWorldHub({ db, config })

@@ -15,6 +15,7 @@ import { geminiResponseSchema, validateGameSpec } from '../src/ai/gamespec.js'
 import { createSimulation } from '../public/arcade-sim.js'
 import { checkPlausible, plausibilityFor } from '../src/plausibility.js'
 import { posterPng, POSTER_SIZE } from '../src/poster.js'
+import { resolvePoster, saveStoredPoster, schedulePosterCapture } from '../src/poster-store.js'
 import { aiStatus, geminiRequest, openAiRequest, resolveProvider } from '../src/ai/providers.js'
 import { loadConfig, registrableDomain } from '../src/config.js'
 import { blocklistReason, classifySafety } from '../src/safety.js'
@@ -468,6 +469,31 @@ test('arcade sim honors taps, combos, lives, and win rules', () => {
   assert.equal(end.won, true)
 })
 
+test('a stored capture replaces the title card and tests do not launch one', async () => {
+  const db = await openDatabase('pglite:memory')
+  try {
+    await migrate(db)
+    await db.query(
+      `insert into games (id, name, mechanic, duration, accent, tier, generation, freeform_html)
+       values ('dot-run', 'Dot Run', 'arcade', 60, '#e6ff3a', 'freeform', 'import', '<html></html>')`
+    )
+    const row = { id: 'dot-run', name: 'Dot Run', tier: 'freeform', freeformHtml: '<html></html>', posterState: '' }
+    schedulePosterCapture(db, row, 'test')
+    const pending = await db.query(`select poster_state from games where id = 'dot-run'`)
+    assert.equal(pending.rows[0].poster_state, '')
+    const card = await resolvePoster(db, { ...row, type: 'arcade', accent: '#e6ff3a', updatedAt: 't' })
+    assert.equal(card.kind, 'card')
+    assert.equal(card.bytes.readUInt32BE(16), POSTER_SIZE)
+    const shot = posterPng({ id: 'stored-dot', name: 'Stored', accent: '#112233', type: 'arcade', updatedAt: 't' })
+    assert.equal(await saveStoredPoster(db, 'dot-run', shot), true)
+    const served = await resolvePoster(db, { ...row, posterState: 'shot', type: 'arcade', accent: '#e6ff3a', updatedAt: 't' })
+    assert.equal(served.kind, 'shot')
+    assert.equal(served.bytes.equals(shot), true)
+  } finally {
+    await db.close()
+  }
+})
+
 test('poster png and score plausibility', () => {
   const png = posterPng({ id: 'meteor-dodge', name: 'Meteor Dodge', accent: '#ff779e', type: 'dodge', updatedAt: 't' })
   assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
@@ -494,7 +520,10 @@ test('file-backed PGlite data survives a restart', async () => {
     const first = await openDatabase(`pglite://${dir}`)
     await migrate(first)
     const seeded = await seedIfEmpty(first)
-    assert.equal(seeded, 18)
+    assert.equal(seeded, 30)
+    const names = await first.query(`select name, credit->>'author' as author from games`)
+    const blob = names.rows.map((row) => `${row.name}|${row.author || ''}`).join('\n')
+    assert.equal(/Ada Run|Zip Run|Dot Run|Submitter|Ada Lovelace/.test(blob), false)
     await first.query(`update games set plays = 4 where id = 'click-frenzy'`)
     await first.close()
     const second = await openDatabase(`pglite://${dir}`)

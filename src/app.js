@@ -13,7 +13,8 @@ import { TAGS, tagsFor } from './ai/tags.js'
 import { blocklistReason, classifySafety } from './safety.js'
 import { HttpError } from './errors.js'
 import { renderPlayPage, renderSharePage } from './html.js'
-import { posterPng } from './poster.js'
+import { resolvePoster, schedulePosterCapture } from './poster-store.js'
+import { templateMarker } from './templates/render.js'
 import { assertCsrf, ensureCsrf, readCookies, readJson, rememberCookie, sendHtml, sendJson, serializeCookie } from './http.js'
 import { log } from './log.js'
 import { hashPassword, verifyPassword } from './passwords.js'
@@ -272,6 +273,7 @@ function present(config, game, options = {}) {
   if (out.tier === 'freeform') {
     out.sandboxUrl = `${config.usercontentOrigin}/g/${game.id}`
     if (options.canEdit) out.html = game.freeformHtml || ''
+    if (templateMarker(game.freeformHtml)) out.remix = true
   }
   return out
 }
@@ -595,6 +597,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
       env: config.env,
       safetyModel: config.safetyModelOnPublish
     })
+    if (game.status === 'published') schedulePosterCapture(db, game, config.nodeEnv)
     return sendJson(res, 201, { game: present(config, game, { canEdit: true }), url: `/g/${game.id}`, version }, ctx)
   }
 
@@ -785,7 +788,32 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   if (method === 'GET' && posterMatch) {
     const game = await publishedOrNull(db, posterMatch[1])
     if (!game) return sendJson(res, 404, { error: 'Game not found', code: 'not_found' }, ctx)
-    return sendImage(res, posterPng(game), ctx)
+    const poster = await resolvePoster(db, game)
+    return sendImage(res, poster.bytes, ctx, poster.kind)
+  }
+
+  const remixMatch = pathname.match(/^\/api\/games\/([a-z0-9-]+)\/remix$/)
+  if (method === 'POST' && remixMatch) {
+    const user = await requireCreator(req, ctx, db)
+    await readJson(req)
+    const source = await publishedOrNull(db, remixMatch[1])
+    if (!source || !templateMarker(source.freeformHtml)) throw new HttpError(404, 'Game not found', 'not_found')
+    const checked = assertFreeform(source.freeformHtml)
+    if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
+    const fields = validateGameInput({
+      name: source.name,
+      description: source.description,
+      type: 'arcade',
+      duration: source.duration,
+      accent: source.accent
+    })
+    fields.generation = 'rule-based-template'
+    fields.tier = 'freeform'
+    fields.freeformHtml = checked.html
+    fields.tags = (source.tags || []).filter((tag) => TAGS.includes(tag))
+    fields.credit = {}
+    const { game, version } = await createGame(db, fields, null, user.id)
+    return sendJson(res, 201, { game: present(config, game, { canEdit: true }), url: `/g/${game.id}`, version }, ctx)
   }
 
   if (method === 'GET' && pathname.startsWith('/blocks/')) {
@@ -831,10 +859,10 @@ function requestOrigin(config, req) {
   }
 }
 
-function sendImage(res, bytes, ctx) {
+function sendImage(res, bytes, ctx, kind = 'card') {
   const headers = {
     'content-type': 'image/png',
-    'cache-control': 'public, max-age=3600',
+    'cache-control': kind === 'shot' ? 'public, max-age=86400' : 'no-store',
     'x-content-type-options': 'nosniff',
     'content-length': String(bytes.length)
   }

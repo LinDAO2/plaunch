@@ -4,6 +4,7 @@ import { checkPlausible, plausibilityFor } from './plausibility.js'
 import { specFromGame } from './ai/gamespec.js'
 import { rankScores } from './scores.js'
 import { slugify } from './validate.js'
+import { posterKind } from './poster-store.js'
 
 function parseJson(value) {
   if (value == null) return null
@@ -38,7 +39,8 @@ export function mapGame(row) {
     tags: readTags(row.tags),
     featured: row.featured === true,
     flagReason: row.flag_reason || '',
-    credit: readCredit(row.credit)
+    credit: readCredit(row.credit),
+    posterState: row.poster_state === 'shot' ? 'shot' : ''
   }
 }
 
@@ -80,7 +82,8 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     canEdit,
     tags: game.tags || [],
     featured: game.featured === true,
-    credit: game.credit?.author ? game.credit : null
+    credit: game.credit?.author ? game.credit : null,
+    poster: posterKind(game)
   }
   if (canEdit) out.flagReason = game.flagReason || ''
   if (includeSpec) out.spec = game.spec
