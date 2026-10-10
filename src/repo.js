@@ -564,6 +564,7 @@ export async function resetWorld(db, { id, actorId }) {
   if (current.type !== 'world') throw new HttpError(400, 'This game has no shared world', 'validation_error')
   await db.query('delete from world_edits where game_id = $1', [id])
   await db.query('delete from world_stats where game_id = $1', [id])
+  await db.query('delete from world_sparks where game_id = $1', [id])
   await writeAudit(db, { actorId, action: 'world.reset', targetType: 'game', targetId: id, detail: {} })
   return current
 }

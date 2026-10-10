@@ -1,4 +1,6 @@
 import { BIOMES, STRUCTURES, WORLD_SIZES } from './blocks.js'
+import { goalCopy } from './goals.js'
+import { worldFromSpec } from './terrain.js'
 
 const PALETTES = {
   grassland: ['#5ea84a', '#8a5a32', '#8d8f96', '#3aa0c8'],
@@ -220,15 +222,17 @@ export function lookFor(id) {
 }
 
 export function featuredWorlds() {
+  const grassCopy = goalCopy(worldFromSpec({ biome: 'grassland', terrainSeed: 1107, worldSize: 'medium', structure: 'tower' }))
+  const candyCopy = goalCopy(worldFromSpec({ biome: 'candy', terrainSeed: 9041, worldSize: 'medium', structure: 'pyramid' }))
   const grassland = worldSpecFromFields({
     name: 'Blocks: Grassland',
-    description: 'A shared grassland. Break, place, and leave the land changed.',
+    description: grassCopy.description,
     theme: 'grassland blocks',
     biome: 'grassland',
     terrainSeed: 1107,
     worldSize: 'medium',
     structure: 'tower',
-    goal: 'Raise a tower the next visitor can see.',
+    goal: grassCopy.goal,
     duration: 60,
     difficulty: 'normal',
     accent: PALETTES.grassland[0],
@@ -236,13 +240,13 @@ export function featuredWorlds() {
   })
   const candy = worldSpecFromFields({
     name: 'Blocks: Candy Moon',
-    description: 'A bright candy field under a moonlit sky. The world is shared.',
+    description: candyCopy.description,
     theme: 'candy moon',
     biome: 'candy',
     terrainSeed: 9041,
     worldSize: 'medium',
     structure: 'pyramid',
-    goal: 'Leave a bright mark on the candy moon.',
+    goal: candyCopy.goal,
     duration: 60,
     difficulty: 'normal',
     accent: PALETTES.candy[0],

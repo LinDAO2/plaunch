@@ -89,9 +89,39 @@ body.world-play #guess-input { display: none !important; }
   color: #e7e9ea;
   text-shadow: none;
 }
-.world-online { top: 8px; font-family: "IBM Plex Mono", monospace; }
-.world-with { top: 28px; }
-.world-hint { top: 52px; text-align: center; }
+.world-goal {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  width: 168px;
+  margin: 0;
+  padding: 8px;
+  background: #000;
+  color: #e7e9ea;
+  border: 1px solid #2f3336;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.world-goal.clear { border-color: #e6ff3a; }
+.world-goal p { margin: 0; font-size: 13px; font-family: "IBM Plex Mono", monospace; }
+.world-goal-sub { color: #e7e9ea; margin-top: 2px; }
+.world-goal.clear .world-goal-title { color: #e6ff3a; }
+.world-goal-bar {
+  height: 6px;
+  margin-top: 6px;
+  background: #2f3336;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.world-goal-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #e6ff3a;
+}
+.world-online { top: 8px; left: 192px; font-family: "IBM Plex Mono", monospace; }
+.world-with { top: 28px; left: 192px; }
+.world-hint { top: 86px; text-align: center; }
 .crosshair {
   position: absolute;
   left: 50%;

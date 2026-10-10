@@ -1,8 +1,9 @@
 import { WebSocketServer } from 'ws'
 import { getGameRow } from '../repo.js'
 import { findUserBySession } from '../repo.js'
+import { lookYaw, sparkHit, sparkSpots } from './goals.js'
 import { acceptPosition, validateEdit } from './rules.js'
-import { addWorldStat, loadEdits, saveEdit } from './store.js'
+import { addWorldStat, loadEdits, loadSparks, saveEdit, saveSpark } from './store.js'
 import { spawnPoint, worldFromSpec } from './terrain.js'
 
 const ADJ = ['bramble', 'pebble', 'lumen', 'marigold', 'cinder', 'quartz', 'willow', 'nimbus', 'poppy', 'cedar', 'amber', 'misty']
@@ -94,7 +95,22 @@ export function createWorldHub({ db, config }) {
       // A missing table surfaces as a failed join below; an empty map is safer than a crash.
     }
     const spawn = spawnPoint(world, edits)
-    room = { id: game.id, world, edits, spawn, players: new Map(), seq: 1 }
+    const sparks = new Set()
+    try {
+      for (const id of await loadSparks(db, game.id)) sparks.add(id)
+    } catch {
+      // Missing table: the room still plays, and pickups stay in memory until reset.
+    }
+    room = {
+      id: game.id,
+      world,
+      edits,
+      sparks,
+      spots: sparkSpots(world),
+      spawn,
+      players: new Map(),
+      seq: 1
+    }
     rooms.set(game.id, room)
     return room
   }
@@ -147,8 +163,8 @@ export function createWorldHub({ db, config }) {
       x: room.spawn.x,
       y: room.spawn.y,
       z: room.spawn.z,
-      yaw: 0,
-      pitch: -0.25,
+      yaw: lookYaw(room.world, room.spawn.x, room.spawn.z),
+      pitch: -0.22,
       movedAt: Date.now(),
       markedAt: Date.now(),
       bucket: { tokens: 6, t: Date.now() },
@@ -168,6 +184,7 @@ export function createWorldHub({ db, config }) {
       color: player.color,
       spawn: { x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch },
       edits,
+      gems: [...room.sparks],
       players: others(room, id),
       online: room.players.size
     })
@@ -191,6 +208,38 @@ export function createWorldHub({ db, config }) {
         player.yaw = next.yaw
         player.pitch = next.pitch
         player.movedAt = now
+        return
+      }
+      if (msg.t === 'gem') {
+        const dt = Math.max(0.05, (now - player.movedAt) / 1000)
+        if (msg.px !== undefined) {
+          const next = acceptPosition(player, { x: msg.px, y: msg.py, z: msg.pz, yaw: msg.yaw, pitch: msg.pitch }, dt, room.world)
+          player.x = next.x
+          player.y = next.y
+          player.z = next.z
+          player.yaw = next.yaw
+          player.pitch = next.pitch
+          player.movedAt = now
+        }
+        const id = msg.id
+        if (room.sparks.has(id)) {
+          send(ws, { t: 'gem', id, name: player.name })
+          return
+        }
+        const hit = sparkHit(room.spots, room.sparks, id, player)
+        if (!hit.ok) {
+          send(ws, { t: 'reject', reason: hit.reason, id })
+          return
+        }
+        room.sparks.add(id)
+        try {
+          await saveSpark(db, room.id, id, player.name)
+        } catch {
+          room.sparks.delete(id)
+          send(ws, { t: 'reject', reason: 'save', id })
+          return
+        }
+        broadcast(room, { t: 'gem', id, name: player.name })
         return
       }
       if (msg.t !== 'edit') return
@@ -269,6 +318,7 @@ export function createWorldHub({ db, config }) {
       const room = rooms.get(gameId)
       if (!room) return
       room.edits.clear()
+      room.sparks.clear()
       broadcast(room, { t: 'reset' })
     },
     attach(server) {

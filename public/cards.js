@@ -1,5 +1,6 @@
 import { icon } from '/icons.js'
 import { lookFor } from '/blocks/spec.js'
+import { goalTargets } from '/blocks/goals.js'
 import { blockAt, skyHex, worldFromSpec } from '/blocks/terrain.js'
 import { blockHex } from '/blocks/blocks.js'
 
@@ -109,6 +110,19 @@ function paintWorld(item, now) {
     isoCube(ctx, sx, sy, col.color)
   }
   isoCube(ctx, w / 2 + Math.sin(now / 500) * 24, h - 78, '#e6ff3a')
+  const targets = goalTargets(world)
+  ctx.fillStyle = '#e6ff3a'
+  for (let i = 0; i < 3; i++) {
+    const bob = Math.sin(now / 480 + i) * 5
+    ctx.fillRect(36 + i * 22, 36 + bob, 10, 10)
+  }
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(16, h - 52, w - 32, 36)
+  ctx.fillStyle = '#e6ff3a'
+  ctx.font = '22px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`${targets.label} +${targets.raise}  ·  ${targets.sparks} sparks`, w / 2, h - 34)
 }
 
 function paint(item, now) {

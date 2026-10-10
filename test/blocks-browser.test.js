@@ -52,13 +52,25 @@ test('two embed players share a placed block', { timeout: 120000 }, async () => 
     await wide.goto(`${server.base}/play/blocks-grassland`, { waitUntil: 'domcontentloaded' })
     await wide.waitForFunction(() => window.__blocks?.ready)
     await wide.waitForFunction(() => (window.__blocks?.editCount || 0) > 0)
+    await wide.waitForFunction(() => {
+      const goal = document.querySelector('#world-goal')
+      return goal && !goal.hidden && /Tower \d+\/4/.test(goal.textContent) && /Sparks \d+\/6/.test(goal.textContent)
+    })
+    const grassSky = await wide.evaluate(() => window.__blocks.sky)
+    assert.match(grassSky, /^#[0-9a-f]{6}$/)
     await wide.screenshot({ path: path.join(artifacts, 'blocks-play-desktop.png') })
+    await wide.screenshot({ path: path.join(artifacts, 'blocks-grassland-goal.png') })
 
     const handset = await phone.newPage()
     handset.on('pageerror', (error) => errors.push(String(error)))
     await handset.goto(`${server.base}/play/blocks-candy-moon`, { waitUntil: 'domcontentloaded' })
     await handset.waitForFunction(() => window.__blocks?.ready)
+    await handset.waitForFunction(() => {
+      const goal = document.querySelector('#world-goal')
+      return goal && !goal.hidden && /Pyramid \d+\/3/.test(goal.textContent) && /Sparks \d+\/8/.test(goal.textContent)
+    })
     await handset.screenshot({ path: path.join(artifacts, 'blocks-phone.png') })
+    await handset.screenshot({ path: path.join(artifacts, 'blocks-candy-goal.png') })
     assert.deepEqual(errors, [])
   } finally {
     await browser.close()

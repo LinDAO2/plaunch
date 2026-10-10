@@ -51,7 +51,27 @@ export async function listWorldStats(db, gameId) {
   }))
 }
 
+export async function loadSparks(db, gameId) {
+  const result = await db.query(
+    'select spark_id from world_sparks where game_id = $1',
+    [gameId]
+  )
+  return result.rows.map((row) => Number(row.spark_id))
+}
+
+export async function saveSpark(db, gameId, sparkId, name) {
+  const result = await db.query(
+    `insert into world_sparks (game_id, spark_id, picker_name)
+     values ($1, $2, $3)
+     on conflict (game_id, spark_id) do nothing
+     returning spark_id`,
+    [gameId, sparkId, name.slice(0, 40)]
+  )
+  return result.rows.length > 0
+}
+
 export async function clearWorld(db, gameId) {
   await db.query('delete from world_edits where game_id = $1', [gameId])
   await db.query('delete from world_stats where game_id = $1', [gameId])
+  await db.query('delete from world_sparks where game_id = $1', [gameId])
 }

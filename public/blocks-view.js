@@ -1,10 +1,11 @@
 import { HOTBAR, blockHex, blockOf, blockRgb, isSolid } from '/blocks/blocks.js'
+import { goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
 import { meshRegion } from '/blocks/mesh.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
 
 const EYE = 1.62
-const HINT = 'Click or drag to look. WASD moves, space jumps. Left click breaks. Right click or E places. Keys 1–9 and the wheel pick a block.'
-const TOUCH_HINT = 'Drag the right side to look. The left stick moves. Tap to break. Place and jump are on the right.'
+const HINT = 'Click or drag to look. WASD moves, space jumps. Left click breaks. Right click or E places. Walk over the yellow sparks.'
+const TOUCH_HINT = 'Drag the right side to look. The left stick moves. Tap to break. Walk over the yellow sparks.'
 
 function skyRgb(hex) {
   const n = Number.parseInt(String(hex).slice(1), 16)
@@ -152,14 +153,17 @@ function pushBox(target, x, y, z, w, h, d, rgb) {
 export function mountWorld({ spec, slug, field, offline = false, onStats } = {}) {
   const world = worldFromSpec(spec || {})
   const edits = new Map()
+  const spots = sparkSpots(world)
+  const picked = new Set()
+  const pending = new Set()
   const coarse = window.matchMedia('(pointer: coarse)').matches
   const far = coarse ? 42 : 78
   const fogNear = coarse ? 14 : 28
   const fogFar = coarse ? 40 : 70
   const spawn = spawnPoint(world, edits)
   const pos = { x: spawn.x, y: spawn.y, z: spawn.z }
-  let yaw = 0
-  let pitch = -0.28
+  let yaw = lookYaw(world, pos.x, pos.z)
+  let pitch = -0.22
   let vy = 0
   let grounded = false
   let slot = 0
@@ -184,6 +188,11 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const ui = document.createElement('div')
   ui.className = 'world-ui'
   ui.innerHTML = `
+    <div class="world-goal" id="world-goal" role="status">
+      <p class="world-goal-title" id="world-goal-title"></p>
+      <p class="world-goal-sub" id="world-goal-sub"></p>
+      <div class="world-goal-bar" aria-hidden="true"><i id="world-goal-fill"></i></div>
+    </div>
     <p class="world-online" id="world-online">1 online</p>
     <p class="world-with" id="world-with"></p>
     <p class="world-hint" id="world-hint"></p>
@@ -200,12 +209,68 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const onlineEl = ui.querySelector('#world-online')
   const withEl = ui.querySelector('#world-with')
   const hintEl = ui.querySelector('#world-hint')
+  const goalEl = ui.querySelector('#world-goal')
+  const goalTitle = ui.querySelector('#world-goal-title')
+  const goalSub = ui.querySelector('#world-goal-sub')
+  const goalFill = ui.querySelector('#world-goal-fill')
   const namesEl = ui.querySelector('#world-names')
   const hotbar = ui.querySelector('#world-hotbar')
   const stickEl = ui.querySelector('#world-stick')
   const knob = stickEl.querySelector('i')
   hintEl.textContent = coarse ? TOUCH_HINT : HINT
   setTimeout(() => { hintEl.hidden = true }, 6500)
+
+  let audioCtx = null
+  let sparkDirty = true
+  function unlockAudio() {
+    try {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext
+        if (!Ctx) return
+        audioCtx = new Ctx()
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {})
+    } catch { /* autoplay or a missing context stays silent */ }
+  }
+  function blip(freq, dur, type, when) {
+    if (!audioCtx || audioCtx.state === 'suspended') return
+    const t = when ?? audioCtx.currentTime
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.type = type
+    osc.frequency.setValueAtTime(freq, t)
+    gain.gain.setValueAtTime(0.0001, t)
+    gain.gain.exponentialRampToValueAtTime(0.07, t + 0.012)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    osc.connect(gain)
+    gain.connect(audioCtx.destination)
+    osc.start(t)
+    osc.stop(t + dur + 0.02)
+  }
+  function cue(kind) {
+    unlockAudio()
+    if (kind === 'place') blip(520, 0.07, 'square')
+    else if (kind === 'break') blip(170, 0.09, 'triangle')
+    else if (kind === 'spark') {
+      const t = audioCtx?.currentTime
+      if (t === undefined) return
+      blip(660, 0.06, 'sine', t)
+      blip(880, 0.08, 'sine', t + 0.07)
+    }
+  }
+  function paintGoal() {
+    const progress = goalProgress(world, edits, picked)
+    state.goal = progress
+    const built = Math.min(progress.built, progress.raise)
+    const have = Math.min(progress.have, progress.sparks)
+    goalTitle.textContent = progress.done ? 'Clear' : `${progress.label} ${built}/${progress.raise}`
+    goalSub.textContent = progress.done
+      ? `${progress.label} ${progress.raise}/${progress.raise} · Sparks ${progress.sparks}/${progress.sparks}`
+      : `Sparks ${have}/${progress.sparks}`
+    goalEl.classList.toggle('clear', progress.done)
+    goalFill.style.width = `${Math.round(progress.ratio * 100)}%`
+  }
+  paintGoal()
 
   const buttons = HOTBAR.map((id, index) => {
     const button = document.createElement('button')
@@ -266,6 +331,8 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const chunks = new Map()
   let avatarBuf = null
   let avatarCount = 0
+  let sparkBuf = null
+  let sparkCount = 0
   const proj = new Float32Array(16)
   const view = new Float32Array(16)
   const mvp = new Float32Array(16)
@@ -280,11 +347,12 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       attribute float aTile;
       uniform mat4 uMvp;
       uniform vec3 uCam;
+      uniform float uBob;
       varying vec3 vColor;
       varying vec2 vUv;
       varying float vFog;
       void main() {
-        gl_Position = uMvp * vec4(aPos, 1.0);
+        gl_Position = uMvp * vec4(aPos.x, aPos.y + uBob, aPos.z, 1.0);
         vColor = aColor;
         vUv = vec2((aTile + aUv.x) / 16.0, aUv.y);
         vec3 d = aPos - uCam;
@@ -297,12 +365,13 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       uniform float uFogNear;
       uniform float uFogFar;
       uniform float uTex;
+      uniform float uLight;
       varying vec3 vColor;
       varying vec2 vUv;
       varying float vFog;
       void main() {
         vec3 tex = texture2D(uAtlas, vUv).rgb;
-        vec3 albedo = mix(vColor, tex * vColor, uTex);
+        vec3 albedo = mix(vColor, tex * vColor, uTex) * uLight;
         float fog = clamp((vFog - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
         gl_FragColor = vec4(mix(albedo, uSky, fog), 1.0);
       }`)
@@ -322,6 +391,8 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     loc.near = gl.getUniformLocation(program, 'uFogNear')
     loc.far = gl.getUniformLocation(program, 'uFogFar')
     loc.tex = gl.getUniformLocation(program, 'uTex')
+    loc.light = gl.getUniformLocation(program, 'uLight')
+    loc.bob = gl.getUniformLocation(program, 'uBob')
     atlas = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D, atlas)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, makeAtlas())
@@ -388,6 +459,8 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     remeshAt(x, z)
     state.lastEdit = { x, y, z, block }
     state.editCount += 1
+    if (state.ready) cue(block ? 'place' : 'break')
+    paintGoal()
   }
 
   function bind(buf) {
@@ -541,6 +614,11 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
         const last = loaded[loaded.length - 1]
         state.lastEdit = last ? { x: last[0], y: last[1], z: last[2], block: last[3] } : null
         if (gl) buildAll()
+        picked.clear()
+        pending.clear()
+        for (const id of msg.gems || []) picked.add(id)
+        sparkDirty = true
+        paintGoal()
         remotes.clear()
         for (const player of msg.players || []) remotes.set(player.id, player)
         setOnline(msg.online || 1, msg.players)
@@ -551,6 +629,16 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
         applyEdit(msg.x, msg.y, msg.z, msg.block)
         return
       }
+      if (msg.t === 'gem') {
+        pending.delete(msg.id)
+        if (!picked.has(msg.id)) {
+          picked.add(msg.id)
+          cue('spark')
+          sparkDirty = true
+          paintGoal()
+        }
+        return
+      }
       if (msg.t === 'players') {
         remotes.clear()
         for (const player of msg.players || []) remotes.set(player.id, player)
@@ -559,11 +647,18 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       }
       if (msg.t === 'reset') {
         edits.clear()
+        picked.clear()
+        pending.clear()
+        sparkDirty = true
+        paintGoal()
         if (gl) buildAll()
         state.note = 'reset'
         return
       }
-      if (msg.t === 'reject') state.note = msg.reason || 'reject'
+      if (msg.t === 'reject') {
+        if (msg.id !== undefined) pending.delete(msg.id)
+        state.note = msg.reason || 'reject'
+      }
     })
     socket.addEventListener('close', () => {
       if (!stopped && !state.ready) {
@@ -583,6 +678,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   }
 
   window.addEventListener('keydown', (event) => {
+    unlockAudio()
     if (typing()) return
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
     if (key >= '1' && key <= '9') { select(Number(key) - 1); event.preventDefault(); return }
@@ -602,6 +698,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   canvas.addEventListener('contextmenu', (event) => event.preventDefault())
   let lookDrag = null
   canvas.addEventListener('pointerdown', (event) => {
+    unlockAudio()
     if (event.target !== canvas) return
     canvas.focus()
     const rect = canvas.getBoundingClientRect()
@@ -785,13 +882,69 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
   }
 
-  function draw() {
-    resize()
-    if (!state.gl) {
-      drawFlat()
+  function rebuildSparks() {
+    if (!gl) return
+    const bag = { positions: [], colors: [], uvs: [], tiles: [], count: 0 }
+    const rgb = [230, 255, 58]
+    for (const spot of spots) {
+      if (picked.has(spot.id)) continue
+      pushBox(bag, spot.x - 0.18, spot.y - 0.18, spot.z - 0.18, 0.36, 0.36, 0.36, rgb)
+    }
+    if (!bag.positions.length) {
+      sparkCount = 0
+      sparkDirty = false
       return
     }
-    const sky = skyRgb(skyHex(world.biome))
+    const verts = bag.positions.length / 3
+    const data = new Float32Array(verts * 9)
+    for (let i = 0; i < verts; i++) {
+      const o = i * 9
+      data[o] = bag.positions[i * 3]
+      data[o + 1] = bag.positions[i * 3 + 1]
+      data[o + 2] = bag.positions[i * 3 + 2]
+      data[o + 3] = bag.colors[i * 3]
+      data[o + 4] = bag.colors[i * 3 + 1]
+      data[o + 5] = bag.colors[i * 3 + 2]
+      data[o + 6] = 0
+      data[o + 7] = 0
+      data[o + 8] = 0
+    }
+    if (!sparkBuf) sparkBuf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, sparkBuf)
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW)
+    sparkCount = verts
+    sparkDirty = false
+  }
+
+  function checkSparks() {
+    const solo = offline || !slug
+    const live = socket && socket.readyState === 1
+    if (!solo && !live) return
+    for (const spot of spots) {
+      if (picked.has(spot.id) || pending.has(spot.id)) continue
+      const hit = sparkHit(spots, picked, spot.id, pos)
+      if (!hit.ok) continue
+      if (solo) {
+        picked.add(spot.id)
+        cue('spark')
+        sparkDirty = true
+        paintGoal()
+        continue
+      }
+      pending.add(spot.id)
+      send({ t: 'gem', id: spot.id, px: pos.x, py: pos.y, pz: pos.z, yaw, pitch })
+    }
+  }
+
+  function draw(now) {
+    resize()
+    const cycle = skyCycle(world.biome, skyPhase(now))
+    state.sky = cycle.hex
+    if (!state.gl) {
+      drawFlat(cycle)
+      return
+    }
+    const sky = [cycle.r / 255, cycle.g / 255, cycle.b / 255]
     gl.clearColor(sky[0], sky[1], sky[2], 1)
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     const aspect = canvas.width / Math.max(1, canvas.height)
@@ -806,6 +959,8 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     gl.uniform3f(loc.sky, sky[0], sky[1], sky[2])
     gl.uniform1f(loc.near, fogNear)
     gl.uniform1f(loc.far, fogFar)
+    gl.uniform1f(loc.light, cycle.light)
+    gl.uniform1f(loc.bob, 0)
     gl.uniform1f(loc.tex, 1)
     for (const chunk of chunks.values()) {
       bind(chunk.buf)
@@ -814,18 +969,27 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     if (remotes.size) {
       drawAvatars()
       gl.uniform1f(loc.tex, 0)
+      gl.uniform1f(loc.bob, 0)
       bind(avatarBuf)
       gl.drawArrays(gl.TRIANGLES, 0, avatarCount)
+    }
+    if (sparkDirty) rebuildSparks()
+    if (sparkCount && sparkBuf) {
+      gl.uniform1f(loc.tex, 0)
+      gl.uniform1f(loc.light, 1)
+      gl.uniform1f(loc.bob, Math.sin(now / 420) * 0.12)
+      bind(sparkBuf)
+      gl.drawArrays(gl.TRIANGLES, 0, sparkCount)
     }
     drawNames()
   }
 
-  function drawFlat() {
+  function drawFlat(cycle) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const w = canvas.width
     const h = canvas.height
-    ctx.fillStyle = skyHex(world.biome)
+    ctx.fillStyle = cycle?.hex || skyHex(world.biome)
     ctx.fillRect(0, 0, w, h)
     const scale = Math.min(w, h) / 22
     const ox = w / 2
@@ -851,6 +1015,13 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       ctx.fillStyle = cell.color
       ctx.fillRect(sx, sy, scale * 0.48, scale * 0.28)
     }
+    ctx.fillStyle = '#e6ff3a'
+    for (const spot of spots) {
+      if (picked.has(spot.id)) continue
+      const sx = ox + (spot.x - spot.z) * scale * 0.5
+      const sy = oy + (spot.x + spot.z - spot.y) * scale * 0.25 - (pos.x + pos.z) * scale * 0.25
+      ctx.fillRect(sx, sy, scale * 0.22, scale * 0.22)
+    }
   }
 
   let last = performance.now()
@@ -861,12 +1032,13 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     const dt = Math.min(0.05, (now - last) / 1000 || 0)
     last = now
     step(dt)
+    checkSparks()
     moveAcc += dt
     if (moveAcc > 0.1) {
       moveAcc = 0
       send({ t: 'move', x: pos.x, y: pos.y, z: pos.z, yaw, pitch })
     }
-    draw()
+    draw(now)
     raf = requestAnimationFrame(frame)
   }
   connect()
@@ -882,7 +1054,9 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       if (gl) {
         for (const chunk of chunks.values()) gl.deleteBuffer(chunk.buf)
         if (avatarBuf) gl.deleteBuffer(avatarBuf)
+        if (sparkBuf) gl.deleteBuffer(sparkBuf)
       }
+      try { audioCtx?.close() } catch { /* already closed */ }
       field.classList.remove('world-on')
       field.replaceChildren()
       if (window.__blocks === state) delete window.__blocks
