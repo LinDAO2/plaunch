@@ -79,6 +79,7 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     status: game.status,
     ownerId: game.ownerId,
     generation: game.generation,
+    tier: game.tier === 'freeform' ? 'freeform' : 'spec',
     canEdit,
     tags: game.tags || [],
     featured: game.featured === true,
