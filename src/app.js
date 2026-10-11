@@ -763,7 +763,11 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     const game = await publishedOrNull(db, playMatch[1])
     if (!game) return sendHtml(res, 404, renderMissing('Game not found'), ctx, 'embed')
     const embed = url.searchParams.get('embed') === '1'
-    return sendHtml(res, 200, await renderPlayPage(game, { embed }), ctx, embed ? 'player' : 'embed')
+    return sendHtml(res, 200, await renderPlayPage(game, {
+      embed,
+      origin: requestOrigin(config, req),
+      site: config.xSiteHandle
+    }), ctx, embed ? 'player' : 'embed')
   }
 
   const shareMatch = pathname.match(/^\/r\/([a-z0-9-]+)$/)

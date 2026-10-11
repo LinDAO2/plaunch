@@ -106,12 +106,12 @@ Rosebud has no generation API and its terms prohibit automated use, so there is 
 - `GET /g/:slug` studio opened on a published game
 - `GET /play/:slug` chrome-less, mobile-first guest play page (touch and keyboard)
 - `GET /play/:slug?embed=1` 480×480 player with a Play overlay. Frame ancestors are X and Twitter only
-- `GET /r/:slug` X player card (`twitter:card=player`) plus a page that links to `/play` and lists checked and unverified scores
+- `GET /r/:slug` X player card (`twitter:card=player`) plus a page that links to `/play` and lists checked and unverified scores. Blocks worlds add a Share on X checklist with the card title, the `?embed=1` player URL, and the poster image.
 - `POST /api/games/:slug/share` counts a click on the studio Share on X button
 - `GET /api/games/:slug/poster.png` 1200×1200 poster used as `twitter:image`
 - `GET /api/health` includes database status
 
-`/play` and `/r` send `frame-ancestors 'self' https://x.com https://*.x.com https://twitter.com https://*.twitter.com` and do not send `X-Frame-Options`. `?embed=1` drops `'self'`. Set `PUBLIC_BASE_URL` to the public origin and `X_SITE_HANDLE` for `twitter:site`. The studio Share on X button opens `https://x.com/intent/post` with the `/r/:slug` URL.
+`/play` and `/r` send `frame-ancestors 'self' https://x.com https://*.x.com https://twitter.com https://*.twitter.com` and do not send `X-Frame-Options`. `?embed=1` drops `'self'`. A Blocks play page carries the same `twitter:player` and Open Graph tags as its `/r` card, with the player URL set to `/play/:slug?embed=1` at 480×480. Set `PUBLIC_BASE_URL` to the public origin and `X_SITE_HANDLE` for `twitter:site`. The studio Share on X button opens `https://x.com/intent/post` with the `/r/:slug` URL.
 
 Anonymous visitors can play and submit scores. A `play_started` event returns a round token. That token is consumed in the same transaction as the score insert. A plausible score is `checked`; a missing token stays `unverified`. Leaderboards return checked scores in `scores` and unverified scores in `unverified`. `verified` remains false. Creating, editing, publishing, and archiving require the owning account (email, password, HttpOnly session cookie, CSRF header). The dashboard lists each owned game with publish state, views, play_started, completions, shares, and the top checked score.
 

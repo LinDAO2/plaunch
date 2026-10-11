@@ -63,6 +63,27 @@ test('two embed players share a placed block', { timeout: 120000 }, async () => 
 
     const handset = await phone.newPage()
     handset.on('pageerror', (error) => errors.push(String(error)))
+    await handset.goto(`${server.base}/play/blocks-candy-moon?embed=1`, { waitUntil: 'domcontentloaded' })
+    assert.equal((await handset.locator('#embed-play').innerText()).trim(), 'Play')
+    await handset.click('#embed-play')
+    await handset.waitForFunction(() => window.__blocks?.ready)
+    const controls = await handset.evaluate(() => {
+      const box = (sel) => {
+        const el = document.querySelector(sel)
+        if (!el) return { w: 0, h: 0 }
+        const rect = el.getBoundingClientRect()
+        return { w: rect.width, h: rect.height, display: getComputedStyle(el).display }
+      }
+      return {
+        stick: box('#world-stick'),
+        place: box('#world-place'),
+        jump: box('#world-jump'),
+        body: { w: document.body.scrollWidth, h: document.body.scrollHeight }
+      }
+    })
+    assert.equal(controls.stick.display, 'block')
+    assert.ok(controls.place.h >= 44 && controls.jump.h >= 44, `phone actions ${controls.place.h} ${controls.jump.h}`)
+    assert.ok(controls.body.w <= 480 && controls.body.h <= 480, `phone embed overflow ${controls.body.w}x${controls.body.h}`)
     await handset.goto(`${server.base}/play/blocks-candy-moon`, { waitUntil: 'domcontentloaded' })
     await handset.waitForFunction(() => window.__blocks?.ready)
     await handset.waitForFunction(() => {

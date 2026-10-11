@@ -16,9 +16,14 @@ export function creditMarkup(credit) {
   return label
 }
 
-export async function renderPlayPage(game, { embed = false } = {}) {
+export async function renderPlayPage(game, { embed = false, origin = '', site = '' } = {}) {
   if (!playTemplate) playTemplate = await readFile(path.join(ROOT, 'play.html'), 'utf8')
   const accent = /^#[0-9a-fA-F]{6}$/.test(game.accent) ? game.accent : '#a88bff'
+  const classes = ['play-body']
+  if (embed) classes.push('embed')
+  if (game.type === 'world') classes.push('world-play')
+  if (embed && game.tier === 'freeform') classes.push('freeform-play')
+  const card = game.type === 'world' ? playerCard(game, { origin, site, page: 'play' }) : null
   const values = {
     TITLE: escapeHtml(`${game.name} — playground`),
     NAME: escapeHtml(game.name),
@@ -26,9 +31,10 @@ export async function renderPlayPage(game, { embed = false } = {}) {
     SLUG: escapeHtml(game.id),
     ACCENT: accent,
     MECHANIC: escapeHtml(String(game.type || '').toUpperCase()),
-    BODY_CLASS: embed ? `play-body embed${game.tier === 'freeform' ? ' freeform-play' : ''}` : 'play-body',
+    BODY_CLASS: classes.join(' '),
     GATE_ATTR: embed ? '' : 'hidden',
-    CREDIT: creditMarkup(game.credit)
+    CREDIT: creditMarkup(game.credit),
+    SHARE_META: card ? card.tags : ''
   }
   return playTemplate.replace(/__([A-Z_]+)__/g, (_, key) => values[key] ?? '')
 }
@@ -52,28 +58,16 @@ function leaderRows(scores) {
   }).join('')
 }
 
-export function renderSharePage(game, { origin, site = '', scores = [], unverified = [] } = {}) {
+export function playerCard(game, { origin, site = '', page = 'share' } = {}) {
   const name = escapeHtml(game.name)
   const description = escapeHtml(game.description || 'A playable mini-game on Playground.')
-  const slug = escapeHtml(game.id)
   const base = safeOrigin(origin)
   const playUrl = escapeHtml(`${base}/play/${game.id}?embed=1`)
-  const pageUrl = escapeHtml(`${base}/r/${game.id}`)
+  const pageUrl = escapeHtml(page === 'play' ? `${base}/play/${game.id}` : `${base}/r/${game.id}`)
   const posterUrl = escapeHtml(`${base}/api/games/${game.id}/poster.png`)
-  const playPath = `/play/${slug}`
-  const studioPath = `/g/${slug}`
-  const siteTag = site ? `<meta name="twitter:site" content="${escapeHtml(site)}">` : ''
-  const checkedRows = scores.length ? leaderRows(scores) : '<p class="hint">No checked scores yet. Play a round and claim one.</p>'
-  const unverifiedRows = leaderRows(unverified)
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${name} — playground</title>
-<meta name="twitter:card" content="player">
-${siteTag}
-<meta name="twitter:title" content="${name}">
+  const siteTag = site ? `<meta name="twitter:site" content="${escapeHtml(site)}">\n` : ''
+  const tags = `<meta name="twitter:card" content="player">
+${siteTag}<meta name="twitter:title" content="${name}">
 <meta name="twitter:description" content="${description}">
 <meta name="twitter:player" content="${playUrl}">
 <meta name="twitter:player:width" content="480">
@@ -83,7 +77,40 @@ ${siteTag}
 <meta property="og:description" content="${description}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="${pageUrl}">
-<meta property="og:image" content="${posterUrl}">
+<meta property="og:image" content="${posterUrl}">`
+  return { tags, name, description, playUrl, pageUrl, posterUrl }
+}
+
+function worldShareChecklist(game, card) {
+  if (game.type !== 'world') return ''
+  const slug = escapeHtml(game.id)
+  return `<section class="x-check" aria-label="Share on X">
+<h2>Share on X</h2>
+<p class="hint">Card title, player URL, and image for this world. Open each one on this machine before the origin is public.</p>
+<ul>
+<li><span>Card title</span><b>${card.name}</b></li>
+<li><span>Player URL</span><a href="/play/${slug}?embed=1">${card.playUrl}</a></li>
+<li><span>Image</span><a href="/api/games/${slug}/poster.png">${card.posterUrl}</a></li>
+</ul>
+</section>`
+}
+
+export function renderSharePage(game, { origin, site = '', scores = [], unverified = [] } = {}) {
+  const card = playerCard(game, { origin, site, page: 'share' })
+  const { name, description, pageUrl, tags } = card
+  const slug = escapeHtml(game.id)
+  const playPath = `/play/${slug}`
+  const studioPath = `/g/${slug}`
+  const checkedRows = scores.length ? leaderRows(scores) : '<p class="hint">No checked scores yet. Play a round and claim one.</p>'
+  const unverifiedRows = leaderRows(unverified)
+  const checklist = worldShareChecklist(game, card)
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${name} — playground</title>
+${tags}
 <link rel="canonical" href="${pageUrl}">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/play.css">
@@ -102,6 +129,7 @@ ${siteTag}
 ${game.credit?.author ? `<p class="hint">${creditMarkup(game.credit)}</p>` : ''}
 <a class="primary" href="${playPath}">Play</a>
 <a href="${studioPath}">Open in studio</a>
+${checklist}
 <section class="leaderboard">
 <div class="leaderboard-head"><h2>Top scores</h2><span>Top 20</span></div>
 <h2>Checked</h2>
