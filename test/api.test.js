@@ -24,7 +24,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '1.1.1')
+    assert.equal(res.data.version, '1.2.0')
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
@@ -596,6 +596,29 @@ describe('http api', { concurrency: false }, () => {
     assert.match(share.text, /twitter:player:width" content="480"/)
     assert.match(share.text, /twitter:player:height" content="480"/)
     assert.match(share.text, new RegExp(`/play/${id}\\?embed=1`))
+    assert.match(share.text, /Sandboxed/)
+    assert.match(share.text, /sandbox="allow-scripts"/)
+    const play = await client.request('GET', `/play/${id}`)
+    assert.match(play.text, /name="twitter:card" content="player"/)
+    assert.match(play.text, new RegExp(`name="twitter:player" content="https://play\\.example/play/${id}\\?embed=1"`))
+    assert.match(play.text, /property="og:image"/)
+    assert.match(play.text, /id="sandbox-note"/)
+    assert.match(play.text, /Sandboxed/)
+    assert.equal(play.text.includes('style='), false)
+    const discover = await client.request('GET', '/api/discover?view=new')
+    const found = discover.data.games.find((item) => item.id === id)
+    assert.equal(found.tier, 'freeform')
+    const parented = await client.request('POST', '/api/games', {
+      name: 'Parent Peek',
+      description: 'nope',
+      type: 'arcade',
+      duration: 30,
+      accent: '#112233',
+      tier: 'freeform',
+      html: '<html><body><canvas></canvas><script>parent.document.title</script>playground-score</body></html>'
+    })
+    assert.equal(parented.status, 400)
+    assert.match(parented.data.error, /Parent page access/)
   })
 })
 

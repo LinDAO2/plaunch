@@ -39,7 +39,9 @@ function render(games) {
   }
   for (const game of games) {
     const { card, bottom, share } = gameCard(game, {
-      label: typeNames[game.type] || game.type,
+      label: game.tier === 'freeform'
+        ? `${typeNames[game.type] || game.type} · Sandboxed`
+        : (typeNames[game.type] || game.type),
       playHref: `/play/${game.id}`
     })
     const small = document.createElement('small')

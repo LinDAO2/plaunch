@@ -23,7 +23,12 @@ export async function renderPlayPage(game, { embed = false, origin = '', site = 
   if (embed) classes.push('embed')
   if (game.type === 'world') classes.push('world-play')
   if (embed && game.tier === 'freeform') classes.push('freeform-play')
-  const card = game.type === 'world' ? playerCard(game, { origin, site, page: 'play' }) : null
+  const card = game.type === 'world' || game.tier === 'freeform'
+    ? playerCard(game, { origin, site, page: 'play' })
+    : null
+  const sandboxNote = game.tier === 'freeform'
+    ? '<p id="sandbox-note" class="hint">Sandboxed. This game runs in an iframe and cannot read this page, cookies, or the network.</p>'
+    : ''
   const values = {
     TITLE: escapeHtml(`${game.name} — playground`),
     NAME: escapeHtml(game.name),
@@ -34,7 +39,8 @@ export async function renderPlayPage(game, { embed = false, origin = '', site = 
     BODY_CLASS: classes.join(' '),
     GATE_ATTR: embed ? '' : 'hidden',
     CREDIT: creditMarkup(game.credit),
-    SHARE_META: card ? card.tags : ''
+    SHARE_META: card ? card.tags : '',
+    SANDBOX_NOTE: sandboxNote
   }
   return playTemplate.replace(/__([A-Z_]+)__/g, (_, key) => values[key] ?? '')
 }
@@ -104,6 +110,9 @@ export function renderSharePage(game, { origin, site = '', scores = [], unverifi
   const checkedRows = scores.length ? leaderRows(scores) : '<p class="hint">No checked scores yet. Play a round and claim one.</p>'
   const unverifiedRows = leaderRows(unverified)
   const checklist = worldShareChecklist(game, card)
+  const sandboxNote = game.tier === 'freeform'
+    ? '<p class="hint sandbox-note">Sandboxed. This game runs in an iframe with sandbox="allow-scripts" and cannot read this page, cookies, or the network.</p>'
+    : ''
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -126,6 +135,7 @@ ${tags}
 <h1>${name}</h1>
 <p>${description}</p>
 <p class="by">By ${escapeHtml(game.creator || 'Playground')}</p>
+${sandboxNote}
 ${game.credit?.author ? `<p class="hint">${creditMarkup(game.credit)}</p>` : ''}
 <a class="primary" href="${playPath}">Play</a>
 <a href="${studioPath}">Open in studio</a>

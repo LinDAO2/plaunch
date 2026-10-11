@@ -1,4 +1,4 @@
-# Playground — game launchpad v1.1.1
+# Playground — game launchpad v1.2.0
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
@@ -81,13 +81,29 @@ The studio shows `Built on: <template>` and `Try another style`, which re-rolls 
 
 Kaplay 3001.0.19 and ZzFX are pinned under `vendor/` and served as `/kaplay.js` and `/zzfx.js` from the usercontent origin.
 
-### Freeform sandbox
+### Freeform sandbox (v1.2)
 
-`POST /api/ai/generate` accepts `tier`: `auto` (default), `spec`, or `freeform`. Auto keeps tap, dodge, reaction, guess, and the arcade primitives on GameSpec. Other ideas return `{ tier: "freeform", html }` and `spec: null`. The model must return one HTML document with a canvas, inline CSS and JavaScript, and no network. Static checks reject external URLs, `fetch`, XHR, WebSocket, `eval`, the Function constructor, and `document.cookie` / `localStorage`. A rejection is shown to the model once. The document is never executed on the server.
+Kaplay templates stay the primary path. When a prompt does not match a template, auto generation falls through to a sandboxed HTML game. The studio can also pick **Sandbox** (`tier: "freeform"`) so the model writes that document directly. With no `GEMINI_API_KEY`, that path returns a deterministic canvas fixture. A key asks Gemini for one HTML document. Tests mock that call. The document is checked and stored. It is never executed on the app origin.
 
-Freeform HTML is stored on the game and served only by the usercontent listener (`GET /g/:slug` and short-lived `GET /preview/:token`). Its CSP is `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'`, plus `frame-src 'none'`, `worker-src 'none'`, and no `unsafe-eval` or `wasm-unsafe-eval`. `script-src 'self'` is only so the page can load the pinned Kaplay and ZzFX files on that same origin. `frame-ancestors` allows the app origin, x.com, and twitter.com. The iframe `sandbox` attribute stays `allow-scripts`. Scores come back only as `postMessage` `{ type: "playground-score", points }`. The parent accepts that shape from the iframe, and only when `event.origin` is `"null"`.
+Limits before a document is served:
 
-Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production requires `PUBLIC_BASE_URL` and `USERCONTENT_ORIGIN`, and it refuses to boot when those hosts match or share a registrable domain. A separate domain such as `playgroundusercontent.com` is the layout to use. `ALLOW_SAME_SITE_USERCONTENT=true` is the explicit opt-in for a subdomain. Auto tier prefers a freeform game when the idea needs its own rules, physics, or levels, and keeps the arcade spec for a simple tap, dodge, reaction, guess, or arcade game. An idea the keyword check cannot place is sent to the model when a key is set. `POST /api/freeform/preview` requires a creator (the guest cookie or an account) and counts toward the AI rate limit. `/play/:slug?embed=1` and `/r/:slug` use the same 480×480 player for freeform games. The parent hides its timer and shows the best score; the game draws its own HUD.
+- One HTML page, at most 150KB, with a canvas and a `playground-score` postMessage
+- No `fetch`, XHR, WebSocket, `eval`, Function constructor, workers, nested frames, or external URLs
+- Script `src` allowlist is only `/kaplay.js` and `/zzfx.js` on the sandbox origin
+- `parent.postMessage` is allowed. `parent.document`, `top.location`, `contentWindow`, and `contentDocument` are refused
+- No `document.cookie`, `localStorage`, `sessionStorage`, or `document.domain`
+
+The play page mounts the game in an iframe whose attribute is exactly `sandbox="allow-scripts"`. That omits `allow-same-origin`, so the frame origin is `"null"`, it cannot read the parent DOM, and it sends no cookies. The parent accepts a score only as `{ type: "playground-score", points }` from `event.origin === "null"`.
+
+The sandbox response CSP is exactly:
+
+`default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts; frame-ancestors <app origin> https://x.com https://*.x.com https://twitter.com https://*.twitter.com`
+
+There is no `unsafe-eval` and no `wasm-unsafe-eval`. `font-src` falls back to `default-src 'none'`. `script-src 'self'` exists so the page can load the pinned Kaplay and ZzFX files on that same origin.
+
+Discover labels these games **Sandboxed**. `/play/:slug` and `/r/:slug` carry the same 480×480 `twitter:player` card as other games, and the page says the game is sandboxed. Guests generate, preview, and publish with the guest cookie. No account is required. `POST /api/freeform/preview` counts toward the AI rate limit.
+
+Set `USERCONTENT_ORIGIN` to a different origin from the app. In development it defaults to `http://127.0.0.1:43921`. Production requires `PUBLIC_BASE_URL` and `USERCONTENT_ORIGIN`, and it refuses to boot when those hosts match or share a registrable domain. A separate domain such as `playgroundusercontent.com` is the layout to use. `ALLOW_SAME_SITE_USERCONTENT=true` is the explicit opt-in for a subdomain.
 
 Discover is at `/discover`. Trending ranks unique `play_started` events from the last 24 hours. The same session and IP hash counts once, a burst of three starts inside two minutes is left out, and the creator's own signed-in plays are left out. New is chronological. Featured is set by a moderator.
 

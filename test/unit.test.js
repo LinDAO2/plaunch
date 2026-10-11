@@ -712,6 +712,9 @@ test('freeform checker accepts the template and rejects network and storage acce
   assert.ok(errors.some((error) => /Function/i.test(error)))
   assert.ok(errors.some((error) => /cookie/i.test(error)))
   assert.ok(errors.some((error) => /localStorage/i.test(error)))
+  const peek = inspectFreeform('<html><body><canvas></canvas><script>parent.document.title; top.location.href</script>playground-score</body></html>')
+  assert.ok(peek.some((error) => /Parent page access/.test(error)))
+  assert.deepEqual(inspectFreeform(templateFreeform('parent postMessage only')), [])
 })
 
 test('tier classification keeps arcade ideas on the spec and sends the rest to freeform', () => {

@@ -31,6 +31,7 @@ Rules:
 - Do not read document.cookie, localStorage, or sessionStorage
 - Keep the document under 150KB
 - When the score or the best score changes, call parent.postMessage({ type: "playground-score", points: best }, "*")
+- That postMessage is the only parent access. Do not read parent.document, parent.location, top, or contentWindow
 - points is the best score, an integer from 0 to 100000
 - The message object has only the keys type and points
 - Make the game actually playable and match the player's idea

@@ -19,8 +19,22 @@ const RULES = [
   [/\blocalStorage\b/, 'localStorage is not allowed'],
   [/\bsessionStorage\b/, 'sessionStorage is not allowed'],
   [/\bimport\s*\(/, 'Dynamic import is not allowed'],
-  [/\bnew\s+Worker\b/, 'Workers are not allowed']
+  [/\bnew\s+Worker\b/, 'Workers are not allowed'],
+  [/\bcontentDocument\b/, 'Parent page access is not allowed'],
+  [/\bcontentWindow\b/, 'Parent page access is not allowed'],
+  [/\bdocument\s*\.\s*domain\b/i, 'document.domain is not allowed']
 ]
+
+function parentLeaks(html) {
+  const leaks = []
+  const re = /\b(parent|top)\s*(?:\.|\[)\s*['"]?([A-Za-z_$][\w$]*)/g
+  for (const match of html.matchAll(re)) {
+    if (match[2] === 'postMessage') continue
+    const label = `${match[1]}.${match[2]}`
+    if (!leaks.includes(label)) leaks.push(label)
+  }
+  return leaks
+}
 
 export function inspectFreeform(html) {
   const errors = []
@@ -39,6 +53,9 @@ export function inspectFreeform(html) {
   }
   for (const [pattern, message] of RULES) {
     if (pattern.test(html) && !errors.includes(message)) errors.push(message)
+  }
+  if (parentLeaks(html).length && !errors.includes('Parent page access is not allowed')) {
+    errors.push('Parent page access is not allowed')
   }
   return errors
 }
