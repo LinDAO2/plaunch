@@ -1,6 +1,8 @@
 const coarse = matchMedia('(pointer: coarse)').matches
 const narrow = innerWidth < 700
 const framed = window.parent !== window
+const posterMode = /(?:^|#|&)poster=1(?:&|$)/.test(location.hash || '')
+if (posterMode) document.body.classList.add('poster')
 const theme = normalizeTheme(THEME)
 const config = normalizeConfig(CONFIG)
 const titleText = THEME.names.title || 'Arena'
@@ -821,6 +823,7 @@ function actorMesh(actor) {
     const tag = makeTag(actor.name, tint)
     tag.position.y = 1.45
     rig.add(tag)
+    rig.userData.tag = tag
   } else {
     const useAlien = actor.bot && (String(actor.id).charCodeAt(String(actor.id).length - 1) % 2 === 0)
     const body = take(useAlien && models.alien ? 'alien' : 'astronaut') || new THREE.Group()
@@ -837,6 +840,7 @@ function actorMesh(actor) {
     const tag = makeTag(actor.name, tint)
     tag.position.y = 2.05
     rig.add(tag)
+    rig.userData.tag = tag
   }
   const blob = new THREE.Mesh(new THREE.CircleGeometry(0.46, 12), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28, depthWrite: false }))
   blob.rotation.x = -Math.PI / 2
@@ -1244,6 +1248,58 @@ function placeFloats(dt) {
   }
 }
 
+function fitTag(sprite, worldPos) {
+  const dist = camera.position.distanceTo(worldPos)
+  if (dist < (posterMode ? 4.2 : 2.2)) {
+    sprite.visible = false
+    return
+  }
+  sprite.visible = true
+  const fov = (camera.fov || 72) * Math.PI / 180
+  const worldH = 2 * dist * Math.tan(fov / 2)
+  const px = 56
+  let h = (px / Math.max(innerHeight || 480, 1)) * worldH
+  let w = h * 4
+  if (w > 0.9) {
+    w = 0.9
+    h = w / 4
+  }
+  sprite.scale.set(w, h, 1)
+}
+
+function pushCamera(self, actors) {
+  const pos = camera.position
+  const walls = local.map && local.map.walls
+  for (let pass = 0; pass < 3; pass++) {
+    for (const actor of actors) {
+      if (!actor.alive || !self || actor.id === self.id) continue
+      const dx = pos.x - actor.x
+      const dz = pos.z - actor.z
+      const dist = Math.hypot(dx, dz) || 0.001
+      const min = actor.kind === 'buoy' ? 1.7 : 1.25
+      if (dist < min) {
+        pos.x = actor.x + (dx / dist) * min
+        pos.z = actor.z + (dz / dist) * min
+      }
+    }
+    if (walls && wallPoint(pos.x, 1, pos.z, walls)) {
+      let best = null
+      let bestD = Infinity
+      for (const wall of walls) {
+        const dx = pos.x - wall.x
+        const dz = pos.z - wall.z
+        const d = Math.hypot(dx, dz) || 0.001
+        if (d < bestD) bestD = d, best = { dx: dx / d, dz: dz / d, wall }
+      }
+      if (best) {
+        const out = Math.max(best.wall.w, best.wall.d) * 0.5 + 0.45
+        pos.x = best.wall.x + best.dx * out
+        pos.z = best.wall.z + best.dz * out
+      }
+    }
+  }
+}
+
 function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   if (!assetsReady || !scene) {
     if (glOk && renderer && scene && camera) renderer.render(scene, camera)
@@ -1252,21 +1308,51 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   const drawn = sampleActors(actors, performance.now())
   const self = drawn.find((actor) => actor.id === (you && you.id)) || drawn[0]
   const moving = self ? Math.hypot((self.x - lastX), (self.z - lastZ)) > 0.012 : false
-  if (glOk && self) {
+    if (glOk && self) {
     const speed = Math.hypot(input.mx, input.mz)
+    let aimX = 0
+    let aimY = 1.2
+    let aimZ = 0
+    const ox = Math.sin(self.yaw)
+    const oz = Math.cos(self.yaw)
+    const rx = Math.cos(self.yaw)
+    const rz = -Math.sin(self.yaw)
     if (!playing) {
       const orbit = theme.mode === 'explore' ? 18 : 14
       camera.position.set(Math.sin(animT * 0.35) * orbit, 6.5, Math.cos(animT * 0.35) * orbit)
-      camera.lookAt(0, 1.2, theme.mode === 'race' ? 0 : 2)
+      aimX = 0
+      aimY = 1.2
+      aimZ = theme.mode === 'race' ? 0 : 2
       camera.fov = 72
+      camera.updateProjectionMatrix()
+    } else if (posterMode && theme.mode === 'race') {
+      camera.position.set(self.x - ox * 7.4 + rx * 2.6, 4.4 + self.y, self.z - oz * 7.4 + rz * 2.6)
+      aimX = self.x + ox * 4
+      aimY = 0.7
+      aimZ = self.z + oz * 4
+      camera.fov = 62
+      camera.updateProjectionMatrix()
+    } else if (posterMode && theme.mode === 'explore') {
+      camera.position.set(self.x - ox * 6.4 + rx * 2.5, 3.2, self.z - oz * 6.4 + rz * 2.5)
+      aimX = self.x + ox * 7
+      aimY = 1.5
+      aimZ = self.z + oz * 7
+      camera.fov = 64
+      camera.updateProjectionMatrix()
+    } else if (posterMode) {
+      camera.position.set(self.x - ox * 3.5 + rx * 1.15, self.y + 1.9, self.z - oz * 3.5 + rz * 1.15)
+      aimX = self.x + ox * 6
+      aimY = 1.25
+      aimZ = self.z + oz * 6
+      camera.fov = 64
       camera.updateProjectionMatrix()
     } else if (theme.mode === 'race') {
       const boost = input.fire ? 1 : 0
       const back = 3.1 + boost * 0.6
-      const ox = Math.sin(self.yaw)
-      const oz = Math.cos(self.yaw)
       camera.position.set(self.x - ox * back, 1.55 + self.y + dropY, self.z - oz * back)
-      camera.lookAt(self.x + ox * 8, 0.7, self.z + oz * 8)
+      aimX = self.x + ox * 8
+      aimY = 0.7
+      aimZ = self.z + oz * 8
       const targetFov = input.fire ? 84 : 72
       camera.fov += (targetFov - camera.fov) * Math.min(1, dt / (input.fire ? 0.15 : 0.6))
       camera.updateProjectionMatrix()
@@ -1281,8 +1367,12 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
       const dy = Math.sin(self.pitch)
       const dz = Math.cos(self.yaw) * Math.cos(self.pitch)
       camera.position.set(self.x, self.y + eye + bob + dropY, self.z)
-      camera.lookAt(self.x + dx, self.y + eye + bob + dy, self.z + dz)
+      aimX = self.x + dx
+      aimY = self.y + eye + bob + dy
+      aimZ = self.z + dz
     }
+    if (playing) pushCamera(self, drawn)
+    camera.lookAt(aimX, aimY, aimZ)
     if (!reduceMotion && playing && trauma > 0) {
       const amount = trauma * trauma
       const deg = Math.PI / 180
@@ -1301,12 +1391,17 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
       gun.position.y = base.y + Math.abs(Math.cos(animT * 7.5)) * 0.014 * bob + recoil * 0.02
       gun.position.z = base.z + recoil * 0.05
       gun.rotation.x = base.rx - recoil * (2 * Math.PI / 180)
+      if (posterMode && theme.mode !== 'race') {
+        gun.position.z = base.z - 0.38
+        gun.position.x = base.x - 0.06
+        gun.scale.setScalar(1.6)
+      }
     }
     const aliveIds = new Set()
     for (const actor of drawn) {
       const mesh = actorMesh(actor)
       const show = actor.alive || (mesh.userData.death !== undefined && mesh.userData.death < 0.85)
-      const selfHidden = actor.id === self.id && theme.mode !== 'race'
+      const selfHidden = actor.id === self.id && theme.mode !== 'race' && !posterMode
       if (!show || selfHidden) {
         if (!actor.alive) poseActor(mesh, actor, false, false, dt)
         mesh.visible = actor.alive ? false : mesh.userData.death < 0.85 && !selfHidden
@@ -1323,6 +1418,7 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
       const sample = samples.get(actor.id)
       const walked = sample ? Math.hypot(actor.x - sample.from.x, actor.z - sample.from.z) > 0.02 : false
       poseActor(mesh, actor, actor.id === self.id ? moving : walked, aim, dt)
+      if (mesh.userData.tag) fitTag(mesh.userData.tag, mesh.position)
       if (prevHp.has(actor.id) && actor.hp < prevHp.get(actor.id)) {
         const lost = prevHp.get(actor.id) - actor.hp
         if (lost > 0) floatNum(actor, lost)
@@ -1410,7 +1506,7 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   const coach = document.querySelector('#coach')
   if (coach) {
     const lines = ['Move', 'Look', 'Fire']
-    if (!playing || coachStep > 2) coach.hidden = true
+    if (!playing || coachStep > 2 || posterMode || scripted.on) coach.hidden = true
     else {
       coach.hidden = false
       coach.textContent = lines[coachStep]

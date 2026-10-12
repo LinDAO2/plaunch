@@ -16,6 +16,9 @@ files.set('/three.js', await readFile(path.join(root, 'vendor/three/three.min.js
 for (const name of ['lilita-one-latin.woff2', 'rubik-latin-700.woff2']) {
   files.set(`/fonts/${name}`, await readFile(path.join(root, 'public/fonts', name)))
 }
+for (const name of ['kenney-chars.png', 'kenney-tiles.png']) {
+  files.set(`/sprites/${name}`, await readFile(path.join(root, 'public/sprites', name)))
+}
 for (const [name, body] of arenaAssetFiles()) files.set(name, body)
 
 const browser = await launchCaptureBrowser()

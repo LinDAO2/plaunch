@@ -90,6 +90,9 @@ body:not(.playing) #playhud{opacity:0}
 #sticks{display:none;position:absolute;left:0;right:0;bottom:0;height:180px;pointer-events:none;z-index:4}
 body.touch #sticks{display:block}
 body.touch #cross,body.touch #hit{display:none}
+body.poster #coach,body.poster #banner,body.poster #feed,body.poster #quality,body.poster #cross,body.poster #hit,body.poster #kill{display:none !important}
+body.poster #place{font-size:22px;top:8px}
+body.poster #board{top:8px}
 body.touch #hp{bottom:150px}
 body.touch #ammo{bottom:168px}
 .stick{position:absolute;bottom:16px;width:104px;height:104px;border-radius:50%;border:2px solid rgba(255,255,255,.45);pointer-events:auto;touch-action:none;background:rgba(11,15,26,.28);opacity:.35}

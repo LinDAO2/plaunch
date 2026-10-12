@@ -7,7 +7,7 @@ import { ARENA_TEMPLATES } from '../src/arena/templates.js'
 import { renderArena } from '../src/arena/render.js'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const artDir = '/opt/cursor/artifacts/posters/v131'
+const artDir = '/opt/cursor/artifacts/posters/v135'
 const ids = ['arena', 'circuit-dash', 'beacon-isle']
 
 const files = new Map()
@@ -62,19 +62,24 @@ try {
       page.on('console', (msg) => {
         if (msg.type() === 'error') errors.push(msg.text())
       })
-      await page.goto(`http://127.0.0.1:${port}/${id}#sky=${sky}`, { waitUntil: 'domcontentloaded', timeout: 20000 })
+      await page.goto(`http://127.0.0.1:${port}/${id}#sky=${sky}&poster=1`, { waitUntil: 'domcontentloaded', timeout: 20000 })
       await page.waitForFunction(() => window.__arena && window.__arena.ready, null, { timeout: 25000 })
       const boot = await page.evaluate(() => ({
         quality: window.__arena.quality,
         ratio: window.__arena.ratio,
         gl: window.__arena.gl
       }))
-      await page.evaluate(() => {
+      await page.evaluate((gameId) => {
         window.__arena.begin()
-        window.__arena.lookAtNearest()
-        window.__arena.push({ mz: 1, mx: 0.15, fire: 1 })
-      })
-      await page.waitForTimeout(1100)
+        if (gameId === 'arena') window.__arena.lookAtNearest()
+        const push = gameId === 'circuit-dash'
+          ? { mz: 0.2, mx: 0, fire: 0 }
+          : gameId === 'beacon-isle'
+            ? { mz: 0, mx: 0, fire: 0, yaw: 0 }
+            : { mz: 0, mx: 0, fire: 1 }
+        window.__arena.push(push)
+      }, id)
+      await page.waitForTimeout(800)
       const gray = await page.evaluate(() => {
         const canvas = document.querySelector('#view')
         const probe = document.createElement('canvas')

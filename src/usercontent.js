@@ -33,6 +33,8 @@ function assetType(pathname) {
 }
 
 const FONT_DIR = fileURLToPath(new URL('../public/fonts', import.meta.url))
+const SPRITE_DIR = fileURLToPath(new URL('../public/sprites', import.meta.url))
+const SPRITES = new Map(readdirSync(SPRITE_DIR).filter((name) => name.endsWith('.png')).map((name) => [`/sprites/${name}`, readFileSync(path.join(SPRITE_DIR, name))]))
 const FONTS = new Map([
   ['/fonts/lilita-one-latin.woff2', 'lilita-one-latin.woff2'],
   ['/fonts/rubik-latin-700.woff2', 'rubik-latin-700.woff2'],
@@ -118,6 +120,18 @@ export function createUsercontentApp({ db, config }) {
           'x-vendor-version': vendor.version
         })
         res.end(vendor.body)
+        return
+      }
+      if ((req.method || 'GET') === 'GET' && SPRITES.has(url.pathname)) {
+        const body = SPRITES.get(url.pathname)
+        res.writeHead(200, {
+          'content-type': 'image/png',
+          'content-length': String(body.length),
+          'cache-control': 'public, max-age=86400',
+          'x-content-type-options': 'nosniff',
+          'access-control-allow-origin': '*'
+        })
+        res.end(body)
         return
       }
       if ((req.method || 'GET') === 'GET' && FONTS.has(url.pathname)) {

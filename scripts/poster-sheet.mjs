@@ -8,7 +8,7 @@ import { posterPng } from '../src/poster.js'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const committedDir = path.join(root, 'public', 'posters')
-const outDir = process.env.POSTER_SHEET_DIR || '/opt/cursor/artifacts/posters/v134'
+const outDir = process.env.POSTER_SHEET_DIR || '/opt/cursor/artifacts/posters/v135'
 mkdirSync(outDir, { recursive: true })
 
 const classics = [
@@ -58,7 +58,7 @@ for (const id of order) {
   } else {
     const game = generated.get(id)
     if (!game) throw new Error(`No poster source for ${id}`)
-    writeBytes(copy, posterPng({ ...game, updatedAt: 'v134' }))
+    writeBytes(copy, posterPng({ ...game, updatedAt: 'v135' }))
     kind = 'card'
   }
   manifest.push({ id, file: copy, kind })

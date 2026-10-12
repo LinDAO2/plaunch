@@ -25,23 +25,127 @@ function squash() {
   stretch = 1.2
   stretchUntil = nowSec() + 0.08
 }
+let artReady = false
+function coarsePointer() {
+  try { return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) } catch (err) { return false }
+}
+function brick(x, y, w, h, color) {
+  const edge = Math.max(2, Math.min(4, Math.round(Math.min(w, h) * 0.14)))
+  drawRect({ pos: vec2(x + 2, y + 4), width: w, height: h, color: rgb(27, 27, 47) })
+  drawRect({ pos: vec2(x - edge, y - edge), width: w + edge * 2, height: h + edge * 2, color: rgb(27, 27, 47) })
+  drawRect({ pos: vec2(x, y), width: w, height: h, color: color })
+  const shine = Math.max(4, Math.round(Math.min(w, h) * 0.32))
+  drawRect({ pos: vec2(x + edge + 1, y + edge + 1), width: shine, height: Math.max(3, Math.round(shine * 0.4)), color: rgb(255, 248, 230) })
+}
+function tileSprite(frame, x, y, w, h) {
+  if (!artReady) return false
+  drawSprite({ sprite: 'tiles', frame: frame, pos: vec2(x, y), width: w, height: h })
+  return true
+}
+function cast(frame, x, y, size) {
+  if (!artReady) return false
+  const s = size || 72
+  drawSprite({ sprite: 'chars', frame: frame % 27, pos: vec2(x, y), width: s, height: s })
+  return true
+}
+function ground(x, y, w, h) {
+  const th = Math.max(22, h)
+  if (artReady) {
+    let i = 0
+    while (i < w) {
+      tileSprite(16, x + i, y, Math.min(36, w - i), th)
+      i += 36
+    }
+    return
+  }
+  brick(x, y, w, th, rgb(90, 170, 70))
+}
+function drawWorld() {
+  const title = (THEME.names && THEME.names.title) || ''
+  const t = (typeof time === 'function') ? time() : 0
+  if (title === 'Flap' || title === 'Platformer' || title === 'Endless Runner' || title === 'Jump Up') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 280, color: rgb(79, 179, 255) })
+    drawRect({ pos: vec2(0, 280), width: 480, height: 200, color: rgb(205, 235, 255) })
+    const drift = (t * 22) % 560
+    drawCircle({ pos: vec2(90 - drift + 560, 64), radius: 28, color: rgb(255, 255, 255) })
+    drawCircle({ pos: vec2(250 - drift * 0.65, 108), radius: 18, color: rgb(255, 255, 255) })
+    drawCircle({ pos: vec2(400 - drift * 0.4, 58), radius: 22, color: rgb(255, 255, 255) })
+    drawCircle({ pos: vec2(70, 390), radius: 100, color: rgb(123, 200, 108) })
+    drawCircle({ pos: vec2(230, 410), radius: 120, color: rgb(86, 176, 78) })
+    drawCircle({ pos: vec2(410, 395), radius: 110, color: rgb(123, 200, 108) })
+    drawRect({ pos: vec2(0, 430), width: 480, height: 50, color: rgb(74, 150, 62) })
+    return
+  }
+  if (title === 'Space Shooter') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(10, 14, 40) })
+    drawRect({ pos: vec2(0, 0), width: 480, height: 150, color: rgb(28, 22, 78) })
+    for (let i = 0; i < 36; i++) {
+      const sx = (i * 97) % 480
+      const sy = (i * 53 + t * (12 + (i % 5) * 4)) % 480
+      drawCircle({ pos: vec2(sx, sy), radius: i % 5 === 0 ? 2.4 : 1.3, color: i % 3 ? rgb(255, 255, 255) : rgb(255, 210, 63) })
+    }
+    return
+  }
+  if (title === 'Breakout') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(18, 22, 64) })
+    drawRect({ pos: vec2(0, 360), width: 480, height: 120, color: rgb(32, 28, 88) })
+    for (let i = 0; i < 24; i++) drawCircle({ pos: vec2((i * 83) % 480, (i * 47) % 340), radius: 1.6, color: rgb(255, 255, 255) })
+    return
+  }
+  if (title === 'Snake') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(126, 196, 86) })
+    for (let i = 0; i < 8; i++) drawRect({ pos: vec2(0, i * 60), width: 480, height: 28, color: rgb(104, 176, 68) })
+    return
+  }
+  if (title === 'Block Drop') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(42, 28, 92) })
+    for (let i = 0; i < 12; i++) drawRect({ pos: vec2(i * 40, 0), width: 2, height: 480, color: rgb(72, 48, 140) })
+    drawRect({ pos: vec2(76, 40), width: 328, height: 418, color: rgb(255, 210, 63) })
+    drawRect({ pos: vec2(86, 50), width: 308, height: 398, color: rgb(36, 24, 78) })
+    return
+  }
+  if (title === 'Merge Tiles') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(232, 214, 255) })
+    drawCircle({ pos: vec2(48, 64), radius: 36, color: rgb(255, 210, 63) })
+    drawCircle({ pos: vec2(430, 420), radius: 48, color: rgb(255, 140, 180) })
+    return
+  }
+  if (title === 'Word Guess') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(244, 232, 210) })
+    drawRect({ pos: vec2(0, 0), width: 480, height: 64, color: rgb(255, 210, 63) })
+    drawRect({ pos: vec2(0, 420), width: 480, height: 60, color: rgb(226, 206, 170) })
+    return
+  }
+  if (title === 'Maze Chomper') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(14, 22, 72) })
+    drawRect({ pos: vec2(0, 0), width: 480, height: 36, color: rgb(28, 40, 110) })
+    return
+  }
+  if (title === 'Match-3') {
+    drawRect({ pos: vec2(0, 0), width: 480, height: 240, color: rgb(255, 122, 168) })
+    drawRect({ pos: vec2(0, 240), width: 480, height: 240, color: rgb(255, 196, 72) })
+    drawCircle({ pos: vec2(64, 52), radius: 22, color: rgb(255, 255, 255) })
+    drawCircle({ pos: vec2(420, 400), radius: 28, color: rgb(255, 90, 122) })
+    return
+  }
+  drawRect({ pos: vec2(0, 0), width: 480, height: 280, color: rgb(79, 179, 255) })
+  drawRect({ pos: vec2(0, 280), width: 480, height: 200, color: rgb(205, 235, 255) })
+}
 function stamp(grid, x, y, cell) {
   const rows = grid || []
   const sy = stretch > 1.02 ? 0.8 : 1
   const sx = stretch > 1.02 ? 1.2 : 1
+  const grown = Math.max(cell, 14)
   for (let j = 0; j < rows.length; j++) {
     const row = String(rows[j] || '')
     for (let i = 0; i < row.length; i++) {
       const ch = row[i]
       if (ch === '.' || ch === ' ') continue
-      const w = Math.max(1, cell - 1)
-      const h = Math.max(1, cell - 1)
-      const edge = Math.min(3, Math.max(2, Math.round(cell * 0.18)))
-      const px = x + i * cell
-      const py = y + j * cell
-      drawRect({ pos: vec2(px + 1, py + 3), width: w * sx, height: h * sy, color: rgb(90, 96, 120) })
-      drawRect({ pos: vec2(px - edge, py - edge + 2), width: w * sx + edge * 2, height: h * sy + edge * 2, color: rgb(27, 27, 47) })
-      drawRect({ pos: vec2(px, py), width: w * sx, height: h * sy, color: ink(THEME.palette[ch] || THEME.palette.accent) })
+      const w = Math.max(6, grown - 2)
+      const h = Math.max(6, grown - 2)
+      const px = x + i * grown
+      const py = y + j * grown
+      brick(px, py, w * sx, h * sy, ink(THEME.palette[ch] || THEME.palette.accent))
     }
   }
 }
@@ -134,6 +238,7 @@ function beginPlay(setup) {
   scene('play', function () {
     for (const key of Object.keys(held)) delete held[key]
     window.__state.phase = 'play'
+    onDraw(function () { drawWorld() })
     setup()
     onUpdate(function () {
       const jump = !!(held[' '] || held.ArrowUp || held.w || held.W)
@@ -144,12 +249,15 @@ function beginPlay(setup) {
       stepJuice(dt())
     })
     onDraw(function () {
-      drawRect({ pos: vec2(150, 12), width: 180, height: 32, color: rgb(27, 27, 47) })
-      label(String(window.__state.score || 0), 14, 168, 18, rgb(244, 247, 251), numberFace)
-      drawCircle({ pos: vec2(86, 438), radius: 28, color: rgb(27, 27, 47) })
-      drawRect({ pos: vec2(170, 416), width: 140, height: 48, color: rgb(255, 210, 63) })
-      drawRect({ pos: vec2(170, 460), width: 140, height: 4, color: rgb(184, 134, 11) })
-      drawCircle({ pos: vec2(394, 438), radius: 28, color: rgb(27, 27, 47) })
+      drawRect({ pos: vec2(150, 12), width: 180, height: 28, color: rgb(27, 27, 47) })
+      drawRect({ pos: vec2(150, 40), width: 180, height: 4, color: rgb(255, 210, 63) })
+      label(String(window.__state.score || 0), 16, 168, 16, rgb(255, 210, 63), numberFace)
+      if (coarsePointer()) {
+        drawCircle({ pos: vec2(86, 438), radius: 28, color: rgb(27, 27, 47) })
+        drawRect({ pos: vec2(170, 416), width: 140, height: 48, color: rgb(255, 210, 63) })
+        drawRect({ pos: vec2(170, 460), width: 140, height: 4, color: rgb(184, 134, 11) })
+        drawCircle({ pos: vec2(394, 438), radius: 28, color: rgb(27, 27, 47) })
+      }
       drawJuice()
     })
   })
@@ -174,6 +282,10 @@ function boot() {
     const numbers = loadFont('num', '/fonts/rubik-latin-700.woff2')
     if (display && display.then) display.then(function () { displayFace = 'display' }).catch(function () {})
     if (numbers && numbers.then) numbers.then(function () { numberFace = 'num' }).catch(function () {})
+    const chars = loadSprite('chars', '/sprites/kenney-chars.png', { sliceX: 9, sliceY: 3 })
+    const tiles = loadSprite('tiles', '/sprites/kenney-tiles.png', { sliceX: 20, sliceY: 9 })
+    const pending = [chars, tiles].filter(function (job) { return job && job.then })
+    if (pending.length) Promise.all(pending).then(function () { artReady = true }).catch(function () {})
   } catch (err) {}
   addEventListener('keydown', function (event) {
     if (event.repeat) return

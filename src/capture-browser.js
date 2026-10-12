@@ -130,18 +130,23 @@ async function wake(page, id) {
     await page.waitForFunction(() => window.__state && window.__state.phase === 'start', null, { timeout: 8000 })
     await page.keyboard.press('Enter')
     await page.waitForFunction(() => window.__state && window.__state.phase === 'play', null, { timeout: 8000 })
-    await page.waitForTimeout(id === 'word-guess' ? 1400 : 320)
+    await page.waitForTimeout(id === 'word-guess' ? 1400 : id === 'block-drop' ? 900 : 640)
     return
   }
   const phase = await page.evaluate(() => (window.__state && window.__state.phase) || '').catch(() => '')
   if (await page.evaluate(() => window.__state && window.__state.engine === 'three').catch(() => false)) {
     await page.waitForFunction(() => window.__arena && window.__arena.ready, null, { timeout: 20000 })
-    await page.evaluate(() => {
+    await page.evaluate((gameId) => {
       window.__arena.begin()
-      window.__arena.lookAtNearest()
-      window.__arena.push({ mz: 1, mx: 0.2, fire: 1 })
-    })
-    await page.waitForTimeout(900)
+      if (gameId === 'arena') window.__arena.lookAtNearest()
+      const push = gameId === 'circuit-dash'
+        ? { mz: 0.2, mx: 0, fire: 0 }
+        : gameId === 'beacon-isle'
+          ? { mz: 0, mx: 0, fire: 0, yaw: 0 }
+          : { mz: 0, mx: 0, fire: 1 }
+      window.__arena.push(push)
+    }, id)
+    await page.waitForTimeout(800)
     return
   }
   if (phase === 'start') {
@@ -160,9 +165,9 @@ async function wake(page, id) {
       const root = document.getElementById('pg-root')
       if (root) root.style.transform = 'none'
     })
-    for (const key of ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown']) {
-      await page.keyboard.press(key)
-      await page.waitForTimeout(140)
+    for (let i = 0; i < 16; i++) {
+      await page.keyboard.press(['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'][i % 4])
+      await page.waitForTimeout(80)
     }
     const painted = await page.evaluate(() => {
       const tiles = [...document.querySelectorAll('.tile-inner')]
@@ -173,10 +178,17 @@ async function wake(page, id) {
     return
   }
   if (id === 'stack-blocks') {
-    await page.keyboard.press('Space')
-    await page.waitForTimeout(700)
-    await page.keyboard.press('ArrowLeft')
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press('Space')
+      await page.waitForTimeout(220)
+    }
+    return
+  }
+  if (id === 'tower-bounce') {
+    await page.keyboard.down('ArrowLeft')
     await page.waitForTimeout(400)
+    await page.keyboard.up('ArrowLeft')
+    await page.waitForTimeout(900)
     return
   }
   await page.keyboard.press('ArrowRight')
@@ -185,7 +197,7 @@ async function wake(page, id) {
 }
 
 export async function captureGame(browser, url, id) {
-  const page = await browser.newPage({ viewport: { width: 720, height: 720 }, deviceScaleFactor: 1 })
+  const page = await browser.newPage({ viewport: { width: 480, height: 480 }, deviceScaleFactor: 1 })
   try {
     const errors = []
     page.on('pageerror', (error) => errors.push(String(error)))
@@ -214,7 +226,7 @@ export async function captureHtml(browser, html) {
   }
   const server = serveCapture(files)
   const port = await server.listen()
-  const page = await browser.newPage({ viewport: { width: 720, height: 720 }, deviceScaleFactor: 1 })
+  const page = await browser.newPage({ viewport: { width: 480, height: 480 }, deviceScaleFactor: 1 })
   try {
     await page.goto(`http://127.0.0.1:${port}/game.html`, { waitUntil: 'load', timeout: 15000 })
     await wake(page, 'import')

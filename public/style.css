@@ -379,21 +379,21 @@ input[type="color"] { padding: 4px; height: 40px; }
 }
 .dodge-player {
   position: absolute;
-  top: 78%;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  top: 76%;
+  width: 54px;
+  height: 26px;
+  border-radius: 8px 18px 6px 6px;
   background: #FFD23F;
-  box-shadow: 0 3px 0 #1B1B2F, 0 0 0 3px #1B1B2F;
+  box-shadow: 0 0 0 3px #1B1B2F, 0 4px 0 #B8860B;
   z-index: 2;
 }
 .meteor {
   position: absolute;
-  width: 22px;
+  width: 30px;
   height: 22px;
-  border-radius: 50%;
-  background: #FF2E63;
-  box-shadow: 0 3px 0 #1B1B2F, 0 0 0 3px #1B1B2F;
+  border-radius: 40% 55% 45% 60%;
+  background: #c2410c;
+  box-shadow: 0 0 0 3px #1B1B2F, inset 8px -4px 0 #FFD23F;
   z-index: 2;
 }
 .dodge-controls {
@@ -404,6 +404,9 @@ input[type="color"] { padding: 4px; height: 40px; }
   z-index: 3;
   display: flex;
   justify-content: space-between;
+}
+@media (pointer: fine) {
+  .dodge-controls { display: none; }
 }
 .dodge-controls button {
   min-width: 64px;

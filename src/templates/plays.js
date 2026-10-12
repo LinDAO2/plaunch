@@ -140,11 +140,16 @@ function mount() {
               if (p < 0.5) { mark = '#F4F7FB'; show = '' }
             }
           }
-          const h = Math.max(2, 32 * scale)
-          const y = 70 + r * 36 + (32 - h) / 2
-          drawRect({ pos: vec2(37 + c * 40, y + 3), width: 40, height: h + 6, color: rgb(27, 27, 47) })
-          drawRect({ pos: vec2(40 + c * 40, y), width: 34, height: h, color: ink(mark) })
-          if (show) drawText({ text: show.toUpperCase(), size: 16, pos: vec2(50 + c * 40, y + 6), color: ink(THEME.palette.bg) })
+          const tileW = 58
+          const tileH = 54
+          const gap = 8
+          const ox = Math.floor((480 - length * tileW - (length - 1) * gap) / 2)
+          const h = Math.max(8, tileH * scale)
+          const y = 96 + r * (tileH + gap) + (tileH - h) / 2
+          const x = ox + c * (tileW + gap)
+          brick(x, y, tileW - 6, h, ink(mark))
+          const light = mark === '#3FB950' || mark === '#E3B341' || mark === '#F4F7FB'
+          if (show) drawText({ text: show.toUpperCase(), size: 26, pos: vec2(x + 16, y + 12), color: light ? rgb(27, 27, 47) : rgb(244, 247, 251) })
         }
       }
     })
@@ -159,6 +164,9 @@ function mount() {
     const rows = CONFIG.rows
     const grid = []
     for (let y = 0; y < rows; y++) grid.push(Array(cols).fill(0))
+    for (let y = rows - 2; y < rows; y++) {
+      for (let x = 0; x < cols; x++) if ((x + y) % 3 !== 0) grid[y][x] = (x % 4) + 1
+    }
     let piece = { s: 2, x: 3, y: 0 }
     let drop = 0
     let score = 0
@@ -224,13 +232,14 @@ function mount() {
       }
     })
     onDraw(function () {
-      const cell = Math.min(22, Math.floor(360 / rows), Math.floor(280 / cols))
+      const tones = [rgb(255, 210, 63), rgb(244, 247, 251), rgb(63, 185, 80), rgb(255, 154, 31), rgb(255, 90, 60)]
+      const cell = Math.min(26, Math.floor(400 / rows), Math.floor(300 / cols))
       const ox = Math.floor((480 - cols * cell) / 2)
       for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (grid[y][x]) {
-        drawRect({ pos: vec2(ox + x * cell, 36 + y * cell), width: cell - 1, height: cell - 1, color: ink(THEME.palette.accent) })
+        brick(ox + x * cell + 1, 52 + y * cell + 1, cell - 4, cell - 4, tones[(grid[y][x] - 1) % tones.length])
       }
       for (const spot of cells(piece)) {
-        drawRect({ pos: vec2(ox + spot[0] * cell, 36 + spot[1] * cell), width: cell - 1, height: cell - 1, color: ink(THEME.palette.b || '#ffffff') })
+        brick(ox + spot[0] * cell + 1, 52 + spot[1] * cell + 1, cell - 4, cell - 4, tones[piece.s % tones.length])
       }
     })
   })
@@ -266,10 +275,15 @@ function mount() {
       } else snake.pop()
     })
     onDraw(function () {
-      const cell = Math.min(22, Math.floor(360 / rows))
+      const cell = Math.min(26, Math.floor(400 / rows))
       const ox = Math.floor((480 - cols * cell) / 2)
-      stamp(THEME.sprites.fruit, ox + food.x * cell, 40 + food.y * cell, Math.max(4, cell / 3))
-      for (const part of snake) drawRect({ pos: vec2(ox + part.x * cell, 40 + part.y * cell), width: cell - 2, height: cell - 2, color: ink(THEME.palette.accent) })
+      drawRect({ pos: vec2(ox - 10, 40), width: cols * cell + 20, height: rows * cell + 20, color: rgb(36, 78, 32) })
+      if (!tileSprite(9, ox + food.x * cell, 48 + food.y * cell, cell - 2, cell - 2)) stamp(THEME.sprites.fruit, ox + food.x * cell, 48 + food.y * cell, Math.max(10, cell / 2))
+      for (let i = 0; i < snake.length; i++) {
+        const part = snake[i]
+        if (i === 0 && cast(0, ox + part.x * cell - 6, 42 + part.y * cell - 6, cell + 10)) continue
+        brick(ox + part.x * cell + 1, 48 + part.y * cell + 1, cell - 4, cell - 4, i === 0 ? rgb(255, 210, 63) : rgb(63, 185, 80))
+      }
     })
   })
 }
@@ -320,11 +334,11 @@ function mount() {
       }
     })
     onDraw(function () {
-      const cell = Math.floor(320 / size)
+      const cell = Math.floor(360 / size)
       const ox = Math.floor((480 - size * cell) / 2)
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-        drawRect({ pos: vec2(ox + x * cell, 60 + y * cell), width: cell - 6, height: cell - 6, color: ink(grid[y][x] ? THEME.palette.accent : THEME.palette.mute) })
-        if (grid[y][x]) drawText({ text: String(grid[y][x]), size: 18, pos: vec2(ox + x * cell + 12, 70 + y * cell), color: ink(THEME.palette.bg) })
+        brick(ox + x * cell + 4, 78 + y * cell + 4, cell - 12, cell - 12, grid[y][x] ? ink(THEME.palette.accent) : rgb(210, 190, 235))
+        if (grid[y][x]) drawText({ text: String(grid[y][x]), size: 28, pos: vec2(ox + x * cell + 18, 90 + y * cell), color: rgb(27, 27, 47) })
       }
     })
   })
@@ -362,10 +376,12 @@ function mount() {
       if (y > 400 || y < 8) finish(score)
     })
     onDraw(function () {
-      stamp(THEME.sprites.bird, 70, y, 10)
+      if (!cast(4, 28, y - 36, 72)) stamp(THEME.sprites.bird, 40, y - 24, 22)
       for (const pipe of pipes) {
-        drawRect({ pos: vec2(pipe.x, 0), width: 46, height: 140, color: ink(THEME.palette.accent) })
-        drawRect({ pos: vec2(pipe.x, 140 + CONFIG.gap), width: 46, height: 260, color: ink(THEME.palette.accent) })
+        brick(pipe.x, 0, 64, 128, rgb(63, 185, 80))
+        brick(pipe.x - 8, 112, 80, 18, rgb(40, 130, 55))
+        brick(pipe.x, 140 + CONFIG.gap, 64, 280, rgb(63, 185, 80))
+        brick(pipe.x - 8, 140 + CONFIG.gap, 80, 18, rgb(40, 130, 55))
       }
     })
   })
@@ -406,9 +422,10 @@ function mount() {
       }
     })
     onDraw(function () {
-      for (const brick of bricks) if (brick.alive) drawRect({ pos: vec2(brick.x, brick.y), width: 46, height: 16, color: ink(THEME.palette.accent) })
-      drawRect({ pos: vec2(px - 36, 436), width: 72, height: 12, color: ink(THEME.palette.ink) })
-      drawRect({ pos: vec2(x - 6, y - 6), width: 12, height: 12, color: ink(THEME.palette.b || '#ffffff') })
+      const colors = [rgb(255, 46, 99), rgb(255, 210, 63), rgb(47, 123, 255), rgb(63, 185, 80), rgb(255, 154, 31)]
+      for (let i = 0; i < bricks.length; i++) if (bricks[i].alive) brick(bricks[i].x, bricks[i].y, 52, 22, colors[i % colors.length])
+      brick(px - 52, 424, 104, 16, rgb(244, 247, 251))
+      brick(x - 10, y - 10, 20, 20, rgb(255, 210, 63))
     })
   })
 }
@@ -438,10 +455,10 @@ function mount() {
       if (y > 460 || x > 460) finish(score)
     })
     onDraw(function () {
-      drawRect({ pos: vec2(0, 348), width: 300, height: 16, color: ink(THEME.palette.mute) })
-      drawRect({ pos: vec2(360, 348), width: 120, height: 16, color: ink(THEME.palette.mute) })
-      if (!got) stamp(THEME.sprites.coin, 190, 300, 8)
-      stamp(THEME.sprites.hero, x, y, 10)
+      ground(0, 332, 300, 36)
+      ground(360, 332, 120, 36)
+      if (!got && !tileSprite(9, 172, 284, 40, 40)) stamp(THEME.sprites.coin, 176, 284, 16)
+      if (!cast(0, x - 28, y - 64, 72)) stamp(THEME.sprites.hero, x - 20, y - 48, 22)
     })
   })
 }
@@ -471,9 +488,9 @@ function mount() {
       }
     })
     onDraw(function () {
-      drawRect({ pos: vec2(0, 340), width: 480, height: 12, color: ink(THEME.palette.mute) })
-      stamp(THEME.sprites.hero, 70, y, 12)
-      for (const hurdle of hurdles) stamp(THEME.sprites.hurdle, hurdle.x, 300, 12)
+      ground(0, 318, 480, 40)
+      if (!cast(2, 40, y - 56, 72)) stamp(THEME.sprites.hero, 48, y - 36, 22)
+      for (const hurdle of hurdles) if (!tileSprite(4, hurdle.x, 268, 48, 48)) stamp(THEME.sprites.hurdle, hurdle.x, 276, 20)
     })
   })
 }
@@ -511,9 +528,15 @@ function mount() {
       }
     })
     onDraw(function () {
-      stamp(THEME.sprites.ship, px - 16, 400, 10)
-      for (const bullet of bullets) drawRect({ pos: vec2(bullet.x - 2, bullet.y), width: 4, height: 12, color: ink(THEME.palette.ink) })
-      for (const enemy of enemies) if (enemy.alive) stamp(THEME.sprites.hero, enemy.x - 16, enemy.y, 10)
+      brick(px - 42, 392, 84, 26, rgb(255, 210, 63))
+      brick(px - 10, 372, 22, 22, rgb(244, 247, 251))
+      brick(px - 50, 404, 18, 20, rgb(255, 90, 60))
+      brick(px + 32, 404, 18, 20, rgb(255, 90, 60))
+      for (const bullet of bullets) brick(bullet.x - 3, bullet.y, 8, 18, rgb(255, 248, 230))
+      for (const enemy of enemies) if (enemy.alive) {
+        brick(enemy.x - 30, enemy.y + 10, 60, 28, rgb(255, 90, 60))
+        if (!cast(4, enemy.x - 30, enemy.y - 16, 60)) stamp(THEME.sprites.hero, enemy.x - 28, enemy.y, 22)
+      }
     })
   })
 }
@@ -578,11 +601,11 @@ function mount() {
     onDraw(function () {
       const cell = CONFIG.cell
       for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-        if (layout[y][x] === '#') drawRect({ pos: vec2(20 + x * cell, 50 + y * cell), width: cell - 2, height: cell - 2, color: ink(THEME.palette.mute) })
-        else if (dots[x + ',' + y]) drawRect({ pos: vec2(28 + x * cell, 58 + y * cell), width: 8, height: 8, color: ink(THEME.palette.ink) })
+        if (layout[y][x] === '#') brick(16 + x * cell, 46 + y * cell, cell - 4, cell - 4, rgb(47, 92, 210))
+        else if (dots[x + ',' + y]) drawCircle({ pos: vec2(16 + x * cell + cell / 2, 46 + y * cell + cell / 2), radius: 5, color: rgb(255, 210, 63) })
       }
-      stamp(THEME.sprites.hero, 20 + px * cell, 50 + py * cell, cell / 4)
-      stamp(THEME.sprites.chaser, 20 + gx * cell, 50 + gy * cell, cell / 4)
+      if (!cast(6, 16 + px * cell, 46 + py * cell, cell - 2)) stamp(THEME.sprites.hero, 16 + px * cell, 46 + py * cell, Math.max(12, cell / 2))
+      if (!cast(8, 16 + gx * cell, 46 + gy * cell, cell - 2)) stamp(THEME.sprites.chaser, 16 + gx * cell, 46 + gy * cell, Math.max(12, cell / 2))
     })
   })
 }
@@ -615,8 +638,10 @@ function mount() {
       }
     })
     onDraw(function () {
-      for (const plat of plats) drawRect({ pos: vec2(plat.x - 40, plat.y), width: 80, height: 10, color: ink(THEME.palette.accent) })
-      stamp(THEME.sprites.hero, x - 16, y - 28, 8)
+      for (const plat of plats) {
+        if (!tileSprite(4, plat.x - 46, plat.y - 6, 92, 22)) brick(plat.x - 46, plat.y - 4, 92, 16, rgb(255, 154, 31))
+      }
+      if (!cast(6, x - 28, y - 64, 64)) stamp(THEME.sprites.hero, x - 24, y - 52, 20)
     })
   })
 }
@@ -686,12 +711,14 @@ function mount() {
       }
     })
     onDraw(function () {
-      const cell = Math.floor(300 / Math.max(cols, rows))
+      const cell = Math.floor(360 / Math.max(cols, rows))
       const ox = Math.floor((480 - cols * cell) / 2)
+      const oy = 78
       for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-        drawRect({ pos: vec2(ox + x * cell, 70 + y * cell), width: cell - 4, height: cell - 4, color: ink(tones[grid[y][x] % tones.length]) })
+        const gem = ink(tones[grid[y][x] % tones.length])
+        brick(ox + x * cell + 6, oy + y * cell + 6, cell - 14, cell - 14, gem)
       }
-      drawRect({ pos: vec2(ox + cursor * cell, 70 + cell), width: cell - 4, height: 4, color: ink(THEME.palette.ink) })
+      drawRect({ pos: vec2(ox + cursor * cell + 8, oy + cell - 8), width: cell - 16, height: 6, color: rgb(27, 27, 47) })
     })
   })
 }

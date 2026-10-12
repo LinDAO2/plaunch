@@ -377,9 +377,10 @@ export function createRuntime(els, hooks = {}) {
       }
       els.field.replaceChildren(player, controls)
       els.field.style.pointerEvents = 'auto'
+      els.field.style.background = '#12082a'
       const move = (dir) => {
         dodgeX = Math.min(94, Math.max(6, dodgeX + dir * 9))
-        player.style.left = `calc(${dodgeX}% - 14px)`
+        player.style.left = `calc(${dodgeX}% - 27px)`
       }
       dodgePointer = null
       timer = setInterval(() => {
@@ -415,7 +416,7 @@ export function createRuntime(els, hooks = {}) {
         }
         for (const obstacle of obstacles) {
           obstacle.y += dt * 0.055
-          obstacle.el.style.left = `calc(${obstacle.x}% - 11px)`
+          obstacle.el.style.left = `calc(${obstacle.x}% - 15px)`
           obstacle.el.style.top = `${obstacle.y}%`
           if (obstacle.y > 72 && obstacle.y < 87 && Math.abs(obstacle.x - dodgeX) < 8) {
             els.field.style.pointerEvents = 'none'

@@ -183,42 +183,147 @@ function disc(rgb, x, y, radius, fill) {
   fillCircle(rgb, x, y, radius, fill)
 }
 
-function paintAction(rgb, id, type, accent, yellow) {
-  const hazard = [255, 46, 99]
-  const hot = accent
-  if (id === 'lane-harvest' || id === 'mole-garden') {
-    for (let col = 0; col < 3; col++) {
-      for (let row = 0; row < 3; row++) {
-        disc(rgb, 280 + col * 320, 280 + row * 180, row === 1 && col === 1 ? 54 : 36, (row + col) % 2 ? yellow : hot)
-      }
+function stars(rgb, n, tint) {
+  for (let i = 0; i < n; i++) {
+    fillCircle(rgb, (i * 173) % SIZE, (i * 97) % (SIZE - 80), i % 4 === 0 ? 8 : 4, tint)
+  }
+}
+
+function ship(rgb, x, y, fill) {
+  fillRect(rgb, x - 36, y - 8, 78, 28, [27, 27, 47])
+  fillRect(rgb, x - 28, y - 2, 62, 18, fill)
+  fillRect(rgb, x + 22, y - 22, 18, 20, [255, 46, 99])
+  fillCircle(rgb, x - 6, y + 6, 7, [244, 247, 251])
+}
+
+function meteorRock(rgb, x, y, r) {
+  fillRect(rgb, x - r * 2, y - 6, r * 2, 12, [255, 186, 72])
+  disc(rgb, x, y, r, [196, 78, 36])
+  fillCircle(rgb, x - r * 0.25, y - r * 0.22, r * 0.32, [255, 168, 90])
+}
+
+function gem(rgb, x, y, r, fill) {
+  fillRect(rgb, x - r * 0.45, y - r, r * 0.9, r * 2, [27, 27, 47])
+  fillRect(rgb, x - r, y - r * 0.45, r * 2, r * 0.9, [27, 27, 47])
+  fillRect(rgb, x - r * 0.32, y - r * 0.72, r * 0.64, r * 1.44, fill)
+  fillRect(rgb, x - r * 0.72, y - r * 0.32, r * 1.44, r * 0.64, fill)
+  fillCircle(rgb, x - r * 0.15, y - r * 0.2, r * 0.18, [244, 247, 251])
+}
+
+function paintArcade(rgb, id) {
+  if (id === 'meteor-rain' || id === 'meteor-dodge') {
+    const night = id === 'meteor-rain'
+    fillRect(rgb, 0, 0, SIZE, SIZE, night ? [16, 10, 42] : [28, 18, 64])
+    fillRect(rgb, 0, 0, SIZE, 280, night ? [48, 24, 96] : [64, 32, 120])
+    stars(rgb, 40, night ? [255, 244, 210] : [255, 210, 63])
+    meteorRock(rgb, 280, 260, 70)
+    meteorRock(rgb, 620, 180, 48)
+    meteorRock(rgb, 900, 340, 86)
+    meteorRock(rgb, 460, 480, 36)
+    ship(rgb, 600, 980, night ? [255, 210, 63] : [255, 122, 168])
+    return true
+  }
+  if (id === 'homing-gems') {
+    fillRect(rgb, 0, 0, SIZE, SIZE, [8, 48, 58])
+    fillRect(rgb, 0, 820, SIZE, 380, [6, 32, 40])
+    for (let i = 0; i < 6; i++) fillRect(rgb, 80 + i * 180, 200 + (i % 2) * 80, 40, 520, [12, 70, 82])
+    gem(rgb, 320, 360, 70, [80, 220, 230])
+    gem(rgb, 640, 280, 90, [255, 210, 63])
+    gem(rgb, 900, 480, 60, [255, 90, 140])
+    ship(rgb, 600, 980, [63, 185, 210])
+    return true
+  }
+  if (id === 'lane-harvest') {
+    fillRect(rgb, 0, 0, SIZE, 520, [126, 196, 255])
+    fillRect(rgb, 0, 520, SIZE, 680, [232, 168, 96])
+    fillCircle(rgb, 180, 160, 70, [255, 248, 230])
+    for (let lane = 0; lane < 3; lane++) fillRect(rgb, 180 + lane * 300, 540, 160, 620, [90, 150, 48])
+    for (let i = 0; i < 6; i++) disc(rgb, 260 + (i % 3) * 300, 640 + Math.floor(i / 3) * 180, 36, i % 2 ? [255, 46, 99] : [255, 90, 60])
+    fillRect(rgb, 500, 980, 200, 90, [140, 78, 36])
+    fillRect(rgb, 470, 960, 260, 28, [184, 110, 48])
+    return true
+  }
+  if (id === 'mole-garden') {
+    fillRect(rgb, 0, 0, SIZE, 280, [126, 200, 255])
+    fillRect(rgb, 0, 280, SIZE, 920, [122, 168, 72])
+    fillRect(rgb, 0, 460, SIZE, 740, [138, 92, 48])
+    for (let i = 0; i < 6; i++) {
+      const x = 220 + (i % 3) * 320
+      const y = 560 + Math.floor(i / 3) * 280
+      disc(rgb, x, y + 20, 70, [96, 62, 32])
+      if (i !== 4) disc(rgb, x, y - 10, 36, [92, 58, 36])
     }
-    return
+    disc(rgb, 860, 820, 48, [120, 72, 40])
+    fillCircle(rgb, 844, 804, 8, [244, 247, 251])
+    fillCircle(rgb, 876, 804, 8, [244, 247, 251])
+    fillCircle(rgb, 860, 828, 8, [255, 120, 140])
+    fillRect(rgb, 520, 700, 28, 160, [90, 96, 110])
+    fillRect(rgb, 470, 690, 120, 28, [200, 80, 60])
+    return true
   }
-  if (id === 'lightning-reflex') {
-    disc(rgb, 600, 560, 120, [63, 185, 80])
-    return
-  }
-  if (id === 'lucky-seven' || type === 'guess') {
-    for (let i = 0; i < 3; i++) disc(rgb, 360 + i * 240, 620, 70, i === 1 ? yellow : [244, 247, 251])
-    return
-  }
-  if (id === 'click-frenzy' || type === 'tap') {
-    disc(rgb, 600, 640, 150, yellow)
-    disc(rgb, 820, 420, 48, hot)
-    return
-  }
-  if (id === 'shadow-chase' || id === 'homing-gems') {
-    disc(rgb, 460, 700, 48, yellow)
-    disc(rgb, 760, 460, 40, hot)
-    disc(rgb, 900, 620, 28, [47, 123, 255])
-    return
+  if (id === 'shadow-chase') {
+    fillRect(rgb, 0, 0, SIZE, SIZE, [18, 12, 40])
+    fillRect(rgb, 0, 860, SIZE, 340, [40, 24, 72])
+    for (let i = 0; i < 8; i++) fillRect(rgb, 80, 160 + i * 110, SIZE - 160, 8, [36, 22, 70])
+    disc(rgb, 360, 780, 54, [255, 210, 63])
+    disc(rgb, 820, 420, 70, [90, 40, 140])
+    fillCircle(rgb, 800, 400, 12, [244, 247, 251])
+    fillCircle(rgb, 848, 400, 12, [244, 247, 251])
+    disc(rgb, 560, 300, 22, [255, 210, 63])
+    disc(rgb, 700, 620, 18, [255, 210, 63])
+    return true
   }
   if (id === 'zigzag-orbs') {
-    for (let i = 0; i < 7; i++) disc(rgb, 180 + i * 140, 420 + Math.round(Math.sin(i) * 160), 34, i % 2 ? hazard : yellow)
-    return
+    fillRect(rgb, 0, 0, SIZE, SIZE, [24, 12, 64])
+    fillRect(rgb, 0, 0, SIZE, 220, [90, 40, 160])
+    for (let i = 0; i < 8; i++) {
+      const x = 140 + i * 130
+      const y = 360 + ((i % 2) ? 180 : -40)
+      disc(rgb, x, y, 40, i % 2 ? [255, 46, 140] : [255, 210, 63])
+      if (i) fillRect(rgb, x - 130, Math.min(y, 360 + (((i - 1) % 2) ? 180 : -40)), 130, 16, [180, 120, 255])
+    }
+    ship(rgb, 220, 980, [196, 120, 255])
+    return true
   }
+  if (id === 'click-frenzy') {
+    fillRect(rgb, 0, 0, SIZE, SIZE, [255, 122, 168])
+    fillRect(rgb, 0, 780, SIZE, 420, [255, 196, 72])
+    fillCircle(rgb, 180, 180, 80, [255, 255, 255])
+    disc(rgb, 600, 620, 160, [255, 210, 63])
+    disc(rgb, 280, 420, 48, [47, 123, 255])
+    disc(rgb, 920, 380, 64, [63, 185, 80])
+    disc(rgb, 860, 760, 36, [255, 90, 60])
+    return true
+  }
+  if (id === 'lightning-reflex') {
+    fillRect(rgb, 0, 0, SIZE, SIZE, [10, 36, 28])
+    fillRect(rgb, 0, 0, SIZE, 360, [18, 70, 48])
+    fillRect(rgb, 470, 160, 260, 720, [27, 27, 47])
+    fillRect(rgb, 500, 190, 200, 520, [63, 185, 80])
+    fillCircle(rgb, 600, 980, 70, [255, 210, 63])
+    fillRect(rgb, 560, 940, 80, 24, [27, 27, 47])
+    return true
+  }
+  if (id === 'lucky-seven') {
+    fillRect(rgb, 0, 0, SIZE, SIZE, [10, 48, 36])
+    fillRect(rgb, 80, 160, SIZE - 160, SIZE - 280, [14, 92, 64])
+    fillRect(rgb, 80, 160, SIZE - 160, 24, [212, 168, 72])
+    fillRect(rgb, 80, SIZE - 144, SIZE - 160, 24, [212, 168, 72])
+    for (let i = 0; i < 3; i++) {
+      fillRect(rgb, 220 + i * 270, 340, 200, 280, [244, 247, 251])
+      fillRect(rgb, 236 + i * 270, 356, 168, 248, i === 1 ? [255, 210, 63] : [255, 90, 60])
+    }
+    fillCircle(rgb, 600, 860, 18, [255, 248, 230])
+    return true
+  }
+  return false
+}
+
+function paintAction(rgb, id, type, accent, yellow) {
+  if (paintArcade(rgb, id)) return
+  const hazard = [255, 46, 99]
   disc(rgb, 600, 860, 52, yellow)
-  for (let i = 0; i < 5; i++) disc(rgb, 200 + i * 200, 220 + (i % 3) * 140, 36, i % 2 ? hazard : hot)
+  for (let i = 0; i < 5; i++) disc(rgb, 200 + i * 200, 220 + (i % 3) * 140, 36, i % 2 ? hazard : accent)
 }
 
 function drawIso(rgb, x, y, z, color) {
@@ -274,6 +379,11 @@ export function renderPoster(game) {
   const rgb = Buffer.alloc(SIZE * SIZE * 3)
   const accent = hexColor(game.accent)
   const yellow = [255, 210, 63]
+  if (paintArcade(rgb, game.id || '')) {
+    fillRect(rgb, SIZE / 2 - 90, 36, 180, 48, [27, 27, 47])
+    drawText(rgb, '128', SIZE / 2 - 36, 48, 5, yellow)
+    return encodePng(SIZE, SIZE, rgb)
+  }
   fillRect(rgb, 0, 0, SIZE, Math.round(SIZE * 0.62), [79, 179, 255])
   fillRect(rgb, 0, Math.round(SIZE * 0.62), SIZE, SIZE, [205, 235, 255])
   fillRect(rgb, 0, Math.round(SIZE * 0.78), SIZE, SIZE, [123, 200, 108])

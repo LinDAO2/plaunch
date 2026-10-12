@@ -138,16 +138,7 @@ function draw(ctx, spec, snap, view, juice = { bits: [], squash: 0 }) {
   const unit = Math.max(0.9, Math.min(2.6, Math.min(width / 420, height / 320)))
   const primitives = new Set(spec.primitives || [])
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = '#4FB3FF'
-  ctx.fillRect(0, 0, width, height * 0.55)
-  ctx.fillStyle = '#CDEBFF'
-  ctx.fillRect(0, height * 0.55, width, height * 0.45)
-  ctx.fillStyle = spec.accent || '#FF5A3C'
-  ctx.globalAlpha = 0.16
-  ctx.beginPath()
-  ctx.arc(width * 0.82, height * 0.22, Math.max(28, width * 0.08), 0, Math.PI * 2)
-  ctx.fill()
-  ctx.globalAlpha = 1
+  paintScene(ctx, spec.name || '', width, height, snap.time || 0)
   if (snap.walls?.length) {
     ctx.fillStyle = spec.palette?.[2] || '#2a2440'
     for (const wall of snap.walls) {
@@ -171,7 +162,7 @@ function draw(ctx, spec, snap, view, juice = { bits: [], squash: 0 }) {
     ctx.arc((shot.x / 100) * width, (shot.y / 100) * height, 4, 0, Math.PI * 2)
     ctx.fill()
   }
-  if (spec.controls?.scheme !== 'tap') {
+  if (Number.isFinite(snap.playerX)) {
     const py = Number.isFinite(snap.playerY) ? snap.playerY : 84
     const squashed = juice.squash > 0
     sprite(ctx, spec.player?.sprite || '●', (snap.playerX / 100) * width, (py / 100) * height, size, '#FFD23F', squashed ? 1.2 : 1, squashed ? 0.8 : 1)
@@ -212,19 +203,128 @@ function draw(ctx, spec, snap, view, juice = { bits: [], squash: 0 }) {
   }
 }
 
-// A soft colored disc behind every sprite keeps it visible even when the
-// glyph renders as a dark monochrome symbol (for example ☄ on many systems).
+function paintScene(ctx, name, width, height, timeMs) {
+  const t = timeMs / 1000
+  const drift = (t * 28) % (width + 80)
+  if (name === 'Meteor Rain' || name === 'Meteor Dodge') {
+    ctx.fillStyle = name === 'Meteor Rain' ? '#12082a' : '#2a1848'
+    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = '#3a1870'
+    ctx.fillRect(0, 0, width, height * 0.28)
+    ctx.fillStyle = '#fff4d2'
+    for (let i = 0; i < 18; i++) {
+      const x = (i * 97 + drift) % width
+      const y = (i * 53) % (height * 0.7)
+      ctx.fillRect(x, y, i % 3 ? 2 : 3, i % 3 ? 2 : 3)
+    }
+    return
+  }
+  if (name === 'Homing Gems') {
+    ctx.fillStyle = '#08343c'
+    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = '#0e5560'
+    for (let i = 0; i < 5; i++) ctx.fillRect(width * (0.08 + i * 0.18), height * 0.2, 10, height * 0.6)
+    return
+  }
+  if (name === 'Lane Harvest') {
+    ctx.fillStyle = '#7ec8ff'
+    ctx.fillRect(0, 0, width, height * 0.42)
+    ctx.fillStyle = '#e8b070'
+    ctx.fillRect(0, height * 0.42, width, height)
+    ctx.fillStyle = '#5a9630'
+    for (let i = 0; i < 3; i++) ctx.fillRect(width * (0.12 + i * 0.28), height * 0.46, width * 0.16, height * 0.5)
+    ctx.fillStyle = '#fff8e6'
+    ctx.beginPath()
+    ctx.arc(width * 0.16 - drift * 0.2, height * 0.16, 22, 0, Math.PI * 2)
+    ctx.fill()
+    return
+  }
+  if (name === 'Mole Garden') {
+    ctx.fillStyle = '#8fd0ff'
+    ctx.fillRect(0, 0, width, height * 0.28)
+    ctx.fillStyle = '#7aaa48'
+    ctx.fillRect(0, height * 0.28, width, height * 0.16)
+    ctx.fillStyle = '#8a5a32'
+    ctx.fillRect(0, height * 0.42, width, height)
+    return
+  }
+  if (name === 'Shadow Chase') {
+    ctx.fillStyle = '#140c28'
+    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = '#2a1848'
+    for (let i = 0; i < 6; i++) ctx.fillRect(0, height * (0.18 + i * 0.12), width, 4)
+    return
+  }
+  if (name === 'Zigzag Orbs') {
+    ctx.fillStyle = '#1a0c40'
+    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = '#5a28a0'
+    ctx.fillRect(0, 0, width, height * 0.22)
+    ctx.strokeStyle = '#c48cff'
+    ctx.lineWidth = 6
+    ctx.beginPath()
+    for (let i = 0; i < 8; i++) {
+      const x = (i / 7) * width
+      const y = height * (0.35 + (i % 2) * 0.28)
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.stroke()
+    return
+  }
+  ctx.fillStyle = '#4FB3FF'
+  ctx.fillRect(0, 0, width, height * 0.55)
+  ctx.fillStyle = '#CDEBFF'
+  ctx.fillRect(0, height * 0.55, width, height * 0.45)
+  ctx.fillStyle = '#7BC86C'
+  ctx.fillRect(0, height * 0.78, width, height)
+}
+
+function paintBody(ctx, glyph, dy, r) {
+  if (glyph === '☄' || glyph === '🔺') ctx.ellipse(0, dy, r * 1.1, r * 0.72, -0.45, 0, Math.PI * 2)
+  else if (glyph === '💎' || glyph === '✨') {
+    ctx.moveTo(0, dy - r)
+    ctx.lineTo(r * 0.75, dy)
+    ctx.lineTo(0, dy + r)
+    ctx.lineTo(-r * 0.75, dy)
+    ctx.closePath()
+  } else if (glyph === '🐹' || glyph === '🐛' || glyph === '🌿') ctx.ellipse(0, dy + r * 0.1, r, r * 0.7, 0, 0, Math.PI * 2)
+  else if (glyph === '🚀' || glyph === '🛸') {
+    ctx.moveTo(0, dy - r)
+    ctx.lineTo(r * 0.72, dy + r * 0.85)
+    ctx.lineTo(-r * 0.72, dy + r * 0.85)
+    ctx.closePath()
+  } else if (glyph === '🧺' || glyph === '🔨') ctx.rect(-r, dy - r * 0.35, r * 2, r)
+  else if (glyph === '🏃' || glyph === '👻') {
+    ctx.arc(0, dy - r * 0.45, r * 0.42, 0, Math.PI * 2)
+    ctx.rect(-r * 0.4, dy - r * 0.05, r * 0.8, r * 0.9)
+  } else ctx.ellipse(0, dy, r, r, 0, 0, Math.PI * 2)
+}
+
+// A shaped body plus a white glyph keeps meteors readable. The meteor test
+// reads the fill style of the ☄ glyph, which stays #ffffff.
 function sprite(ctx, glyph, x, y, size, color, sx = 1, sy = 1) {
-  const rx = size * 0.62 * sx
-  const ry = size * 0.62 * sy
+  const r = size * 0.62
+  ctx.save()
+  ctx.translate(x, y + 3)
+  ctx.scale(sx, sy)
   ctx.fillStyle = '#1B1B2F'
   ctx.beginPath()
-  ctx.ellipse(x, y + 3, rx + 3, ry + 3, 0, 0, Math.PI * 2)
+  paintBody(ctx, glyph, 0, r + 3)
   ctx.fill()
+  ctx.restore()
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(sx, sy)
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2)
+  paintBody(ctx, glyph, 0, r)
   ctx.fill()
+  ctx.fillStyle = 'rgba(255,248,230,0.55)'
+  ctx.beginPath()
+  ctx.ellipse(-r * 0.22, -r * 0.28, r * 0.22, r * 0.14, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
   ctx.fillStyle = '#ffffff'
   ctx.fillText(glyph, x, y)
 }
