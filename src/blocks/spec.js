@@ -72,6 +72,25 @@ export function landformFor(prompt) {
   return 'rolling'
 }
 
+export function structureForPrompt(prompt) {
+  const p = String(prompt || '').toLowerCase()
+  if (/pyramid/.test(p)) return 'pyramid'
+  if (/lighthouse/.test(p)) return 'lighthouse'
+  if (/watchtower/.test(p)) return 'watchtower'
+  if (/ruins?/.test(p)) return 'ruins'
+  if (/dock|pier|jetty/.test(p)) return 'dock'
+  if (/cabin|cottage/.test(p)) return 'cabin'
+  if (/house/.test(p)) return 'house'
+  if (/castle|tower/.test(p)) return 'tower'
+  const landform = landformFor(p)
+  if (landform === 'lake') return hashString(p) % 2 === 0 ? 'cabin' : 'dock'
+  if (landform === 'beach') return 'lighthouse'
+  if (landform === 'canyon') return 'ruins'
+  if (landform === 'peaks' || /snow|ice|frost|winter/.test(p)) return 'watchtower'
+  if (/\bminecraft\b|\bvoxel\b|block building|block world/.test(p)) return 'house'
+  return 'none'
+}
+
 export function chooseWorld(prompt) {
   const p = String(prompt || '').toLowerCase()
   const landform = landformFor(p)
@@ -82,11 +101,7 @@ export function chooseWorld(prompt) {
   else if (landform === 'beach') biome = 'grassland'
   else if (/snow|ice|frost|winter/.test(p) || landform === 'peaks') biome = 'snow'
   else if (/desert|dune|sand/.test(p)) biome = 'desert'
-  let structure = 'none'
-  if (/pyramid/.test(p)) structure = 'pyramid'
-  else if (/house|cabin|cottage/.test(p)) structure = 'house'
-  else if (/castle|tower/.test(p)) structure = 'tower'
-  else if (/\bminecraft\b|\bvoxel\b|block building|block world/.test(p)) structure = 'house'
+  const structure = structureForPrompt(p)
   const islands = /island|isle|atoll|archipelago|sky island/.test(p)
   const caves = /\bcaves?\b|\bcaverns?\b|\bmining\b|underground/.test(p)
   const sky = biome === 'moon' || /night/.test(p) ? 'night' : /dusk|sunset/.test(p) ? 'dusk' : /day and night|\bcycle\b/.test(p) ? 'cycle' : 'day'
@@ -362,7 +377,9 @@ export function worldSpecFromFields(game = {}) {
 export function repairWorldSpec(raw, prompt = '') {
   const base = chooseWorld(prompt || (isObject(raw) ? raw.name : '') || 'block world')
   const src = isObject(raw) ? raw : {}
-  const structure = STRUCTURES.includes(src.structure) ? src.structure : base.structure
+  const structure = String(prompt || '').trim()
+    ? structureForPrompt(prompt)
+    : (STRUCTURES.includes(src.structure) ? src.structure : base.structure)
   const worldSize = Object.prototype.hasOwnProperty.call(WORLD_SIZES, src.worldSize) ? src.worldSize : base.worldSize
   let terrainSeed = Number(src.terrainSeed)
   if (!Number.isInteger(terrainSeed) || terrainSeed < 0 || terrainSeed > 1_000_000_000) terrainSeed = base.terrainSeed

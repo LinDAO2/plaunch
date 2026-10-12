@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
 import { generateWorldFromPrompt } from '../src/ai/worldgen.js'
-import { repairWorldSpec, chooseWorld } from '../src/blocks/spec.js'
-import { WATER, blockAt, spawnPoint, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
+import { GLOW, FROST, ROCK, TIMBER } from '../src/blocks/blocks.js'
+import { repairWorldSpec, chooseWorld, structureForPrompt } from '../src/blocks/spec.js'
+import { WATER, blockAt, spawnPoint, structureOrigin, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
 import { saveEdit } from '../src/blocks/store.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -79,6 +80,40 @@ test('landscape prompts keep distinct biomes and landforms', () => {
   assert.equal(castle.structure, 'tower')
   assert.equal(castle.name, 'Castle Blocks')
   assert.equal(castle.terrain.landform, 'rolling')
+  const clear = 'mountains surrounding a clear lake'
+  assert.ok(structureForPrompt(clear) === 'cabin' || structureForPrompt(clear) === 'dock')
+  assert.notEqual(structureForPrompt(clear), 'pyramid')
+  const shore = worldFromSpec(chooseWorld(clear))
+  const origin = structureOrigin(shore)
+  assert.ok(surfaceY(origin.x, origin.z, shore) >= WATER)
+  let timber = 0
+  let wet = 0
+  for (let y = 1; y < 24; y++) {
+    if (blockAt(origin.x, y, origin.z, shore) === TIMBER) timber += 1
+  }
+  for (let dz = -10; dz <= 2; dz++) {
+    if (surfaceY(origin.x, origin.z + dz, shore) < WATER) wet += 1
+  }
+  assert.ok(timber > 0)
+  assert.ok(wet > 0)
+  const light = worldFromSpec({ biome: 'grassland', terrainSeed: 3, worldSize: 'medium', structure: 'lighthouse', terrain: { landform: 'beach', sky: 'day' } })
+  const lo = structureOrigin(light)
+  assert.equal(blockAt(lo.x, surfaceY(lo.x, lo.z, light) + 10, lo.z, light), GLOW)
+  const ruins = worldFromSpec({ biome: 'desert', terrainSeed: 4, worldSize: 'medium', structure: 'ruins', terrain: { landform: 'canyon', sky: 'day' } })
+  const ro = structureOrigin(ruins)
+  const rh = surfaceY(ro.x, ro.z, ruins)
+  let rock = 0
+  for (let dx = -3; dx <= 3; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      if (blockAt(ro.x + dx, rh + 1, ro.z + dz, ruins) === ROCK) rock += 1
+    }
+  }
+  assert.ok(rock > 0)
+  const watch = worldFromSpec({ biome: 'snow', terrainSeed: 5, worldSize: 'medium', structure: 'watchtower', terrain: { landform: 'peaks', sky: 'day' } })
+  const wo = structureOrigin(watch)
+  const wh = surfaceY(wo.x, wo.z, watch)
+  assert.equal(blockAt(wo.x, wh + 8, wo.z, watch), FROST)
+  assert.equal(blockAt(wo.x, wh + 4, wo.z, watch), ROCK)
 })
 
 test('islands drop the shore and caves open air under the surface', () => {
@@ -197,9 +232,24 @@ test('live world generation does not fall back while a key is set', async () => 
     }
     assert.equal(calls, open.length)
     assert.equal(new Set(worlds.map((item) => item.terrainSeed)).size, open.length)
-    const structures = new Set(worlds.map((item) => item.structure))
-    assert.ok(structures.size >= 3, [...structures].join(','))
-    assert.notEqual(structures.size, 1)
+    const fits = {
+      'a dense green forest with tall trees': ['none'],
+      'mountains with a lake': ['cabin', 'dock'],
+      'a sandy beach along the coast': ['lighthouse'],
+      'snowy mountain peaks': ['watchtower'],
+      'a desert canyon': ['ruins']
+    }
+    for (const spec of worlds) {
+      const prompt = open[worlds.indexOf(spec)]
+      assert.ok(fits[prompt].includes(spec.structure), `${prompt} -> ${spec.structure}`)
+      assert.ok(!['tower', 'house', 'pyramid'].includes(spec.structure))
+    }
+    const clear = await generateWorldFromPrompt({ prompt: 'mountains surrounding a clear lake', env })
+    assert.equal(clear.fallback, false)
+    assert.equal(clear.provider, 'anthropic')
+    assert.ok(clear.spec.structure === 'cabin' || clear.spec.structure === 'dock', clear.spec.structure)
+    assert.notEqual(clear.spec.structure, 'pyramid')
+    assert.notEqual(clear.spec.terrainSeed, 48213)
     const pyramid = await generateWorldFromPrompt({ prompt: 'a candy island with a pyramid', env })
     const castle = await generateWorldFromPrompt({ prompt: 'build a castle together', env })
     assert.equal(pyramid.fallback, false)

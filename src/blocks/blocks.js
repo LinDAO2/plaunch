@@ -37,7 +37,7 @@ export function hotbarFor(biome) {
 }
 
 export const BIOMES = ['grassland', 'desert', 'snow', 'candy', 'moon']
-export const STRUCTURES = ['tower', 'house', 'pyramid', 'none']
+export const STRUCTURES = ['tower', 'house', 'pyramid', 'cabin', 'dock', 'lighthouse', 'ruins', 'watchtower', 'none']
 export const WORLD_SIZES = { small: 32, medium: 48, large: 64 }
 export const WORLD_HEIGHT = 48
 export const CHUNK = 16

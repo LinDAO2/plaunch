@@ -1,5 +1,5 @@
 import { isSolid } from './blocks.js'
-import { blockAt, hash2, surfaceY, WATER } from './terrain.js'
+import { blockAt, hash2, structureOrigin, surfaceY, WATER } from './terrain.js'
 
 const COUNT = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
 
@@ -24,7 +24,12 @@ const CYCLE_MS = 72000
 
 export function goalTargets(world) {
   if (world?.structure === 'pyramid') return { label: 'Pyramid', raise: 3, sparks: 8 }
+  if (world?.structure === 'lighthouse') return { label: 'Lighthouse', raise: 4, sparks: 6 }
+  if (world?.structure === 'watchtower') return { label: 'Watchtower', raise: 4, sparks: 6 }
   if (world?.structure === 'tower') return { label: 'Tower', raise: 4, sparks: 6 }
+  if (world?.structure === 'cabin') return { label: 'Cabin', raise: 3, sparks: 5 }
+  if (world?.structure === 'dock') return { label: 'Dock', raise: 3, sparks: 5 }
+  if (world?.structure === 'ruins') return { label: 'Ruins', raise: 3, sparks: 5 }
   if (world?.structure === 'house') return { label: 'House', raise: 4, sparks: 5 }
   if (world?.biome === 'candy') return { label: 'Pyramid', raise: 3, sparks: 8 }
   if (world?.biome === 'grassland') return { label: 'Tower', raise: 4, sparks: 6 }
@@ -43,9 +48,9 @@ export function goalCopy(world) {
 }
 
 function footprint(world) {
-  const cx = world.size >> 1
-  const cz = world.size >> 1
-  return { cx, cz, r: 1 }
+  const origin = structureOrigin(world)
+  const wide = world?.structure === 'ruins' || world?.structure === 'dock' ? 2 : 1
+  return { cx: origin.x, cz: origin.z, r: wide }
 }
 
 function columnPeak(world, edits, x, z) {

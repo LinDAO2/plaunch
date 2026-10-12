@@ -116,7 +116,7 @@ function landformHeight(x, z, world) {
   } else if (landform === 'lake') {
     if (dist < 0.16) h = 4
     else if (dist < 0.26) h = Math.round(4 + ((dist - 0.16) / 0.1) * 3)
-    else if (dist < 0.34) h = WATER + (dist > 0.3 ? 1 : 0)
+    else if (dist < 0.4) h = WATER + (dist > 0.32 ? 1 : 0)
     else h = Math.round(WATER + 3 + n * 8 + Math.max(0, dist - 0.38) * 26)
   } else if (landform === 'beach') {
     const shore = z / size
@@ -160,8 +160,9 @@ function distFromCenter(x, z, world) {
 
 function nearStructure(x, z, world) {
   if (world.structure === 'none') return false
-  const { cx, cz } = center(world)
-  return Math.abs(x - cx) <= 7 && Math.abs(z - cz) <= 7
+  const origin = structureOrigin(world)
+  const reach = world.structure === 'dock' ? 11 : world.structure === 'ruins' ? 5 : 4
+  return Math.abs(x - origin.x) <= reach && Math.abs(z - origin.z) <= reach
 }
 
 function hasTree(x, z, world) {
@@ -201,7 +202,7 @@ function treeHere(x, z, world) {
   if (world.landform === 'beach' && z < world.size * 0.48) return false
   if (world.landform === 'forest' && h >= 16) return false
   if ((world.landform === 'peaks' || world.landform === 'mountains') && h > 24) return false
-  if (world.landform === 'lake' && (h < WATER + 2 || distFromCenter(x, z, world) < 0.36)) return false
+  if (world.landform === 'lake' && (h < WATER + 2 || distFromCenter(x, z, world) < 0.42)) return false
   return true
 }
 
@@ -263,10 +264,17 @@ function shapedTreeBlock(x, y, z, world) {
       const branch = h + trunk - 2
       if (y === branch && ((dz === 0 && Math.abs(dx) === 1) || (dx === 0 && Math.abs(dz) === 1))) return wood
       const dy = y - (h + trunk)
-      const wide = roll > 0.45
-        ? { 0: 3, 1: 2, 3: 2, 4: 1, 6: 1 }
-        : { 0: 2, 1: 2, 2: 1, 4: 2, 5: 1, 7: 1 }
-      if (crownBlock(dx, dz, dy, wide) && !(dx === 0 && dz === 0 && dy <= 0)) return leaf
+      const wide = roll > 0.62
+        ? { 0: 2, 2: 3, 3: 2, 5: 1 }
+        : roll > 0.3
+          ? { 0: 3, 1: 2, 4: 2, 6: 1 }
+          : { 1: 2, 2: 1, 3: 2, 5: 1, 7: 1 }
+      if (crownBlock(dx, dz, dy, wide) && !(dx === 0 && dz === 0 && dy <= 0)) {
+        const rad = wide[dy]
+        const outer = Math.abs(dx) + Math.abs(dz) >= rad
+        if (outer && rad > 1 && hash2(tx + dx * 3, tz + dz * 5, world.seed + dy) > 0.62) return 0
+        return leaf
+      }
     }
   }
   return 0
@@ -277,34 +285,103 @@ function treeBlock(x, y, z, world) {
   return shapedTreeBlock(x, y, z, world)
 }
 
+function shoreLine(world, cx, cz) {
+  let shore = Math.min(world.size - 4, cz + 6)
+  for (let z = cz; z < world.size - 4; z++) {
+    if (surfaceY(cx, z, world) >= WATER + 1) return z
+  }
+  for (let z = cz - 1; z >= 2; z--) {
+    if (surfaceY(cx, z, world) >= WATER + 1) return z
+  }
+  return shore
+}
+
+export function structureOrigin(world) {
+  if (world._origin) return world._origin
+  const { cx, cz } = center(world)
+  let origin = { x: cx, z: cz }
+  const kind = world.structure
+  if (kind === 'cabin' || kind === 'dock' || kind === 'lighthouse') {
+    const shore = shoreLine(world, cx, cz)
+    const inland = Math.min(world.size - 5, shore + 3)
+    if (kind === 'dock') origin = { x: Math.max(4, cx - 7), z: shore }
+    else if (kind === 'cabin') origin = { x: Math.min(world.size - 5, cx + 7), z: inland }
+    else origin = { x: Math.min(world.size - 5, cx + 8), z: inland }
+  }
+  world._origin = origin
+  return origin
+}
+
 function structureAt(x, y, z, world) {
   if (world.structure === 'none') return null
-  const { cx, cz } = center(world)
-  const h = surfaceY(cx, cz, world)
-  const dx = Math.abs(x - cx)
-  const dz = Math.abs(z - cz)
+  const origin = structureOrigin(world)
+  const ox = origin.x
+  const oz = origin.z
+  const h = surfaceY(ox, oz, world)
+  const dx = x - ox
+  const dz = z - oz
+  const ax = Math.abs(dx)
+  const az = Math.abs(dz)
+  if (world.structure === 'dock') {
+    if (ax > 1 || dz > 0 || dz < -9) return null
+    if (y === WATER) return TIMBER
+    if (dx === 0 && dz % 3 === 0) {
+      const bed = surfaceY(x, z, world)
+      if (y > bed && y < WATER) return TIMBER
+    }
+    return null
+  }
+  if (world.structure === 'cabin') {
+    if (ax > 2 || az > 2 || y < h || y > h + 4) return null
+    if (y === h + 4) return ax <= 1 && az <= 1 ? TIMBER : null
+    if (y === h + 3 || y === h) return TIMBER
+    const wall = ax === 2 || az === 2
+    if (wall && !(z === oz - 2 && x === ox && y > h && y < h + 3)) return TIMBER
+    return AIR
+  }
+  if (world.structure === 'lighthouse') {
+    if (ax > 1 || az > 1 || y < h || y > h + 11) return null
+    if (y >= h + 9) return GLOW
+    if (ax === 1 || az === 1 || y === h) return ROCK
+    return AIR
+  }
+  if (world.structure === 'watchtower') {
+    if (ax > 1 || az > 1 || y < h || y > h + 8) return null
+    if (y === h + 8) return world.biome === 'snow' ? FROST : ROCK
+    if (y === h + 7) return TIMBER
+    return ROCK
+  }
+  if (world.structure === 'ruins') {
+    if (ax > 3 || az > 2 || y < h || y > h + 3) return null
+    const wall = ax === 3 || az === 2
+    if (!wall) return y === h && hash2(x, z, world.seed + 11) > 0.45 ? ROCK : null
+    if (hash2(x, y, world.seed + z) > 0.62) return null
+    if (y > h + 1 && hash2(x, z, world.seed + 3) > 0.55) return null
+    return ROCK
+  }
   if (world.structure === 'tower') {
-    if (dx <= 1 && dz <= 1 && y >= h && y <= h + 7) {
-      if (dx === 1 && dz === 1) return TIMBER
+    if (ax <= 1 && az <= 1 && y >= h && y <= h + 7) {
+      if (ax === 1 && az === 1) return TIMBER
       if (y === h + 7) return world.biome === 'candy' ? CANDY : TURF
       return ROCK
     }
     return null
   }
   if (world.structure === 'house') {
-    if (dx <= 2 && dz <= 2 && y >= h && y <= h + 3) {
-      const wall = dx === 2 || dz === 2
+    if (ax <= 2 && az <= 2 && y >= h && y <= h + 3) {
+      const wall = ax === 2 || az === 2
       if (y === h + 3) return world.biome === 'snow' ? FROST : TURF
       if (y === h) return TIMBER
-      if (wall && !(z === cz + 2 && x === cx && (y === h + 1 || y === h + 2))) return TIMBER
+      if (wall && !(z === oz + 2 && x === ox && (y === h + 1 || y === h + 2))) return TIMBER
       return AIR
     }
     return null
   }
+  if (world.structure !== 'pyramid') return null
   const layer = y - h
   if (layer < 0 || layer > 5) return null
   const rad = 5 - layer
-  if (dx <= rad && dz <= rad) {
+  if (ax <= rad && az <= rad) {
     if (world.biome === 'candy') return layer % 2 ? PETAL : CANDY
     if (world.biome === 'desert') return DUNE
     return ROCK

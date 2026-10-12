@@ -240,8 +240,8 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#9ebfd4')
-  const haze = new THREE.Color(world?.biome === 'desert' ? '#d2b48c' : world?.biome === 'snow' ? '#c5d4e6' : '#6f94d4')
-  scene.fog = new THREE.FogExp2(haze, quality.tier === 'low' ? 0.01 : 0.0065)
+  const haze = new THREE.Color(world?.biome === 'desert' ? '#d2b48c' : world?.biome === 'snow' ? '#c5d4e6' : '#7aa0dc')
+  scene.fog = new THREE.FogExp2(haze, quality.tier === 'low' ? 0.0058 : 0.0035)
   const camera = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
   const sky = attachSky(scene)
 
@@ -292,7 +292,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       side: THREE.DoubleSide
     }),
     water: new THREE.MeshPhysicalMaterial({
-      color: 0x17607a,
+      color: 0x2f86a0,
       map: loadMap(loader, '/textures/water_diff.jpg', true),
       normalMap: loadMap(loader, '/textures/water_nor.jpg', false),
       roughnessMap: loadMap(loader, '/textures/water_rough.jpg', false),
@@ -300,7 +300,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       metalness: 0.02,
       transmission: 0,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.78,
       vertexColors: true,
       side: THREE.DoubleSide
     }),
@@ -334,11 +334,13 @@ ${shader.fragmentShader}`
       if (uReflectOn > 0.5) {
         vec2 suv = gl_FragCoord.xy / uResolution;
         vec3 mirrored = texture2D(uReflect, suv).rgb;
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, mirrored, 0.58);
+        float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
+        float fres = pow(1.0 - ndv, 2.4);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, mirrored, mix(0.28, 0.78, fres));
       }`
     )
   }
-  materials.leaves.color = new THREE.Color(0xc5d2b0)
+  materials.leaves.color = new THREE.Color(0x8faf78)
 
   const pmrem = new THREE.PMREMGenerator(renderer)
   const envScene = new THREE.Scene()
@@ -525,16 +527,16 @@ ${shader.fragmentShader}`
         if ((sample(x, h + 1, z) | 0) !== 0) continue
         const ground = sample(x, h, z) | 0
         const n = hash2(x, z, (world.seed || 1) + 41)
-        if (ground === TURF && n > 0.55) {
-          pushCross(take('tuft'), x, z, h + 1, 0.62, 0.22, [0.85 + n * 0.15, 0.95, 0.75])
+        if (ground === TURF && n > 0.72) {
+          pushCross(take('tuft'), x, z, h + 1, 0.9, 0.16, [0.42 + n * 0.1, 0.62, 0.3])
         }
-        if (ground === TURF && hash2(x, z, (world.seed || 1) + 47) > 0.93) {
+        if (ground === TURF && hash2(x, z, (world.seed || 1) + 47) > 0.9) {
           const palette = [[0.96, 0.86, 0.42], [0.94, 0.95, 0.9], [0.58, 0.74, 0.9], [0.84, 0.7, 0.36]]
           const tint = palette[Math.floor(hash2(x, z, (world.seed || 1) + 48) * palette.length) % palette.length]
-          pushCross(take('flower'), x, z, h + 1, 0.48, 0.12, tint)
+          pushCross(take('flower'), x, z, h + 1, 0.7, 0.1, tint)
         }
-        if ((ground === TURF || ground === DUNE || ground === ROCK || ground === FROST) && hash2(x, z, (world.seed || 1) + 53) > 0.92) {
-          pushCross(take('rock'), x, z, h + 1, 0.28, 0.2, [0.75, 0.75, 0.75])
+        if ((ground === TURF || ground === DUNE || ground === ROCK || ground === FROST) && hash2(x, z, (world.seed || 1) + 53) > 0.88) {
+          pushCross(take('rock'), x, z, h + 1, 0.38, 0.28, [0.62, 0.6, 0.56])
         }
       }
     }
@@ -663,7 +665,7 @@ ${shader.fragmentShader}`
     const elev = -0.08 + light * 1.15
     sunDir.set(0.55, Math.sin(elev), 0.35 * Math.cos(elev)).normalize()
     sky.material.uniforms.uSun.value.copy(sunDir)
-    scene.fog.color.copy(haze).lerp(horizon, light > 0.5 ? 0.18 : 0.4)
+    scene.fog.color.copy(haze).lerp(horizon, light > 0.5 ? 0.08 : 0.28)
     scene.background.copy(horizon)
     hemi.color.copy(zenith)
     hemi.groundColor.set(0x8a5a32)

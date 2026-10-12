@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto'
-import { generateWorldIdea, repairWorldSpec } from '../blocks/spec.js'
+import { generateWorldIdea, repairWorldSpec, structureForPrompt } from '../blocks/spec.js'
 import { log } from '../log.js'
 import { aiStatus, parseModelJson, requestModelText } from './generate.js'
 import { resolveProviderChain } from './providers.js'
@@ -87,7 +87,7 @@ const WORLD_PROMPT = `You design one shared Minecraft-style voxel world for a br
 Rules:
 - version is "1.2" and runtime is "world"
 - biome is grassland, desert, snow, candy, or moon
-- structure is tower, house, pyramid, or none. Use none for open land. Do not default every world to house; pick tower, pyramid, house, or none to match the idea, and prefer none unless a building is the point
+- structure is cabin, dock, lighthouse, ruins, watchtower, tower, house, pyramid, or none. The server replaces it: a lake gets a cabin or dock, a beach a lighthouse, a canyon ruins, snow a watchtower, and open land none. Do not use a pyramid unless the idea names one
 - worldSize is small, medium, or large
 - terrainSeed is an integer from 1 to 100000. The server replaces it, so do not reuse one favorite number
 - terrain.islands and terrain.caves are booleans. terrain.sky is day, dusk, night, or cycle
@@ -124,29 +124,11 @@ function ideaFrom(spec, extra = {}) {
   return idea
 }
 
-const STRUCTURES = ['tower', 'house', 'pyramid', 'none']
-
-function hashString(value) {
-  let h = 2166136261
-  const str = String(value || '')
-  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619)
-  return h >>> 0
-}
-
-function askedStructure(prompt) {
-  const p = String(prompt || '').toLowerCase()
-  if (/pyramid/.test(p)) return 'pyramid'
-  if (/house|cabin|cottage/.test(p)) return 'house'
-  if (/castle|tower/.test(p)) return 'tower'
-  return null
-}
-
 function diversify(spec, prompt) {
-  const asked = askedStructure(prompt)
   return {
     ...spec,
     terrainSeed: randomInt(1, 100001),
-    structure: asked || STRUCTURES[hashString(prompt) % STRUCTURES.length]
+    structure: structureForPrompt(prompt)
   }
 }
 
