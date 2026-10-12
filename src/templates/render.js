@@ -31,7 +31,9 @@ export function renderTemplate(spec) {
 <meta charset="utf-8">
 <title>${spec.name}</title>
 <style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
+@font-face{font-family:"Lilita One";src:url("/fonts/lilita-one-latin.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:Rubik;src:url("/fonts/rubik-latin-700.woff2") format("woff2");font-weight:700;font-display:swap}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#4FB3FF}
 canvas{display:block;touch-action:none}
 </style>
 </head>

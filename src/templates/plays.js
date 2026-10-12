@@ -95,6 +95,13 @@ function mount() {
       award(score)
       if (word === answer || rows.length >= CONFIG.maxGuesses) {
         done = true
+        window.__share = rows.map(function (rowWord) {
+          return rowWord.split('').map(function (ch, i) {
+            if (ch === answer[i]) return '🟩'
+            if (answer.indexOf(ch) >= 0) return '🟨'
+            return '⬛'
+          }).join('')
+        }).join(' ')
         finish(score)
       }
     }
@@ -120,6 +127,7 @@ function mount() {
         for (let c = 0; c < length; c++) {
           const ch = word[c] || ''
           const mark = rows[r] ? (rows[r][c] === answer[c] ? '#3FB950' : (answer.indexOf(rows[r][c]) >= 0 ? '#E3B341' : '#3A3F47')) : '#3A3F47'
+          drawRect({ pos: vec2(37 + c * 40, 73 + r * 36), width: 40, height: 38, color: rgb(27, 27, 47) })
           drawRect({ pos: vec2(40 + c * 40, 70 + r * 36), width: 34, height: 32, color: ink(mark) })
           if (ch) drawText({ text: ch.toUpperCase(), size: 16, pos: vec2(50 + c * 40, 76 + r * 36), color: ink(THEME.palette.bg) })
         }

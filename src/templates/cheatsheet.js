@@ -7,7 +7,8 @@ Useful facts about the engine the templates already call:
 - add([text(str, { size }), pos(x, y), anchor("center"), color(rgb)]).
 - Keys: arrows, wasd, space, enter. Touch and mouse set a pointer. A bottom pad is left / action / right.
 - Scores use parent.postMessage({ type: "playground-score", points }, "*") and nowhere else.
-Do not add fetch, WebSocket, eval, Function, workers, or URLs. Sprites are tiny string grids such as [".a.","aaa"] using palette letters.`
+Do not add fetch, WebSocket, eval, Function, workers, or URLs. Sprites are tiny string grids such as [".a.","aaa"] using palette letters.
+Keep the candy-arcade family: outline #1B1B2F, Play yellow #FFD23F, sky #4FB3FF to #CDEBFF, hit #3FB950, present #E3B341, miss #3A3F47. Share text is the score only.`
 
 export const PICK_SCHEMA = {
   type: 'object',

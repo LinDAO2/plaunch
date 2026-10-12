@@ -4,7 +4,7 @@ import { blockAt, hash2, surfaceY, WATER } from './terrain.js'
 const COUNT = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
 
 const NIGHT = {
-  grassland: [26, 39, 68],
+  grassland: [11, 22, 64],
   desert: [58, 36, 24],
   snow: [28, 44, 64],
   candy: [50, 20, 56],
@@ -12,7 +12,7 @@ const NIGHT = {
 }
 
 const DAY = {
-  grassland: [135, 184, 240],
+  grassland: [79, 179, 255],
   desert: [242, 196, 138],
   snow: [213, 228, 239],
   candy: [242, 160, 204],

@@ -169,10 +169,13 @@ const FIT = `(function () {
   bind(document.getElementById('pg-b'), [['x', 88]]);
 })();`
 
-const STYLE = `html,body{margin:0!important;padding:0!important;height:100%;background:#000;overflow:hidden;}
+const STYLE = `@font-face{font-family:"Lilita One";src:url("/fonts/lilita-one-latin.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:Rubik;src:url("/fonts/rubik-latin-700.woff2") format("woff2");font-weight:700;font-display:swap}
+html,body{margin:0!important;padding:0!important;height:100%;background:#4FB3FF;overflow:hidden;}
 #pg-root{position:absolute;left:0;top:0;width:max-content;height:max-content;transform-origin:0 0;}
-#pg-start,#pg-credit,#pg-pad{font-family:sans-serif;}
-#pg-start{position:fixed;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;background:#000;color:#e7e9ea;font-size:20px;}
+#pg-start,#pg-credit,#pg-pad{font-family:Rubik,sans-serif;}
+#pg-start{position:fixed;inset:0;z-index:8;display:flex;align-items:flex-end;justify-content:center;padding:0 0 28px;border:0;background:rgba(8,10,16,0);color:#1B1B2F;font-family:"Lilita One",sans-serif;font-size:28px;box-shadow:inset 0 -190px 0 rgba(8,10,16,.72);}
+#pg-start span{display:inline-flex;align-items:center;justify-content:center;width:200px;height:64px;background:#FFD23F;border-bottom:4px solid #B8860B;border-radius:14px;}
 #pg-start[hidden]{display:none;}
 #pg-credit{position:fixed;top:6px;left:8px;z-index:4;margin:0;padding:2px 6px;background:#000;color:#e7e9ea;font-size:12px;}
 #pg-pad{position:fixed;left:8px;right:8px;bottom:8px;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;}
@@ -224,7 +227,7 @@ ${head}
 <style>${STYLE}</style>
 </head>
 <body>
-<button id="pg-start" type="button">Tap to start</button>
+<button id="pg-start" type="button"><span>Play</span></button>
 ${credit}
 ${pad}
 <div id="pg-root">

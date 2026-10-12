@@ -78,9 +78,11 @@ export function createRuntime(els, hooks = {}) {
   function showRound(points) {
     if (!els.round || !els.roundScore) return
     els.play.hidden = true
-    els.roundScore.textContent = points === null
+    const line = points === null
       ? 'No score'
       : game.type === 'reaction' ? `Score ${points} ms` : `Score ${points}`
+    const near = points === null ? '' : points > 0 ? ' Close. One more run.' : ' First run is the warmup.'
+    els.roundScore.textContent = line + near
     if (els.goal) els.goal.hidden = true
     els.round.hidden = false
   }
@@ -112,7 +114,7 @@ export function createRuntime(els, hooks = {}) {
     hideRound()
     showGoal()
     els.display.textContent = '0'
-    els.play.textContent = 'Start game'
+    els.play.textContent = 'Play'
     els.play.hidden = false
     els.field.replaceChildren()
     els.field.style.pointerEvents = 'none'

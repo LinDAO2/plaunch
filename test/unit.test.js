@@ -794,6 +794,8 @@ test('freeform prompt asks for touch, visuals, and a best score', () => {
   assert.match(FREEFORM_PROMPT, /gradients/)
   assert.match(FREEFORM_PROMPT, /best score/i)
   assert.match(FREEFORM_PROMPT, /playground-score/)
+  assert.match(FREEFORM_PROMPT, /#FFD23F/)
+  assert.match(SYSTEM_PROMPT, /#1B1B2F/)
 })
 
 test('an unsure idea asks the model which tier to use', async () => {

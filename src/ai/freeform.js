@@ -1,4 +1,5 @@
 import { HttpError } from '../errors.js'
+import { STYLE_GUIDE } from '../style-kit.js'
 import { cleanText } from '../validate.js'
 import { aiStatus, requestModelText } from './generate.js'
 import { assertFreeform, inspectFreeform } from './freeform-check.js'
@@ -24,6 +25,7 @@ Rules:
 - The parent page shows best score only. Draw the current score, the best score, and any timer yourself
 - Support touch (tap and drag), mouse, and keyboard. Pointer events cover a finger and a mouse. Do not rely on keyboard focus alone
 - Draw with shapes and gradients. Emoji are allowed. No external images
+- ${STYLE_GUIDE}
 - Track the best score in a variable across in-page restarts. Do not use storage APIs
 - Put CSS and JavaScript inline. No external scripts, stylesheets, fonts, or images
 - No external URLs of any kind. No protocol-relative URLs
@@ -56,7 +58,7 @@ export function templateFreeform(prompt) {
 <meta charset="utf-8">
 <title>Freeform</title>
 <style>
-html,body{margin:0;height:100%;background:#120f1c;overflow:hidden}
+html,body{margin:0;height:100%;background:#4FB3FF;overflow:hidden}
 canvas{width:100%;height:100%;display:block;touch-action:none}
 </style>
 </head>
@@ -80,18 +82,23 @@ function spawn() {
 }
 function draw() {
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height)
-  sky.addColorStop(0, '#2a2158')
-  sky.addColorStop(1, '#120f1c')
+  sky.addColorStop(0, '#4FB3FF')
+  sky.addColorStop(1, '#CDEBFF')
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#f4efe6'
-  ctx.font = '22px sans-serif'
-  ctx.fillText(title + '  \u2728', 20, 36)
+  ctx.fillStyle = '#1B1B2F'
+  ctx.font = '28px sans-serif'
+  ctx.fillText(title, 20, 40)
+  ctx.font = '18px sans-serif'
   ctx.fillText('Score ' + score + '   Best ' + best, 20, 68)
   for (const dot of dots) {
+    ctx.fillStyle = '#1B1B2F'
+    ctx.beginPath()
+    ctx.arc(dot.x, dot.y + 3, dot.r + 3, 0, Math.PI * 2)
+    ctx.fill()
     const glow = ctx.createRadialGradient(dot.x, dot.y, 2, dot.x, dot.y, dot.r)
-    glow.addColorStop(0, '#d9fff4')
-    glow.addColorStop(1, '#4adeb9')
+    glow.addColorStop(0, '#FFD23F')
+    glow.addColorStop(1, '#FF5A3C')
     ctx.fillStyle = glow
     ctx.beginPath()
     ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2)

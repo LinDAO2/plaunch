@@ -6,6 +6,7 @@ import { log } from '../log.js'
 import { DEFAULT_AI_TIMEOUT_MS, aiStatus, describeUpstreamError, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
 import { SAMPLE_SPECS } from './samples.js'
+import { STYLE_GUIDE } from '../style-kit.js'
 
 export { aiStatus }
 
@@ -34,6 +35,7 @@ Rules:
 - Vary spawn.rate, entity speed, pointsPerEntity, comboMultiplier, lifetimeMs, lives, and targetScore so they fit this concept
 - Do not reuse spawn.rate 2.5 or comboMultiplier 2 unless the idea truly needs those exact numbers
 - Make the theme, sprites, pattern, movement, controls, win rule, and primitives specific to the prompt
+- ${STYLE_GUIDE}
 - The examples below contrast on purpose. Do not copy one. Invent a different mix for the player's idea
 ${FEW_SHOTS}
 - Do not include JavaScript, HTML, URLs, or executable code

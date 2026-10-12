@@ -213,10 +213,11 @@ export function renderPoster(game) {
   if (game.type === 'world') return renderWorldPoster(game)
   const rgb = Buffer.alloc(SIZE * SIZE * 3)
   const accent = hexColor(game.accent)
-  const paper = [231, 233, 234]
-  const yellow = [230, 255, 58]
+  const paper = [244, 247, 251]
+  const yellow = [255, 210, 63]
   const seed = hashString(game.id || game.name)
-  fillRect(rgb, 0, 0, SIZE, SIZE, tint(accent, 0.34))
+  fillRect(rgb, 0, 0, SIZE, SIZE, [79, 179, 255])
+  fillRect(rgb, 0, Math.round(SIZE * 0.55), SIZE, Math.round(SIZE * 0.45), [205, 235, 255])
   fillRect(rgb, 0, 0, SIZE, 28, accent)
   fillRect(rgb, 0, SIZE - 28, SIZE, 28, accent)
   fillRect(rgb, 0, 0, 28, SIZE, accent)

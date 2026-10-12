@@ -1,4 +1,18 @@
 @font-face {
+  font-family: "Lilita One";
+  src: url("/fonts/lilita-one-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Rubik;
+  src: url("/fonts/rubik-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
   font-family: "Bricolage Grotesque";
   src: url("/fonts/bricolage-grotesque-latin-700.woff2") format("woff2");
   font-weight: 700;
@@ -280,7 +294,17 @@ input[type="color"] { padding: 4px; height: 40px; }
   top: 64%;
   transform: translateX(-50%);
   z-index: 3;
+  width: 200px;
+  height: 64px;
+  border: 0;
+  border-bottom: 4px solid #B8860B;
+  border-radius: 14px;
+  background: #FFD23F;
+  color: #1B1B2F;
+  font-family: "Lilita One", sans-serif;
+  font-size: 28px;
 }
+#play:active, .big-button:active { transform: translateX(-50%) translateY(3px); }
 .guess-input {
   position: absolute;
   left: 50%;

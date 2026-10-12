@@ -113,11 +113,15 @@ function draw(ctx, spec, snap, view) {
   const unit = Math.max(0.9, Math.min(2.6, Math.min(width / 420, height / 320)))
   const primitives = new Set(spec.primitives || [])
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = '#000000'
-  ctx.fillRect(0, 0, width, height)
-  ctx.fillStyle = spec.accent || '#e6ff3a'
-  ctx.globalAlpha = 0.14
-  ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = '#4FB3FF'
+  ctx.fillRect(0, 0, width, height * 0.55)
+  ctx.fillStyle = '#CDEBFF'
+  ctx.fillRect(0, height * 0.55, width, height * 0.45)
+  ctx.fillStyle = spec.accent || '#FF5A3C'
+  ctx.globalAlpha = 0.16
+  ctx.beginPath()
+  ctx.arc(width * 0.82, height * 0.22, Math.max(28, width * 0.08), 0, Math.PI * 2)
+  ctx.fill()
   ctx.globalAlpha = 1
   if (snap.walls?.length) {
     ctx.fillStyle = spec.palette?.[2] || '#2a2440'
@@ -149,13 +153,18 @@ function draw(ctx, spec, snap, view) {
   for (const entity of snap.entities) {
     sprite(ctx, entity.sprite || '●', (entity.x / 100) * width, (entity.y / 100) * height, size, DISC[entity.kind] || '#c9b6ff')
   }
-  ctx.font = `${Math.round(14 * unit)}px sans-serif`
-  ctx.fillStyle = '#e7e9ea'
+  ctx.font = `700 ${Math.round(18 * unit)}px Rubik, sans-serif`
   ctx.textAlign = 'left'
-  ctx.fillText(String(snap.score), 12, 18 * unit)
+  ctx.fillStyle = '#1B1B2F'
+  const scoreLabel = String(snap.score)
+  const scoreWidth = Math.max(48, ctx.measureText(scoreLabel).width + 20)
+  ctx.fillRect(12, 10, scoreWidth, 28)
+  ctx.fillStyle = '#FFD23F'
+  ctx.fillText(scoreLabel, 22, 24)
   ctx.textAlign = 'right'
+  ctx.fillStyle = '#1B1B2F'
   const tag = primitives.has('maze') ? 'grid' : primitives.has('popup') ? 'hide' : ''
-  ctx.fillText(tag ? `lives ${snap.lives} · ${tag}` : `lives ${snap.lives}`, width - 12, 18 * unit)
+  ctx.fillText(tag ? `lives ${snap.lives} · ${tag}` : `lives ${snap.lives}`, width - 12, 24)
   if (snap.time < HINT_MS && view.hint) {
     ctx.globalAlpha = Math.min(1, (HINT_MS - snap.time) / 600)
     ctx.font = `600 ${Math.round(15 * unit)}px sans-serif`
@@ -172,12 +181,14 @@ function draw(ctx, spec, snap, view) {
 // A soft colored disc behind every sprite keeps it visible even when the
 // glyph renders as a dark monochrome symbol (for example ☄ on many systems).
 function sprite(ctx, glyph, x, y, size, color) {
+  ctx.fillStyle = '#1B1B2F'
+  ctx.beginPath()
+  ctx.arc(x, y + 3, size * 0.66, 0, Math.PI * 2)
+  ctx.fill()
   ctx.fillStyle = color
-  ctx.globalAlpha = 0.35
   ctx.beginPath()
   ctx.arc(x, y, size * 0.62, 0, Math.PI * 2)
   ctx.fill()
-  ctx.globalAlpha = 1
   ctx.fillStyle = '#ffffff'
   ctx.fillText(glyph, x, y)
 }
