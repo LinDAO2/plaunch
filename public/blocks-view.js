@@ -1,5 +1,5 @@
-import { HOTBAR, blockHex, blockOf, isSolid } from '/blocks/blocks.js'
-import { goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
+import { CANOPY, CANDY, DUNE, FROST, HOTBAR, PETAL, ROCK, SOIL, TIMBER, TURF, blockOf, isSolid } from '/blocks/blocks.js'
+import { VISTA_PITCH, goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
 import { createWorldRenderer } from '/world-render.js'
 
@@ -17,7 +17,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const spawn = spawnPoint(world, edits)
   const pos = { x: spawn.x, y: spawn.y, z: spawn.z }
   let yaw = lookYaw(world, pos.x, pos.z)
-  let pitch = -0.16
+  let pitch = VISTA_PITCH
   let looked = false
   let vy = 0
   let grounded = false
@@ -129,10 +129,48 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   }
   paintGoal()
 
+  function speckThumb(dark, light) {
+    const chip = document.createElement('canvas')
+    chip.width = 48
+    chip.height = 48
+    const ctx = chip.getContext('2d')
+    const a = Number.parseInt(dark.slice(1), 16)
+    const b = Number.parseInt(light.slice(1), 16)
+    const from = [(a >> 16) & 255, (a >> 8) & 255, a & 255]
+    const to = [(b >> 16) & 255, (b >> 8) & 255, b & 255]
+    const img = ctx.createImageData(48, 48)
+    for (let y = 0; y < 48; y++) {
+      for (let x = 0; x < 48; x++) {
+        const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+        const f = n - Math.floor(n)
+        const grain = Math.sin((x + y * 3) * 0.7) * 0.5 + 0.5
+        const t = Math.min(1, Math.max(0, f * 0.65 + grain * 0.35))
+        const o = (y * 48 + x) * 4
+        img.data[o] = from[0] + (to[0] - from[0]) * t
+        img.data[o + 1] = from[1] + (to[1] - from[1]) * t
+        img.data[o + 2] = from[2] + (to[2] - from[2]) * t
+        img.data[o + 3] = 255
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+    return chip.toDataURL('image/png')
+  }
+
+  const thumbUrl = {
+    [TURF]: '/textures/grass_diff.jpg',
+    [SOIL]: '/textures/dirt_diff.jpg',
+    [ROCK]: '/textures/stone_diff.jpg',
+    [DUNE]: '/textures/sand_diff.jpg',
+    [TIMBER]: '/textures/wood_diff.jpg',
+    [CANOPY]: '/textures/leaves_diff.jpg',
+    [FROST]: '/textures/snow_diff.jpg',
+    [PETAL]: speckThumb('#c46a5a', '#f2a3c7'),
+    [CANDY]: speckThumb('#8a3048', '#e8c4a8')
+  }
   const buttons = HOTBAR.map((id, index) => {
     const button = document.createElement('button')
     button.type = 'button'
-    button.style.background = blockHex(id)
+    button.style.backgroundImage = `url("${thumbUrl[id] || speckThumb('#6d6256', '#c4b8a4')}")`
     button.setAttribute('aria-label', blockOf(id).name)
     button.className = index === 0 ? 'on' : ''
     button.addEventListener('pointerdown', (event) => {
@@ -292,6 +330,13 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   state.aim = (nextYaw, nextPitch) => {
     if (Number.isFinite(nextYaw)) yaw = nextYaw
     if (Number.isFinite(nextPitch)) pitch = Math.max(-1.15, Math.min(1.15, nextPitch))
+    looked = true
+  }
+  state.measure = () => {
+    if (!state.gl || typeof renderer.coverage !== 'function') {
+      return { ratio: 0, uniform: true, total: 0, chunks: 0, triangles: 0 }
+    }
+    return renderer.coverage()
   }
   state.others = []
 
@@ -321,8 +366,10 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
           pos.x = msg.spawn.x
           pos.y = msg.spawn.y
           pos.z = msg.spawn.z
-          yaw = msg.spawn.yaw || 0
-          pitch = msg.spawn.pitch ?? -0.16
+          if (!looked) {
+            yaw = msg.spawn.yaw || 0
+            pitch = msg.spawn.pitch ?? VISTA_PITCH
+          }
         }
         edits.clear()
         const loaded = msg.edits || []
@@ -399,7 +446,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     live = true
     if (!looked) {
       yaw = lookYaw(world, pos.x, pos.z)
-      pitch = -0.16
+      pitch = VISTA_PITCH
     }
     const gate = ui.querySelector('#world-start')
     if (gate) gate.hidden = true

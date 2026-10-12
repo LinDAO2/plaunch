@@ -1,3 +1,4 @@
+import { frameCoverage } from '/blocks/frame-check.js'
 import { meshRegion } from '/blocks/mesh.js'
 import {
   CANOPY, CANDY, CLAY, DUNE, FROST, GLOW, PETAL, POOL, ROCK, SOIL, TIMBER, TURF
@@ -45,6 +46,28 @@ function loadMap(loader, url, color) {
   return tex
 }
 
+const LEAF_SWAY = `transformed.x += sin(position.y * 1.6 + uTime * 1.35 + position.z * 0.7) * 0.05;
+transformed.z += cos(position.x * 1.4 + uTime * 1.05) * 0.05;`
+const WATER_SWAY = `transformed.y += sin(position.x * 1.7 + position.z * 1.3 + uTime * 1.6) * 0.045;`
+
+function patchVertex(shader, motion) {
+  shader.vertexShader = shader.vertexShader.replace(
+    '#include <fog_vertex>',
+    `#include <fog_vertex>
+#ifdef USE_FOG
+	vFogDepth *= mix(1.45, 0.72, clamp(position.y / 28.0, 0.0, 1.0));
+#endif`
+  )
+  if (!motion) return
+  shader.uniforms.uTime = TIME
+  shader.vertexShader = `uniform float uTime;\n${shader.vertexShader}`
+  shader.vertexShader = shader.vertexShader.replace(
+    '#include <begin_vertex>',
+    `#include <begin_vertex>
+${motion}`
+  )
+}
+
 function pbrMaterial(loader, name, extra = {}) {
   const map = loadMap(loader, `/textures/${name}_diff.jpg`, true)
   const normalMap = loadMap(loader, `/textures/${name}_nor.jpg`, false)
@@ -56,25 +79,13 @@ function pbrMaterial(loader, name, extra = {}) {
     roughnessMap,
     roughness: extra.roughness ?? 1,
     metalness: 0,
-    vertexColors: true
+    vertexColors: true,
+    side: extra.side !== undefined ? extra.side : THREE.DoubleSide
   }
-  if (extra.side !== undefined) params.side = extra.side
   const material = new THREE.MeshStandardMaterial(params)
+  material.customProgramCacheKey = () => (sway ? `sway:${name}` : `pbr:${name}`)
   material.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <fog_vertex>',
-      `#include <fog_vertex>
-       fogDepth *= mix(1.45, 0.72, clamp(position.y / 28.0, 0.0, 1.0));`
-    )
-    if (sway) {
-      shader.uniforms.uTime = TIME
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-         transformed.x += sin(position.y * 1.6 + uTime * 1.35 + position.z * 0.7) * 0.05;
-         transformed.z += cos(position.x * 1.4 + uTime * 1.05) * 0.05;`
-      )
-    }
+    patchVertex(shader, sway ? LEAF_SWAY : '')
   }
   return material
 }
@@ -288,7 +299,8 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       transparent: true,
       opacity: 0.88,
       vertexColors: true,
-      envMapIntensity: 1.35
+      envMapIntensity: 1.35,
+      side: THREE.DoubleSide
     }),
     petal: flatMaterial(0xd98cab, { roughness: 0.55 }),
     candy: flatMaterial(0xe25b93, { roughness: 0.42 }),
@@ -299,13 +311,9 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       if (tex) tex.anisotropy = aniso
     }
   }
+  materials.water.customProgramCacheKey = () => 'water'
   materials.water.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = TIME
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      `#include <begin_vertex>
-       transformed.y += sin(position.x * 1.7 + position.z * 1.3 + uTime * 1.6) * 0.045;`
-    )
+    patchVertex(shader, WATER_SWAY)
   }
   materials.leaves.color = new THREE.Color(0xc5d2b0)
 
@@ -574,6 +582,24 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     return [ahead.x, ahead.y, ahead.z]
   }
 
+  function coverage() {
+    const gl = renderer.getContext()
+    renderer.setRenderTarget(null)
+    const w = gl.drawingBufferWidth
+    const h = gl.drawingBufferHeight
+    const pixels = new Uint8Array(w * h * 4)
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+    const stats = frameCoverage(pixels, w, h)
+    return {
+      ...stats,
+      width: w,
+      height: h,
+      chunks: chunks.size,
+      triangles: renderer.info.render.triangles,
+      calls: renderer.info.render.calls
+    }
+  }
+
   remeshAll()
 
   return {
@@ -582,6 +608,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     remeshAll,
     remeshAt,
     render,
+    coverage,
     project,
     dispose() {
       for (const list of chunks.values()) disposeChunk(list)

@@ -122,6 +122,8 @@ export function sparkHit(spots, picked, id, pos) {
   return { ok: true, id }
 }
 
+export const VISTA_PITCH = -13 * Math.PI / 180
+
 export function lookYaw(world, x, z) {
   return Math.atan2((world.size / 2) - x, (world.size / 2) - z)
 }

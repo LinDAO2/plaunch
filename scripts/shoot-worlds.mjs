@@ -1,6 +1,8 @@
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from 'playwright'
+import { VISTA_PITCH } from '../src/blocks/goals.js'
+import { frameProblem } from '../src/blocks/frame-check.js'
 
 const base = 'http://127.0.0.1:43217'
 const out = '/opt/cursor/artifacts/worlds'
@@ -18,6 +20,9 @@ const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 const errors = []
 page.on('pageerror', (error) => errors.push(String(error)))
+page.on('console', (msg) => {
+  if (msg.type() === 'error') errors.push(msg.text())
+})
 await page.goto(base + '/', { waitUntil: 'domcontentloaded' })
 await page.waitForFunction(() => document.querySelector('#gen-mode')?.textContent)
 await page.screenshot({ path: path.join(out, 'create.png') })
@@ -35,6 +40,7 @@ const csrf = await page.evaluate(async () => {
 })
 
 for (const [name, prompt] of prompts) {
+  errors.length = 0
   const made = await page.evaluate(async ({ token, prompt }) => {
     const generated = await fetch('/api/ai/generate', {
       method: 'POST',
@@ -80,9 +86,37 @@ for (const [name, prompt] of prompts) {
     console.log('fail', name, info)
     throw error
   }
-  await page.waitForTimeout(1600)
+  await page.evaluate((pitch) => {
+    const here = window.__blocks.pos()
+    window.__blocks.aim(here.yaw, pitch)
+  }, VISTA_PITCH)
+  let stats = null
+  let problem = 'no sample'
+  for (let attempt = 0; attempt < 12; attempt++) {
+    await page.waitForTimeout(400)
+    stats = await page.evaluate(() => window.__blocks.measure())
+    const pixel = frameProblem(stats)
+    if (!stats?.chunks) problem = `${name}: no chunks`
+    else if ((stats.triangles || 0) < 100) problem = `${name}: no terrain triangles (${stats.triangles})`
+    else if (pixel) problem = `${name}: ${pixel}`
+    else problem = ''
+    if (!problem) break
+  }
+  const thumbs = await page.evaluate(() => [...document.querySelectorAll('.hotbar button')].map((button) => button.style.backgroundImage))
+  if (thumbs.length < 9 || thumbs.some((url) => !url.includes('textures/') && !url.includes('data:image'))) {
+    problem = problem || `${name}: hotbar is missing texture thumbnails`
+  }
   await page.screenshot({ path: path.join(out, `${name}.png`) })
-  console.log(name, made.id, made.biome, made.landform, made.structure, made.music, made.cycle)
+  const pose = await page.evaluate(() => window.__blocks.pos())
+  console.log(name, made.id, made.biome, made.landform, made.structure, made.music, made.cycle, JSON.stringify({ ...stats, pitch: pose.pitch }), thumbs.map((url) => url.slice(0, 48)).join(' | '))
+  const shader = errors.filter((line) => /Shader Error|VALIDATE_STATUS|not compiled|program not valid/.test(line))
+  if (shader.length) {
+    throw new Error(`${name} shader\n${shader.slice(0, 6).join('\n')}`)
+  }
+  if (problem) {
+    console.log('render check failed', problem, JSON.stringify(stats))
+    throw new Error(problem)
+  }
 }
 if (errors.length) console.log('page errors', errors)
 await browser.close()

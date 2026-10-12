@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws'
 import { getGameRow } from '../repo.js'
 import { findUserBySession } from '../repo.js'
-import { lookYaw, sparkHit, sparkSpots } from './goals.js'
+import { VISTA_PITCH, lookYaw, sparkHit, sparkSpots } from './goals.js'
 import { acceptPosition, validateEdit } from './rules.js'
 import { addWorldStat, loadEdits, loadSparks, saveEdit, saveSpark } from './store.js'
 import { spawnPoint, worldFromSpec } from './terrain.js'
@@ -164,7 +164,7 @@ export function createWorldHub({ db, config }) {
       y: room.spawn.y,
       z: room.spawn.z,
       yaw: lookYaw(room.world, room.spawn.x, room.spawn.z),
-      pitch: -0.16,
+      pitch: VISTA_PITCH,
       movedAt: Date.now(),
       markedAt: Date.now(),
       bucket: { tokens: 6, t: Date.now() },
