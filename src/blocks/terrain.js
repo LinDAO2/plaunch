@@ -375,6 +375,25 @@ function columnClear(world, edits, x, z, gy) {
   return true
 }
 
+const LOOK_PITCH = -13 * Math.PI / 180
+
+function lookReach(world, edits, x, z, gy, cx, cz) {
+  const yaw = Math.atan2(cx - (x + 0.5), cz - (z + 0.5))
+  const cp = Math.cos(LOOK_PITCH)
+  const dx = Math.sin(yaw) * cp
+  const dy = Math.sin(LOOK_PITCH)
+  const dz = Math.cos(yaw) * cp
+  const eyeY = gy + 1 + 1.62
+  for (let t = 1; t <= 28; t += 0.5) {
+    const bx = Math.floor(x + 0.5 + dx * t)
+    const by = Math.floor(eyeY + dy * t)
+    const bz = Math.floor(z + 0.5 + dz * t)
+    if (by < 0 || by >= world.height) return 0
+    if (isSolid(blockAt(bx, by, bz, world, edits))) return t
+  }
+  return 0
+}
+
 function vistaHeight(world, edits, x, z) {
   if (x < 2 || z < 2 || x >= world.size - 2 || z >= world.size - 2) return null
   const gy = groundY(world, x, z, edits)
@@ -384,7 +403,7 @@ function vistaHeight(world, edits, x, z) {
     for (let dz = -1; dz <= 1; dz++) {
       if (!dx && !dz) continue
       const ny = groundY(world, x + dx, z + dz, edits)
-      if (ny > gy || gy - ny > 1) return null
+      if (ny > gy + 1 || gy - ny > 3) return null
       if (!columnClear(world, edits, x + dx, z + dz, gy)) return null
     }
   }
@@ -402,7 +421,12 @@ export function spawnPoint(world, edits) {
     if (dist < minDist) return
     const gy = vistaHeight(world, edits, x, z)
     if (gy === null) return
-    const score = gy * 4 + bonus - Math.abs(dist - prefer) * 0.35
+    const reach = lookReach(world, edits, x, z, gy, cx, cz)
+    let score = bonus - Math.abs(dist - prefer) * 0.35
+    if (reach >= 9 && reach <= 18) score += 90 + gy * 0.12
+    else if (reach >= 5 && reach < 9) score += 48 + gy * 0.05
+    else if (reach > 18 && reach <= 26) score += 36
+    else score += gy * 0.05
     if (score > bestScore) {
       bestScore = score
       best = { x, z, y: gy }
@@ -410,7 +434,12 @@ export function spawnPoint(world, edits) {
   }
   const reach = Math.min(world.size / 2 - 2, Math.round(world.size * 0.42))
   for (let r = minDist; r <= reach; r++) {
-    for (let dx = -8; dx <= 8; dx++) consider(cx + dx, cz + r, 6)
+    for (let dx = -10; dx <= 10; dx += 2) {
+      consider(cx + dx, cz + r, 8)
+      consider(cx + dx, cz - r, 2)
+      consider(cx + r, cz + dx, 3)
+      consider(cx - r, cz + dx, 3)
+    }
   }
   if (!best) {
     for (let z = 2; z < world.size - 2; z += 2) {

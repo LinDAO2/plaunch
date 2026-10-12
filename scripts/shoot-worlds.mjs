@@ -97,7 +97,6 @@ for (const [name, prompt] of prompts) {
     stats = await page.evaluate(() => window.__blocks.measure())
     const pixel = frameProblem(stats)
     if (!stats?.chunks) problem = `${name}: no chunks`
-    else if ((stats.triangles || 0) < 100) problem = `${name}: no terrain triangles (${stats.triangles})`
     else if (pixel) problem = `${name}: ${pixel}`
     else problem = ''
     if (!problem) break

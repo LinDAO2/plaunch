@@ -6,7 +6,8 @@ import { heuristicTier } from '../src/ai/classify.js'
 import { validateGameSpec } from '../src/ai/gamespec.js'
 import { aoFactor, meshRegion } from '../src/blocks/mesh.js'
 import { validateEdit } from '../src/blocks/rules.js'
-import { goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, sparkHit, sparkSpots } from '../src/blocks/goals.js'
+import { VISTA_PITCH, goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, sparkHit, sparkSpots } from '../src/blocks/goals.js'
+import { isSolid } from '../src/blocks/blocks.js'
 import { featuredWorlds, wantsWorld } from '../src/blocks/spec.js'
 import { blockAt, spawnPoint, worldFromSpec } from '../src/blocks/terrain.js'
 import { validSpec } from '../testing/helpers.js'
@@ -109,6 +110,18 @@ test('spawn is open high ground facing the landmark', () => {
     const yaw = lookYaw(world, spawn.x, spawn.z)
     const dot = Math.sin(yaw) * ((world.size >> 1) - spawn.x) + Math.cos(yaw) * ((world.size >> 1) - spawn.z)
     assert.ok(dot > 0)
+    const cp = Math.cos(VISTA_PITCH)
+    const dx = Math.sin(yaw) * cp
+    const dy = Math.sin(VISTA_PITCH)
+    const dz = Math.cos(yaw) * cp
+    let hit = 0
+    for (let t = 1; t <= 28; t += 0.5) {
+      const bx = Math.floor(spawn.x + dx * t)
+      const by = Math.floor(spawn.y + 1.62 + dy * t)
+      const bz = Math.floor(spawn.z + dz * t)
+      if (isSolid(blockAt(bx, by, bz, world))) { hit = t; break }
+    }
+    assert.ok(hit >= 5 && hit <= 26, `look hits at ${hit} from ${spawn.y}`)
   }
 })
 
