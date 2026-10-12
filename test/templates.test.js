@@ -85,9 +85,21 @@ test('the splicer rejects edits outside the allowed blocks', () => {
   const range = spliceTemplate(source, { CONFIG: { maxGuesses: 99 } }, guess)
   assert.equal(range.ok, false)
   assert.match(range.error, /not an allowed number/)
-  const title = spliceTemplate(source, { THEME: { names: { title: 'Wordle' } } }, guess)
+  const title = spliceTemplate(source, { THEME: { names: { title: 'Wordle' }, palette: { a: '#112233' } } }, guess)
   assert.equal(title.ok, false)
   assert.match(title.error, /not an allowed value/)
+  assert.equal(guess.fields.THEME['palette.a'], 'color')
+  const partial = spliceTemplate(source, {
+    THEME: {
+      palette: { a: '#112233', k0: '#abcdef' },
+      names: { title: 'Citrus Guess', hint: 'x'.repeat(80) }
+    }
+  }, guess)
+  assert.equal(partial.ok, true, partial.error)
+  assert.match(partial.html, /#112233/)
+  assert.match(partial.html, /Citrus Guess/)
+  assert.equal(partial.html.includes('#abcdef'), false)
+  assert.equal(partial.html.includes('xxxxxxx'), false)
   const fetched = spliceTemplate(source, {
     RULES: { scoreGuess: 'function scoreGuess(guess, answer) { return fetch("https://example.com") }' }
   }, guess)

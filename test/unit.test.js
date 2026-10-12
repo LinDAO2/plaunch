@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import { EXAMPLE_GAMES } from '../src/arcade/examples.js'
 import { classifyTier, heuristicTier, normalizeTier } from '../src/ai/classify.js'
 import { generateIdea } from '../src/ai/idea.js'
-import { FREEFORM_PROMPT, generateFreeform, templateFreeform } from '../src/ai/freeform.js'
+import { FREEFORM_PROMPT, generateFreeform, playabilityNotes, templateFreeform } from '../src/ai/freeform.js'
 import { inspectFreeform } from '../src/ai/freeform-check.js'
 import { generateGame, parseModelJson, requestModelText, SYSTEM_PROMPT } from '../src/ai/generate.js'
 import { sandboxCsp } from '../src/usercontent.js'
@@ -203,6 +203,8 @@ test('provider selection prefers Anthropic, then Gemini, then xAI, then OpenAI',
   assert.equal(resolveProvider({ AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).model, 'gpt-6-astra')
   assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).id, 'anthropic')
   assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).model, 'claude-sonnet-5-5')
+  assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).thinking, 'off')
+  assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a', ANTHROPIC_THINKING: 'on' }).thinking, 'on')
   assert.equal(resolveProvider({ GEMINI_API_KEY: 'g', XAI_API_KEY: 'x', OPENAI_API_KEY: 'o', ANTHROPIC_API_KEY: 'a' }).id, 'anthropic')
   assert.equal(resolveProvider({ AI_PROVIDER_SPEC: 'anthropic', AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }, 'spec').id, 'anthropic')
   assert.equal(resolveProvider({ GEMINI_MODEL: 'custom-gemini', GEMINI_API_KEY: 'g' }).model, 'custom-gemini')
@@ -807,6 +809,8 @@ test('freeform prompt asks for touch, visuals, and a best score', () => {
   assert.match(FREEFORM_PROMPT, /#FFD23F/)
   assert.match(FREEFORM_PROMPT, /\/kaplay\.js/)
   assert.match(FREEFORM_PROMPT, /compact code/)
+  assert.match(FREEFORM_PROMPT, /30 seconds/)
+  assert.equal(playabilityNotes(templateFreeform('pong')).length, 0)
   assert.match(SYSTEM_PROMPT, /#1B1B2F/)
 })
 
@@ -1041,4 +1045,57 @@ test('a truncated Anthropic stream stays nonempty and continues once under 12k t
   assert.equal(bodies[1].max_tokens <= 4000, true)
   assert.equal(bodies[0].stream, true)
   assert.equal(bodies[1].max_tokens, 4000)
+})
+
+test('an empty max_tokens reply still continues once', async () => {
+  const partial = [
+    'event: message_delta',
+    'data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":8000}}',
+    ''
+  ].join('\n')
+  const bodies = []
+  let calls = 0
+  const fetchImpl = async (_url, init) => {
+    calls += 1
+    bodies.push(JSON.parse(init.body))
+    if (calls === 1) return new Response(partial, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    return new Response(JSON.stringify({
+      content: [{ type: 'tool_use', name: 'emit_result', input: { html: '<p>ready</p>' } }],
+      stop_reason: 'end_turn',
+      usage: { output_tokens: 30 }
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  const text = await requestModelText({
+    id: 'anthropic',
+    model: 'claude-sonnet-5-5',
+    apiKey: 'sk-ant',
+    base: 'https://api.anthropic.com',
+    timeoutMs: 60000
+  }, [{ role: 'user', content: 'idea' }], fetchImpl, {
+    stream: true,
+    continueOnTruncation: true,
+    maxOutputTokens: 8000
+  })
+  assert.equal(calls, 2)
+  assert.match(text, /ready/)
+  assert.match(JSON.stringify(bodies[1].messages), /hit the output cap/)
+  assert.equal(bodies[1].max_tokens, 4000)
+})
+
+test('freeform self-check asks again when the game cannot score', async () => {
+  let calls = 0
+  const quiet = '<!DOCTYPE html><html><body><canvas id="c"></canvas><script>parent.postMessage({ type: "playground-score", points: 0 }, "*")</script></body></html>'
+  const fetchImpl = async () => {
+    calls += 1
+    const html = calls === 1 ? quiet : templateFreeform('tower defense')
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ html }) }] } }] }), { status: 200 })
+  }
+  const result = await generateFreeform({
+    prompt: 'tower defense please',
+    env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g', AI_FALLBACKS: '' },
+    fetchImpl
+  })
+  assert.equal(calls, 2)
+  assert.match(result.html, /press Space/i)
+  assert.equal(playabilityNotes(quiet).length > 0, true)
 })

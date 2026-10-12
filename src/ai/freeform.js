@@ -28,6 +28,10 @@ Rules:
 - ${STYLE_GUIDE}
 - Track the best score in a variable across in-page restarts. Do not use storage APIs
 - Write compact code. Target under 8000 output tokens and under 40KB. Do not inline Kaplay, ZzFX, or three.js. If you need one, use <script src="/kaplay.js"></script>, <script src="/zzfx.js"></script>, or <script src="/three.js"></script>. Do not paste a long stylesheet. Use the candy hex colors already listed above
+- Draw one line of instructions on the canvas before play starts. Name the key or gesture that scores: Space, an arrow key, tap, or drag
+- Start the round immediately. Do not hide the game behind a start button
+- A player who follows that line must score more than once within 30 seconds. Award the first point from Space, ArrowRight, Enter, or a tap
+- Call the playground-score postMessage every time the best score changes
 - No external URLs of any kind. No protocol-relative URLs. No https images or fonts
 - Do not call fetch, XMLHttpRequest, WebSocket, eval, the Function constructor, import, or Worker
 - Do not read document.cookie, localStorage, or sessionStorage
@@ -91,6 +95,7 @@ function draw() {
   ctx.fillText(title, 20, 40)
   ctx.font = '18px sans-serif'
   ctx.fillText('Score ' + score + '   Best ' + best, 20, 68)
+  ctx.fillText('Tap a coin or press Space. Each hit scores.', 20, 96)
   for (const dot of dots) {
     ctx.fillStyle = '#1B1B2F'
     ctx.beginPath()
@@ -142,6 +147,20 @@ report()
 </script>
 </body>
 </html>`
+}
+
+export function playabilityNotes(html) {
+  const notes = []
+  const text = String(html || '')
+  const drawn = /fillText\s*\(\s*['"][^'"]{8,}['"]/.test(text)
+  const tells = /how to play|press space|arrow|tap|click|drag/i.test(text)
+  if (!drawn || !tells) notes.push('Draw a one-line How to play instruction on the canvas naming Space, an arrow key, tap, or drag.')
+  if (!/score\s*(\+\+|\+=)/.test(text)) notes.push('Increase the score when the player follows that instruction, more than once within 30 seconds.')
+  if (!/playground-score/.test(text)) notes.push('Post the best score with parent.postMessage type playground-score each time it changes.')
+  if (!/pointerdown/.test(text) && !/addEventListener\(\s*['"]keydown['"]/.test(text)) {
+    notes.push('Listen for the instructed key or pointer and start the round immediately, with no start button.')
+  }
+  return notes
 }
 
 function extractHtml(raw) {
@@ -214,7 +233,8 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
     })
     const html = extractHtml(raw)
     errors = inspectFreeform(html)
-    if (!errors.length) {
+    const notes = errors.length ? [] : playabilityNotes(html)
+    if (!errors.length && !notes.length) {
       const game = gameFields(idea, `ai:${provider.id}`)
       game.notice = `Generated with ${provider.id} (${provider.model}) as a sandboxed HTML game. The document is checked, then served from a separate origin. It is never executed on the server.`
       return {
@@ -233,8 +253,11 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
     messages.push({ role: 'assistant', content: previous })
     messages.push({
       role: 'user',
-      content: `The previous attempt was rejected.\nErrors:\n- ${errors.join('\n- ')}\nPrevious attempt:\n${previous}\nFix every error and return one JSON object with an html string. No external URLs, fetch, XMLHttpRequest, WebSocket, eval, Function, document.cookie, or localStorage.`
+      content: errors.length
+        ? `The previous attempt was rejected.\nErrors:\n- ${errors.join('\n- ')}\nPrevious attempt:\n${previous}\nFix every error and return one JSON object with an html string. No external URLs, fetch, XMLHttpRequest, WebSocket, eval, Function, document.cookie, or localStorage.`
+        : `Self-check: the game is not winnable and scoreable within 30 seconds of play, with clear instructions on screen.\nFix:\n- ${notes.join('\n- ')}\nPrevious attempt:\n${previous}\nReturn one JSON object with the corrected html. Start immediately, draw the controls, and raise the score when the player does what the line says.`
     })
+    errors = errors.length ? errors : notes
   }
   throw new HttpError(502, `Freeform game was rejected: ${errors.join('; ')}`, 'ai_invalid_output')
 }

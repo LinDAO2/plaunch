@@ -123,11 +123,15 @@ export function spliceTemplate(html, edits, spec) {
   if (edits.THEME) {
     const found = []
     leaves(edits.THEME, '', found)
+    // THEME is cosmetic. Drop a non-editable or invalid leaf instead of discarding the whole edit,
+    // which made models fall back to the plain template on one long hint or one extra color.
+    // A trademarked title still rejects the edit outright.
     for (const [path, value] of found) {
-      const kind = spec.fields.THEME[path]
-      if (!kind) return { ok: false, error: `THEME.${path} is not editable` }
-      if (!checkValue(kind, null, value)) return { ok: false, error: `THEME.${path} is not an allowed value` }
+      if (spec.fields.THEME[path] === 'text' && typeof value === 'string' && TRADEMARK.test(value)) return { ok: false, error: `THEME.${path} is not an allowed value` }
     }
+    const kept = found.filter(([path, value]) => spec.fields.THEME[path] && checkValue(spec.fields.THEME[path], null, value))
+    found.length = 0
+    found.push(...kept)
     const region = block(next, 'THEME')
     if (!region) return { ok: false, error: 'THEME block is missing' }
     let theme

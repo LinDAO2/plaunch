@@ -47,6 +47,7 @@ function providerFromChoice(env = {}) {
   const anthropic = env.ANTHROPIC_API_KEY ? {
     id: 'anthropic',
     model: env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
+    thinking: String(env.ANTHROPIC_THINKING || 'off').toLowerCase(),
     apiKey: env.ANTHROPIC_API_KEY,
     base: env.ANTHROPIC_API_BASE || 'https://api.anthropic.com',
     timeoutMs: timeoutEnv(env.AI_TIMEOUT_MS)
@@ -306,6 +307,9 @@ export function anthropicRequest(provider, messages, options = {}) {
     // Newer Claude models reject a forced tool_choice ("tool"/"any"), so ask with auto.
     tool_choice: { type: 'auto' }
   }
+  // Adaptive thinking can spend the whole freeform budget before the tool call, leaving no output.
+  // This model refuses {type:'disabled'}; between_tools is its off setting.
+  if (String(provider.thinking || 'off').toLowerCase() === 'off') body.thinking = { type: 'between_tools' }
   if (options.stream) body.stream = true
   return {
     url: `${trimBase(provider.base)}/v1/messages`,

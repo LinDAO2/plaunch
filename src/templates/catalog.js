@@ -26,7 +26,8 @@ function theme(title, hint, accent, sprites = {}, extra = {}) {
   }
 }
 
-const colors = ['palette.bg', 'palette.ink', 'palette.accent', 'palette.mute']
+// Sprite grids use palette letters a-d, and models recolor them; rejecting them threw away the whole edit.
+const colors = ['palette.bg', 'palette.ink', 'palette.accent', 'palette.mute', 'palette.a', 'palette.b', 'palette.c', 'palette.d']
 const names = ['names.title', 'names.hint', 'names.over']
 
 function fields({ config, sprites = [], rules = [] }) {

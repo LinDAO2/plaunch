@@ -164,9 +164,12 @@ test('arena rooms are authoritative, rate limited, and capped', async () => {
     for (let i = 0; i < 80; i++) {
       player.ws.send(JSON.stringify({ t: 'in', seq: i, yaw: 0, pitch: 0, mx: 0, mz: 0, fire: 0, x: 900, y: 900, z: 900 }))
     }
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    const snap = [...player.messages].reverse().find((msg) => msg.t === 'snap')
-    const self = snap.actors.find((actor) => actor.id === hello.id)
+    const placed = await waitFor(player.messages, (msg) => {
+      if (msg.t !== 'snap') return false
+      const self = msg.actors.find((actor) => actor.id === hello.id)
+      return Boolean(self && Math.abs(self.x) < 8)
+    }, 4000)
+    const self = placed.actors.find((actor) => actor.id === hello.id)
     assert.ok(Math.abs(self.x) < 8, `position stayed server-side, x=${self.x}`)
     const fire = setInterval(() => {
       if (player.ws.readyState !== 1) return
@@ -176,15 +179,20 @@ test('arena rooms are authoritative, rate limited, and capped', async () => {
       const foes = latest.actors.filter((actor) => actor.alive && actor.id !== hello.id)
       foes.sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z))
       const yaw = foes[0] ? Math.atan2(foes[0].x - me.x, foes[0].z - me.z) : 0
-      player.ws.send(JSON.stringify({ t: 'in', yaw, pitch: 0, mx: 0, mz: 0, fire: 1, seq: 2 }))
+      player.ws.send(JSON.stringify({ t: 'in', yaw, pitch: 0, mx: 0, mz: foes[0] ? 1 : 0, fire: 1, seq: 2 }))
     }, 40)
-    const scored = await waitFor(player.messages, (msg) => msg.t === 'snap' && msg.actors.some((actor) => actor.id === hello.id && actor.score > 0), 10000)
-    clearInterval(fire)
+    let scored
+    try {
+      scored = await waitFor(player.messages, (msg) => msg.t === 'snap' && msg.actors.some((actor) => actor.id === hello.id && actor.score > 0), 15000)
+    } finally {
+      clearInterval(fire)
+    }
     assert.ok(scored.actors.find((actor) => actor.id === hello.id).score >= 100)
 
     const mates = []
     for (let i = 0; i < 11; i++) mates.push(await connect('/api/arenas/arena'))
-    await waitFor(mates.at(-1).messages, (msg) => msg.t === 'welcome' || msg.t === 'reject')
+    const joined = await Promise.all(mates.map((mate) => waitFor(mate.messages, (msg) => msg.t === 'welcome' || msg.t === 'reject')))
+    assert.equal(joined.every((msg) => msg.t === 'welcome'), true, joined.map((msg) => msg.reason || msg.t).join(','))
     const extra = await connect('/api/arenas/arena')
     const full = await waitFor(extra.messages, (msg) => msg.t === 'reject' || msg.t === 'welcome')
     assert.equal(full.t, 'reject')

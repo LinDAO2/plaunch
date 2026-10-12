@@ -22,6 +22,15 @@ test('Anthropic uses tool-use and OpenAI uses the Responses API', () => {
   assert.equal(anthropic.headers['anthropic-version'], '2023-06-01')
   assert.equal(anthropic.body.temperature, undefined)
   assert.equal(anthropic.body.tool_choice.type, 'auto')
+  assert.equal(anthropic.body.thinking.type, 'between_tools')
+  const thinkingOn = anthropicRequest({
+    id: 'anthropic',
+    model: 'claude-sonnet-5-5',
+    apiKey: 'sk-ant',
+    base: 'https://api.anthropic.com',
+    thinking: 'on'
+  }, [{ role: 'user', content: 'idea' }])
+  assert.equal(thinkingOn.body.thinking, undefined)
   assert.match(anthropic.body.system, /Always answer by calling the emit_result tool exactly once/)
   assert.equal(anthropic.body.tools[0].input_schema.required[0], 'html')
   const openai = openAiResponsesRequest({

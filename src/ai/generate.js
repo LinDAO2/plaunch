@@ -231,6 +231,10 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     outputTokens = meta.outputTokens
   }
   if (!content) {
+    // Thinking can burn the whole cap before the tool call. Continuation needs that truncated empty reply.
+    if (truncated && options.allowTruncatedEmpty) {
+      return { text: '', truncated: true, outputTokens: outputTokens || options.maxOutputTokens || 0 }
+    }
     const error = new HttpError(502, 'AI provider returned an empty response', 'ai_provider_error')
     error.retry = true
     throw error
@@ -250,7 +254,12 @@ function withUpstream(error, source) {
 export async function requestModelText(provider, messages, fetchImpl, options = {}) {
   const opts = { maxResponseChars: 262144, ...options }
   options.onUse?.(provider)
-  const once = (msgs, extra) => callProvider(provider, msgs, fetchImpl, { ...opts, ...extra, continueOnTruncation: false })
+  const once = (msgs, extra) => callProvider(provider, msgs, fetchImpl, {
+    ...opts,
+    ...extra,
+    continueOnTruncation: false,
+    allowTruncatedEmpty: Boolean(options.continueOnTruncation) && !extra?.noEmpty
+  })
   const attempt = async (msgs, extra) => {
     try {
       return await once(msgs, extra)
@@ -268,16 +277,23 @@ export async function requestModelText(provider, messages, fetchImpl, options = 
     if (!next || !canFallback(err)) throw err
     return requestModelText(next, messages, fetchImpl, { ...options, fallbacks: options.fallbacks.slice(1) })
   }
-  if (options.continueOnTruncation && result.truncated && result.text && result.outputTokens < FREEFORM_OUTPUT_BUDGET) {
-    const room = Math.min(4000, FREEFORM_OUTPUT_BUDGET - result.outputTokens)
+  if (options.continueOnTruncation && result.truncated && result.outputTokens < FREEFORM_OUTPUT_BUDGET) {
+    const used = result.outputTokens || options.maxOutputTokens || FREEFORM_OUTPUT_BUDGET
+    const room = Math.min(4000, FREEFORM_OUTPUT_BUDGET - used)
     if (room >= 256) {
-      options.onProgress?.({ phase: 'continuing', outputTokens: result.outputTokens, label: 'Continuing a cut-off answer…' })
-      try {
-        const more = await attempt([
+      options.onProgress?.({ phase: 'continuing', outputTokens: used, label: 'Continuing a cut-off answer…' })
+      const follow = result.text
+        ? [
           ...messages,
           { role: 'assistant', content: result.text },
           { role: 'user', content: 'Continue exactly where the text stopped. Do not repeat earlier text. Finish the JSON or HTML document.' }
-        ], { maxOutputTokens: room })
+        ]
+        : [
+          ...messages,
+          { role: 'user', content: 'The previous reply hit the output cap before any result text. Call emit_result once with the full result. Do not spend the reply on thinking. Return the complete JSON or HTML now.' }
+        ]
+      try {
+        const more = await attempt(follow, { maxOutputTokens: room, noEmpty: true })
         result = {
           text: stitchModelText(result.text, more.text),
           truncated: Boolean(more.truncated),
