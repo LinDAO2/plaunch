@@ -25,6 +25,7 @@ let freeformFrame = null
 let freeformPoints = null
 let freeformBest = 0
 let lastGeneration = 'manual'
+let lastCredit = null
 let authMode = 'login'
 let activeTag = ''
 let baseSpawnRate = null
@@ -117,7 +118,7 @@ function payload() {
   const game = editor()
   const prompt = $('prompt').value
   if (lastTier === 'freeform' && lastHtml) {
-    return {
+    const body = {
       name: game.name,
       description: game.description,
       type: 'arcade',
@@ -129,10 +130,13 @@ function payload() {
       html: lastHtml,
       prompt
     }
+    if (lastCredit) body.credit = lastCredit
+    return body
   }
   const spec = syncSpec(lastSpec, game)
   const body = { ...game, generation: lastGeneration || 'manual', tier: 'spec', prompt }
   if (spec) body.spec = spec
+  if (lastCredit) body.credit = lastCredit
   return body
 }
 
@@ -163,7 +167,7 @@ function showSandbox(url) {
 
 function showWorldPreview(game) {
   try { lastSpec = ensureWorldSpec(game, lastSpec) } catch { /* keep the last valid world spec */ }
-  const key = lastSpec ? `${lastSpec.biome}|${lastSpec.terrainSeed}|${lastSpec.worldSize}|${lastSpec.structure}` : ''
+  const key = lastSpec ? `${lastSpec.biome}|${lastSpec.terrainSeed}|${lastSpec.worldSize}|${lastSpec.structure}|${lastSpec.terrain?.islands ? 1 : 0}|${lastSpec.terrain?.caves ? 1 : 0}|${lastSpec.cycle || ''}` : ''
   $('field').classList.remove('freeform-on')
   $('game').classList.remove('freeform-on')
   $('display').hidden = true
@@ -284,6 +288,23 @@ function paintBuiltOn() {
   $('built-on-name').textContent = lastTemplate.name
 }
 
+function paintResearch(research, credit) {
+  const strategy = $('research-strategy')
+  const inspired = $('inspired-by')
+  const label = research?.label || ''
+  if (strategy) {
+    strategy.hidden = !label
+    strategy.textContent = label
+  }
+  const list = credit?.inspiredBy?.length ? credit.inspiredBy : (research?.inspiredBy || [])
+  if (inspired) {
+    inspired.hidden = !list.length
+    inspired.textContent = list.length
+      ? `Inspired by: ${list.map((item) => item.license ? `${item.name} (${item.license})` : item.name).join(', ')}`
+      : ''
+  }
+}
+
 function showEditor() {
   $('ask').hidden = true
   $('discover').hidden = true
@@ -296,8 +317,10 @@ function showAsk() {
   $('ask').hidden = false
   $('discover').hidden = false
   lastTemplate = null
+  lastCredit = null
   styleTurn = 0
   paintBuiltOn()
+  paintResearch(null, null)
 }
 
 function clearWorld() {
@@ -384,7 +407,9 @@ async function showGame(summary) {
   freeformPoints = null
   lastSpec = game.spec || null
   lastGeneration = game.generation || 'manual'
+  lastCredit = game.credit || null
   fill(game)
+  paintResearch(null, game.credit)
   current = game
   history.pushState({}, '', `/g/${game.id}`)
   $('leaderboard-scope').textContent = game.type === 'reaction' ? 'Fastest reaction · top 20' : 'Top 20 scores'
@@ -594,7 +619,7 @@ for (const sky of document.querySelectorAll('.sky')) {
     prompt.focus()
   })
 }
-const promptExamples = ['a neon cyberpunk arena', 'a bright toy blaster arena', 'a kart race with gates', 'a small island with beacons']
+const promptExamples = ['a candy island with a pyramid', 'snow caves at dusk', 'a desert treasure hunt', 'a moon base at night']
 let promptExample = 0
 setInterval(() => {
   const prompt = $('prompt')
@@ -702,13 +727,13 @@ async function readGenerateStream(res) {
 $('generate').addEventListener('click', async () => {
   try {
     $('generate').disabled = true
-    showProgress('Choosing a template…', 0)
+    showProgress('Matching block worlds…', 0)
     const headers = { 'content-type': 'application/json', accept: 'text/event-stream', 'x-csrf-token': await ensureCsrf() }
     const res = await fetch('/api/ai/generate', {
       method: 'POST',
       headers,
       credentials: 'same-origin',
-      body: JSON.stringify({ prompt: $('prompt').value, tier: $('tier').value })
+      body: JSON.stringify({ prompt: $('prompt').value, tier: 'auto', kind: 'world' })
     })
     const type = res.headers.get('content-type') || ''
     let result
@@ -736,16 +761,18 @@ $('generate').addEventListener('click', async () => {
     freeformPoints = null
     if (lastTier === 'freeform') {
       result.game.type = 'arcade'
-      const previewed = await api('/freeform/preview', 'POST', { html: result.html })
+      const previewed = await api('/freeform/preview', 'POST', { html: result.html, generation: result.game?.generation })
       previewUrl = previewed.url
     }
     const tags = result.tags || []
     $('tag-line').textContent = tags.join(' · ')
     if (result.safety?.flagged) setStatus('Held for review.')
     lastGeneration = result.game?.generation || 'manual'
+    lastCredit = result.credit || null
     opened = null
     fill({ ...result.game, spec: result.spec })
     showEditor()
+    paintResearch(result.research, result.credit)
     toast('Ready to play.')
     refreshOwnerButtons()
   } catch (error) {

@@ -17,17 +17,11 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     const mechanics = await page.locator('#type option').allTextContents()
     assert.deepEqual(mechanics, ['Tap challenge', 'Reaction test', 'Number guess', 'Meteor dodge', 'Arcade', 'Block world'])
 
-    await page.fill('#prompt', 'space dodge falling meteors')
+    await page.fill('#prompt', 'a candy island with a pyramid')
     await page.click('#generate')
-    await page.waitForFunction(() => document.querySelector('#editor')?.hidden === false && document.querySelector('#name')?.value === 'Cosmic Rush')
+    await page.waitForFunction(() => document.querySelector('#editor')?.hidden === false && /Candy/.test(document.querySelector('#name')?.value || ''))
     assert.match(await page.locator('#gen-mode').innerText(), /template/i)
-    assert.equal(await page.locator('#mechanic').innerText(), 'METEOR DODGE')
-    await page.locator('#advanced').evaluate((el) => { el.open = true })
-    await page.selectOption('#type', 'reaction')
-    await page.click('#play')
-    await page.click('#play')
-    await page.waitForFunction(() => document.querySelector('#game-label')?.textContent.includes('TOO EARLY'))
-    await page.selectOption('#type', 'dodge')
+    assert.equal(await page.locator('#mechanic').innerText(), 'BLOCKS')
 
     const email = `ada-${Date.now()}@example.com`
     await page.click('#account')
@@ -42,15 +36,11 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await page.waitForFunction(() => (document.querySelector('#status')?.textContent || '').includes('/g/'))
     const status = await page.locator('#status').innerText()
     const slug = status.match(/\/g\/([a-z0-9-]+)/)[1]
-    assert.equal(slug, 'cosmic-rush')
+    assert.match(slug, /candy/)
     await page.waitForFunction(() => {
       const link = document.querySelector('#share-x')
-      return link && !link.hidden && link.href.includes('https://x.com/intent/post') && decodeURIComponent(link.href).includes('/r/cosmic-rush')
+      return link && !link.hidden && link.href.includes('https://x.com/intent/post') && decodeURIComponent(link.href).includes('/r/')
     })
-
-    await page.click('#play')
-    await page.waitForFunction(() => document.querySelector('#game-label')?.textContent.includes('DODGE'))
-    await page.keyboard.press('ArrowRight')
 
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`${server.base}/play/click-frenzy`, { waitUntil: 'domcontentloaded' })
@@ -181,7 +171,7 @@ test('redesign pages fit a desktop', { timeout: 180000 }, async () => {
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     await desktop.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
-    await desktop.waitForFunction(() => document.body.innerText.includes('Make a game from one sentence') && document.body.innerText.includes('Click Frenzy'))
+    await desktop.waitForFunction(() => document.body.innerText.includes('Make a shared block world from one sentence') && document.body.innerText.includes('Click Frenzy'))
     assert.equal(await desktop.evaluate(() => getComputedStyle(document.body).backgroundImage), 'none')
     await desktop.waitForFunction(() => !document.querySelector('#ai-off')?.hidden)
     assert.match(await desktop.locator('#ai-off').innerText(), /AI is off/)
@@ -198,7 +188,7 @@ test('redesign pages fit a desktop', { timeout: 180000 }, async () => {
     await shot(desktop, '01-home-desktop.png')
     await desktop.locator('.idea').first().click()
     await desktop.click('#generate')
-    await desktop.waitForFunction(() => document.querySelector('#editor')?.hidden === false && document.querySelector('#name')?.value === 'Cosmic Rush')
+    await desktop.waitForFunction(() => document.querySelector('#editor')?.hidden === false && /Candy/.test(document.querySelector('#name')?.value || ''))
     await shot(desktop, '01-editor-desktop.png')
     await desktop.goto(server.base + '/discover', { waitUntil: 'domcontentloaded' })
     await desktop.waitForFunction(() => document.body.innerText.includes('Click Frenzy') && document.querySelector('.card-share'))

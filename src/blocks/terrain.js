@@ -44,6 +44,10 @@ export function worldFromSpec(spec = {}) {
   const structure = STRUCTURES.includes(spec.structure) ? spec.structure : 'none'
   let seed = Number(spec.terrainSeed)
   if (!Number.isInteger(seed) || seed < 0 || seed > 1_000_000_000) seed = 1
+  const terrain = spec.terrain && typeof spec.terrain === 'object' ? spec.terrain : {}
+  const prefabs = Array.isArray(spec.prefabs)
+    ? spec.prefabs.filter((item) => item && typeof item.kind === 'string').slice(0, 6)
+    : []
   return {
     biome,
     sizeName,
@@ -51,7 +55,10 @@ export function worldFromSpec(spec = {}) {
     structure,
     seed,
     height: WORLD_HEIGHT,
-    chunk: CHUNK
+    chunk: CHUNK,
+    islands: terrain.islands === true,
+    caves: terrain.caves === true,
+    prefabs
   }
 }
 
@@ -69,6 +76,14 @@ export function surfaceY(x, z, world) {
   let h = Math.round(8 + (n - 0.42) * amp)
   if (h < 3) h = 3
   if (h > WORLD_HEIGHT - 6) h = WORLD_HEIGHT - 6
+  if (world.islands) {
+    const cx = (world.size - 1) / 2
+    const cz = (world.size - 1) / 2
+    const dx = (x - cx) / (world.size * 0.46)
+    const dz = (z - cz) / (world.size * 0.46)
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    h = dist > 0.78 ? 2 : Math.max(4, Math.round(h * (1 - dist * 0.45)))
+  }
   world._height.set(`${x},${z}`, h)
   return h
 }
@@ -182,13 +197,31 @@ function fillBlock(world, depth) {
   return depth < 4 ? SOIL : ROCK
 }
 
+function prefabBlock(x, y, z, world) {
+  if (!world.prefabs?.length) return null
+  const h = surfaceY(x, z, world)
+  const { cx, cz } = center(world)
+  for (let i = 0; i < world.prefabs.length; i++) {
+    const kind = world.prefabs[i].kind
+    const bx = Math.min(world.size - 2, Math.max(1, cx + 5 + i * 2))
+    const bz = Math.min(world.size - 2, Math.max(1, cz - 4))
+    if (kind === 'beacon' && x === bx && z === bz && y > h && y <= h + 4) return GLOW
+    if (kind === 'arch' && z === bz && y === h + 3 && Math.abs(x - bx) <= 2) return ROCK
+    if (kind === 'bridge' && y === WATER && Math.abs(z - cz) <= 1 && x > 2 && x < world.size - 2 && Math.abs(x - cx) <= 6) return TIMBER
+  }
+  return null
+}
+
 export function naturalAt(x, y, z, world) {
   if (y === 0) return ROCK
   const shaped = structureAt(x, y, z, world)
   if (shaped !== null) return shaped
+  const built = prefabBlock(x, y, z, world)
+  if (built) return built
   const tree = treeBlock(x, y, z, world)
   if (tree) return tree
   const h = surfaceY(x, z, world)
+  if (world.caves && y > 1 && y < h - 2 && hash2(x + y * 13, z + y * 7, world.seed + 91) > 0.58) return AIR
   if (y > h && y <= WATER && h < WATER) return POOL
   if (y > h) return AIR
   if (y === h) return surfaceBlock(world, x, z, h)

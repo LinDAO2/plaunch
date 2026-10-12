@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { generateIdea } from './idea.js'
+import { clearResearchCache } from './research.js'
 import { templateFreeform } from './freeform.js'
 import { inspectFreeform } from './freeform-check.js'
 import { foldProviderStream } from './providers.js'
@@ -132,7 +133,8 @@ export function meteringFetch(inner, totals) {
   }
 }
 
-export async function runBakeoff({ prompts, providers, outDir, smoke = false, env = process.env, fetchImpl } = {}) {
+export async function runBakeoff({ prompts, providers, outDir, smoke = false, env = process.env, fetchImpl, research = true } = {}) {
+  clearResearchCache()
   const results = []
   await mkdir(outDir, { recursive: true })
   const gamesDir = path.join(outDir, 'games')
@@ -151,7 +153,7 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false, en
         ? meteringFetch(fetchImpl || globalThis.fetch, totals)
         : meteringFetch(fixture.fetchImpl, totals)
       try {
-        const idea = await generateIdea({ prompt, tier: 'auto', env: run.env, fetchImpl: call })
+        const idea = await generateIdea({ prompt, tier: 'auto', env: { ...run.env, AI_RESEARCH: research ? 'on' : 'off' }, fetchImpl: call })
         const html = idea.html || idea.game?.freeformHtml || ''
         const problems = []
         if (html) problems.push(...inspectFreeform(html))
@@ -176,6 +178,7 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false, en
           mode: fellBack ? 'template' : idea.mode,
           model: fellBack ? null : idea.model,
           fallback: fellBack,
+          strategy: idea.research?.strategy || '',
           ms: Date.now() - started,
           tokens: { ...totals },
           usd: null,
@@ -193,6 +196,7 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false, en
           tokens: { ...totals },
           usd: null,
           errors: [err.message],
+          strategy: '',
           smoke: 'off',
           file: ''
         })
@@ -204,9 +208,9 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false, en
     '',
     'Token counts are from the fixture or the provider usage field. USD is omitted when the model has no confirmed price.',
     '',
-    '| Prompt | Provider | OK | Mode | Fallback | ms | in | out |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- |',
-    ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.fallback ? 'template fallback' : ''} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
+    '| Prompt | Provider | OK | Mode | Strategy | Fallback | ms | in | out |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.strategy || ''} | ${row.fallback ? 'template fallback' : ''} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
   ].join('\n')
   await writeFile(path.join(outDir, 'bakeoff.json'), JSON.stringify({ results }, null, 2))
   await writeFile(path.join(outDir, 'bakeoff.md'), markdown)

@@ -86,15 +86,15 @@ function parseModelJson(raw) {
   return JSON.parse(text)
 }
 
-function pickerMessages(prompt) {
+function pickerMessages(prompt, brief) {
   const list = TEMPLATES.map((spec) => `${spec.id}: ${spec.description} Keywords: ${spec.match.high.concat(spec.match.medium).join(', ')}`).join('\n')
   return [
     { role: 'system', content: 'Choose one template id for the player idea. Return JSON only: {"templateId":"...","confidence":0.8,"changes":["short change"]}. confidence is 0 to 1. changes is a short list of theme or tuning notes. Never use trademarked titles in the changes.' },
-    { role: 'user', content: `Idea:\n${prompt}\n\nTemplates:\n${list}` }
+    { role: 'user', content: `Idea:\n${prompt}\n\nTemplates:\n${list}${brief ? `\n\n${brief}` : ''}` }
   ]
 }
 
-function editMessages(spec, prompt, changes) {
+function editMessages(spec, prompt, changes, brief) {
   const html = HTML[spec.id]
   const blocks = ['CONFIG', 'THEME', 'RULES'].map((name) => blockText(html, name)).join('\n')
   const system = spec.engine === 'three'
@@ -102,11 +102,11 @@ function editMessages(spec, prompt, changes) {
     : `You edit one Kaplay template. Return JSON only. Keys are optional: CONFIG, THEME, RULES. Include only fields you change. CONFIG values are integers inside the allowed ranges. THEME palette values are #rrggbb colors. THEME names are short original titles, never trademarked game names. RULES values are full function source starting with "function <name>". Do not return HTML. ${KAPLAY_CHEATSHEET}`
   return [
     { role: 'system', content: system },
-    { role: 'user', content: `Template: ${spec.name} (${spec.id})\n${spec.description}\nIdea: ${prompt}\nChanges: ${changes.join('; ') || 'match the idea with colors, names, and a few numbers'}\nEditable fields: ${JSON.stringify(spec.fields)}\n${blocks}` }
+    { role: 'user', content: `Template: ${spec.name} (${spec.id})\n${spec.description}\nIdea: ${prompt}\nChanges: ${changes.join('; ') || 'match the idea with colors, names, and a few numbers'}\nEditable fields: ${JSON.stringify(spec.fields)}\n${blocks}${brief ? `\n\n${brief}` : ''}` }
   ]
 }
 
-export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis.fetch, onProgress }) {
+export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis.fetch, onProgress, brief = '' }) {
   const idea = cleanText(prompt, 600)
   const picked = pickTemplate(idea)
   if (!picked) return null
@@ -120,7 +120,7 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
   if (picked.confidence < 0.84) {
     try {
       onProgress?.({ phase: 'choosing', outputTokens: 0, label: 'Choosing a template…' })
-      const raw = await requestModelText(provider, pickerMessages(idea), fetchImpl, { schema: PICK_SCHEMA, schemaName: 'template_pick', maxOutputTokens: 300, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item }, onProgress })
+      const raw = await requestModelText(provider, pickerMessages(idea, brief), fetchImpl, { schema: PICK_SCHEMA, schemaName: 'template_pick', maxOutputTokens: 300, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item }, onProgress })
       const choice = parseModelJson(raw)
       const chosen = templateById(choice.templateId)
       if (chosen && Number(choice.confidence) >= 0.5) {
@@ -133,7 +133,7 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
   }
   try {
     onProgress?.({ phase: 'writing', outputTokens: 0, label: 'Writing the game…' })
-    const raw = await requestModelText(provider, editMessages(spec, idea, changes), fetchImpl, { schema: EDIT_SCHEMA, schemaName: 'template_edit', maxOutputTokens: 2048, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item }, onProgress })
+    const raw = await requestModelText(provider, editMessages(spec, idea, changes, brief), fetchImpl, { schema: EDIT_SCHEMA, schemaName: 'template_edit', maxOutputTokens: 2048, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item }, onProgress })
     const edits = parseModelJson(raw)
     const allowed = {}
     if (edits && typeof edits === 'object') {

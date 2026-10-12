@@ -1,3 +1,6 @@
+// The shell hint bar is #FFD23F on #0B0F1A. Freeform games that never draw a how-to-play line get this same one-line overlay.
+export const HOW_TO_PLAY_OVERLAY = '<p id="pg-how">How to play: Press Space, an arrow key, or tap.</p><style>#pg-how{position:fixed;left:12px;right:12px;bottom:12px;z-index:6;margin:0;padding:8px 12px;background:#0B0F1A;color:#FFD23F;font:14px/1.3 Rubik,sans-serif}</style>'
+
 export const SHELL = `
 const held = Object.create(null)
 const pointer = { x: 240, y: 240, down: false }

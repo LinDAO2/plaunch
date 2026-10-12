@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { createApp } from '../src/app.js'
+import { clearResearchCache } from '../src/ai/research.js'
 import { createArenaHub } from '../src/arena/hub.js'
 import { createWorldHub } from '../src/blocks/hub.js'
 import { loadConfig } from '../src/config.js'
@@ -34,6 +35,7 @@ export function testConfig(overrides = {}) {
 }
 
 export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
+  clearResearchCache()
   const config = testConfig(env)
   const db = await openDatabase(config.databaseUrl)
   await migrate(db)

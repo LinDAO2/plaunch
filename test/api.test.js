@@ -183,7 +183,7 @@ describe('http api', { concurrency: false }, () => {
     assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/)
     assert.equal(page.headers.get('x-frame-options'), 'DENY')
     const home = await client.request('GET', '/')
-    assert.match(home.text, /Make a game from one sentence/)
+    assert.match(home.text, /Make a shared block world from one sentence/)
     const script = await client.request('GET', '/app.js')
     assert.equal(script.status, 200)
     assert.match(script.headers.get('content-type'), /javascript/)
@@ -644,10 +644,11 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       const anon = await client.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })
       assert.equal(anon.status, 200)
       assert.equal(anon.data.mode, 'ai')
-      assert.equal(calls, 1)
+      assert.equal(anon.data.research.strategy, 'spec')
+      assert.equal(calls, 2)
       const legacy = await client.request('POST', '/api/generate', { prompt: 'a space dodge game please' })
       assert.equal(legacy.data.mode, 'template')
-      assert.equal(calls, 1)
+      assert.equal(calls, 2)
       await client.request('POST', '/api/auth/register', { email: 'ai@example.com', password: 'test-password-123', displayName: 'Ai' })
       const res = await client.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })
       assert.equal(res.status, 200)
@@ -655,7 +656,7 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       assert.equal(res.data.provider, 'gemini')
       assert.equal(res.data.model, 'gemini-3.8-flash')
       assert.equal(res.data.spec.runtime, 'dodge')
-      assert.equal(calls, 2)
+      assert.equal(calls, 3)
       const status = await client.request('GET', '/api/ai/status')
       assert.equal(status.data.mode, 'ai')
       assert.equal(JSON.stringify(status.data).includes('route-test-key'), false)
@@ -708,7 +709,7 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       assert.match(res.data.error, /HTTP 400 INVALID_ARGUMENT/)
       assert.doesNotMatch(res.data.error, /overloaded/)
       assert.doesNotMatch(JSON.stringify(res.data), /AIzaSyUPSTREAM/)
-      assert.equal(calls, 1)
+      assert.equal(calls, 2)
     } finally {
       await server.close()
     }
@@ -735,12 +736,12 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       await client.request('POST', '/api/auth/register', { email: 'cap@example.com', password: 'test-password-123', displayName: 'Cap' })
       const first = await client.request('POST', '/api/ai/generate', { prompt: 'a space dodge game please' })
       assert.equal(first.status, 200)
-      assert.equal(calls, 1)
+      assert.equal(calls, 2)
       const second = await client.request('POST', '/api/ai/generate', { prompt: 'a different garden game please' })
       assert.equal(second.status, 429)
       assert.equal(second.data.code, 'ai_daily_limit')
       assert.match(second.data.error, /this account/)
-      assert.equal(calls, 1)
+      assert.equal(calls, 2)
     } finally {
       await server.close()
     }
@@ -769,7 +770,7 @@ describe('ai route and rate limit', { concurrency: false }, () => {
       const blocked = await second.request('POST', '/api/ai/generate', { prompt: 'a garden tap game please' })
       assert.equal(blocked.status, 429)
       assert.match(blocked.data.error, /everyone/)
-      assert.equal(globalCalls, 1)
+      assert.equal(globalCalls, 2)
     } finally {
       await globalServer.close()
     }
@@ -1063,7 +1064,7 @@ describe('guest creators', { concurrency: false }, () => {
       assert.equal(other.status, 429)
       assert.equal(other.data.code, 'ai_daily_limit')
       assert.match(other.data.error, /this network/)
-      assert.equal(calls, 1)
+      assert.equal(calls, 2)
     } finally {
       await server.close()
     }

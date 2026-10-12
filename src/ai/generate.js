@@ -102,6 +102,29 @@ function isEventStream(response, text) {
   return sample.startsWith('data:') || sample.startsWith('event:')
 }
 
+// Payload characters (text, tool input, thinking) seen so far in a provider SSE stream.
+export function streamPayloadChars(raw) {
+  let chars = 0
+  for (const match of String(raw).matchAll(/"(?:text|partial_json|thinking)":"((?:[^"\\]|\\.)*)"/g)) chars += match[1].length
+  return chars
+}
+
+// True while the stream is waiting on the model: after message_start or a content_block_start
+// (tool_use or thinking) with no delta yet, or during thinking. Anthropic buffers a tool_use
+// input and sends only pings (~30 s apart) until it flushes, so the short idle timer must not apply.
+export function streamIsThinking(raw) {
+  const text = String(raw)
+  const tail = text.slice(Math.max(0, text.length - 4000))
+  const events = [...tail.matchAll(/"type":\s*"(message_start|content_block_start|content_block_delta|content_block_stop|thinking_delta|ping)"/g)].map((match) => match[1]).filter((type) => type !== 'ping')
+  if (!text.includes('data:')) return true
+  const lastEvent = events.at(-1)
+  const open = text.lastIndexOf('"type":"content_block_start"')
+  if (open > text.lastIndexOf('"type":"content_block_stop"') && /"content_block":\{"type":"tool_use"/.test(text.slice(open, open + 200))) return true
+  return lastEvent === 'message_start' || lastEvent === 'content_block_start' || lastEvent === 'thinking_delta' || events.length === 0
+}
+
+export const THINKING_STALL_MS = 90_000
+
 async function readResponseText(response, { maxChars, stallMs, deadline, onChunk }) {
   const reader = response.body?.getReader?.()
   if (!reader) {
@@ -122,13 +145,14 @@ async function readResponseText(response, { maxChars, stallMs, deadline, onChunk
       const timers = []
       const racers = [pending]
       if (stallMs) {
+        const idle = streamIsThinking(text) ? Math.max(stallMs, THINKING_STALL_MS) : stallMs
         racers.push(new Promise((_, reject) => {
           timers.push(setTimeout(() => {
             const err = new Error('AI provider stalled')
             err.name = 'TimeoutError'
             err.stall = true
             reject(err)
-          }, stallMs))
+          }, idle))
         }))
       }
       if (deadline) {
@@ -186,7 +210,7 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
       deadline: options.stream ? started + limit : 0,
       onChunk: (buf) => {
         if (!options.onProgress) return
-        const outputTokens = Math.ceil(buf.length / 4)
+        const outputTokens = Math.ceil(streamPayloadChars(buf) / 4)
         options.onProgress({ phase: 'writing', outputTokens, label: `Writing the game… ${outputTokens} tokens` })
       }
     })
@@ -319,7 +343,7 @@ function templateResult(prompt) {
   }
 }
 
-export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }) {
+export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch, brief = '' }) {
   if (wantsWorld(prompt)) {
     const idea = generateWorldIdea(prompt)
     return { mode: idea.mode, provider: null, model: null, game: idea.game, spec: idea.spec, notice: idea.notice }
@@ -331,7 +355,7 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
   if (idea.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: `Player idea:\n${idea}` }
+    { role: 'user', content: brief ? `Player idea:\n${idea}\n\n${brief}` : `Player idea:\n${idea}` }
   ]
   let lastError = 'AI provider failed'
   let code = 'ai_invalid_output'

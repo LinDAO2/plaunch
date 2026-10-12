@@ -1,4 +1,5 @@
 import { HttpError } from '../errors.js'
+import { HOW_TO_PLAY_OVERLAY } from '../templates/shell.js'
 import { STYLE_GUIDE } from '../style-kit.js'
 import { cleanText } from '../validate.js'
 import { aiStatus, requestModelText } from './generate.js'
@@ -149,12 +150,24 @@ report()
 </html>`
 }
 
-export function playabilityNotes(html) {
-  const notes = []
+function tellsHowToPlay(html) {
   const text = String(html || '')
   const drawn = /fillText\s*\(\s*['"][^'"]{8,}['"]/.test(text)
   const tells = /how to play|press space|arrow|tap|click|drag/i.test(text)
-  if (!drawn || !tells) notes.push('Draw a one-line How to play instruction on the canvas naming Space, an arrow key, tap, or drag.')
+  return drawn && tells
+}
+
+// A missing instruction line is not a failed game. The shell overlay supplies it.
+export function ensureHowToPlay(html) {
+  const text = String(html || '')
+  if (!text || tellsHowToPlay(text) || text.includes('id="pg-how"')) return text
+  if (/<\/body>/i.test(text)) return text.replace(/<\/body>/i, `${HOW_TO_PLAY_OVERLAY}</body>`)
+  return text + HOW_TO_PLAY_OVERLAY
+}
+
+export function playabilityNotes(html) {
+  const notes = []
+  const text = String(html || '')
   if (!/score\s*(\+\+|\+=)/.test(text)) notes.push('Increase the score when the player follows that instruction, more than once within 30 seconds.')
   if (!/playground-score/.test(text)) notes.push('Post the best score with parent.postMessage type playground-score each time it changes.')
   if (!/pointerdown/.test(text) && !/addEventListener\(\s*['"]keydown['"]/.test(text)) {
@@ -189,12 +202,12 @@ function gameFields(prompt, generation) {
   }
 }
 
-export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fetch, onProgress }) {
+export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fetch, onProgress, brief = '' }) {
   const idea = cleanText(prompt, 600)
   if (idea.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
   const status = aiStatus(env)
   if (status.mode !== 'ai') {
-    const html = templateFreeform(idea)
+    const html = ensureHowToPlay(templateFreeform(idea))
     const checked = assertFreeform(html)
     if (!checked.ok) throw new HttpError(500, checked.errors.join('; '), 'freeform_rejected')
     const game = gameFields(idea, 'rule-based-template')
@@ -215,7 +228,7 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
   let provider = chain[0]
   const messages = [
     { role: 'system', content: FREEFORM_PROMPT },
-    { role: 'user', content: `Player idea:\n${idea}` }
+    { role: 'user', content: brief ? `Player idea:\n${idea}\n\n${brief}` : `Player idea:\n${idea}` }
   ]
   let errors = ['Model output was empty']
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -235,6 +248,7 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
     errors = inspectFreeform(html)
     const notes = errors.length ? [] : playabilityNotes(html)
     if (!errors.length && !notes.length) {
+      const ready = ensureHowToPlay(html)
       const game = gameFields(idea, `ai:${provider.id}`)
       game.notice = `Generated with ${provider.id} (${provider.model}) as a sandboxed HTML game. The document is checked, then served from a separate origin. It is never executed on the server.`
       return {
@@ -244,7 +258,7 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
         model: provider.model,
         game,
         spec: null,
-        html,
+        html: ready,
         notice: game.notice,
         tierReason: 'Auto picked the freeform sandbox. The idea does not fit the arcade spec.'
       }

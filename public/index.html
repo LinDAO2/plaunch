@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#000000">
-<title>playground — make a game from one sentence</title>
+<title>playground — make a shared block world</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -22,21 +22,18 @@
 <main class="shell">
 <div class="home">
 <section class="ask" id="ask">
-<h1>Make a game from one sentence. Share it on X.</h1>
-<p id="ai-off" class="ai-off" role="status" hidden>AI is off on this server. Generate is showing built-in template games, not AI-made ones.</p>
-<textarea id="prompt" aria-label="Game idea" placeholder="a neon cyberpunk arena"></textarea>
+<h1>Make a shared block world from one sentence. Play it in an X post.</h1>
+<p id="ai-off" class="ai-off" role="status" hidden>AI is off on this server. Generate still builds a shared block world from the idea.</p>
+<textarea id="prompt" aria-label="World idea" placeholder="a candy island with a pyramid to build"></textarea>
 <div class="ideas">
-<button class="idea" type="button" data-prompt="A space game where you dodge falling meteors.">Dodge meteors</button>
-<button class="idea" type="button" data-prompt="bright toy arena">Bright toy arena</button>
-<button class="idea" type="button" data-prompt="kart gate race">Kart gate race</button>
-<button class="idea" type="button" data-prompt="island beacon walk">Island beacon walk</button>
-<button class="idea" type="button" data-prompt="Tap as fast as you can before time runs out.">Tap challenge</button>
-<button class="idea" type="button" data-prompt="Wait for the signal to turn green, then tap.">Green light</button>
-<button class="idea" type="button" data-prompt="Guess the secret number from 1 to 10.">Number guess</button>
-<button class="idea" type="button" data-prompt="Catch the gems and keep moving so the shards miss.">Catch the gems</button>
-<button class="idea" type="button" data-prompt="Grab the coins and stay away from the shadow.">Flee the shadow</button>
+<button class="idea" type="button" data-prompt="a candy island with a pyramid and a playful mood">Candy island</button>
+<button class="idea" type="button" data-prompt="snow caves at dusk, race to the beacon">Snow caves</button>
+<button class="idea" type="button" data-prompt="a desert treasure hunt with a clay house">Desert treasure</button>
+<button class="idea" type="button" data-prompt="a moon base at night with glowing blocks">Moon base</button>
+<button class="idea" type="button" data-prompt="build a castle together on a grassland">Shared castle</button>
+<button class="idea" type="button" data-prompt="floating sky islands with a calm music mood">Sky islands</button>
 </div>
-<div class="skies" aria-label="Sky">
+<div class="skies" aria-label="Sky" hidden>
 <button class="sky" type="button" data-sky="day" style="background:#4FB3FF;border-bottom:8px solid #CDEBFF">Day</button>
 <button class="sky" type="button" data-sky="dusk" style="background:#2B2A6B;border-bottom:8px solid #FF9E6B">Dusk</button>
 <button class="sky" type="button" data-sky="night" style="background:#0B1640;border-bottom:8px solid #24407A">Night</button>
@@ -63,7 +60,9 @@
 <div class="preview-top"><h2 id="preview-name">Click Frenzy</h2><span class="chip" id="mechanic">TAP</span></div>
 <p id="preview-description">Tap as fast as you can.</p>
 <p id="built-on" class="hint" hidden>Built on: <span id="built-on-name"></span><button id="restyle" class="text-btn" type="button">Try another style</button></p>
-<p id="remix-row" class="hint" hidden><button id="remix" class="outline" type="button">Remix</button> Copy this template into your studio and change the style.</p>
+<p id="research-strategy" class="hint" hidden></p>
+<p id="inspired-by" class="hint" hidden></p>
+<p id="remix-row" class="hint" hidden><button id="remix" class="outline" type="button">Remix</button> Copy this world and its spec into your studio.</p>
 <p id="controls-hint" class="hint"></p>
 <div class="game" id="game">
 <p id="goal-banner" class="goal-banner">Tap as fast as you can.</p>
@@ -121,13 +120,13 @@
 <div><label for="type">Game mechanic</label><select id="type"><option value="tap">Tap challenge</option><option value="reaction">Reaction test</option><option value="guess">Number guess</option><option value="dodge">Meteor dodge</option><option value="arcade">Arcade</option><option value="world">Block world</option></select></div>
 <div><label for="duration">Duration</label><select id="duration"><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
 </div>
-<label for="tier">Generator</label>
-<select id="tier">
+<label for="tier" hidden>Generator</label>
+<select id="tier" hidden>
 <option value="auto">Auto</option>
 <option value="spec">Built-in game</option>
 <option value="freeform">Sandbox</option>
 </select>
-<p id="tier-note" class="hint">Auto uses a template when the idea matches one, a built-in arcade game when it fits, and a sandbox game otherwise.</p>
+<p id="tier-note" class="hint" hidden>Create builds a shared block world.</p>
 <p id="tag-line" class="hint"></p>
 </details>
 <button id="update" class="outline block" type="button" hidden>Save changes</button>

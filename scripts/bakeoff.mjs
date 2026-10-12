@@ -28,9 +28,10 @@ function reopenRow(row) {
     model: fallback ? null : (row.model ?? null)
   }
 }
+const research = !process.argv.includes('--no-research')
 const results = process.argv.includes('--resmoke')
   ? JSON.parse(await readFile(path.join(outDir, 'bakeoff.json'), 'utf8')).results.map(reopenRow)
-  : await runBakeoff({ prompts, providers, outDir, smoke })
+  : await runBakeoff({ prompts, providers, outDir, smoke, research })
 if (smoke) {
   const browser = await launchCaptureBrowser()
   if (!browser) {

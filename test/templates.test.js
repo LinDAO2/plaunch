@@ -474,8 +474,20 @@ test('the studio names the template and can restyle it', { timeout: 120000 }, as
   try {
     await page.goto(server.base + '/', { waitUntil: 'domcontentloaded' })
     await page.waitForFunction(() => /Template/i.test(document.querySelector('#gen-mode')?.textContent || ''))
-    await page.fill('#prompt', 'wordle')
-    await page.click('#generate')
+    const id = await page.evaluate(async () => {
+      const csrfRes = await fetch('/api/auth/csrf', { credentials: 'same-origin' })
+      const csrf = (await csrfRes.json()).csrfToken
+      const res = await fetch('/api/games/word-guess/remix', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrf },
+        body: '{}'
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'remix failed')
+      return data.game.id
+    })
+    await page.goto(`${server.base}/g/${id}`, { waitUntil: 'domcontentloaded' })
     await page.waitForFunction(() => document.querySelector('#built-on')?.hidden === false)
     assert.equal(await page.locator('#built-on-name').innerText(), 'Word Guess')
     assert.match(await page.locator('#built-on').innerText(), /Built on:/)

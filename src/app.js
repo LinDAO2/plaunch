@@ -7,6 +7,8 @@ import { assertFreeform } from './ai/freeform-check.js'
 import { inspectImport } from './imports/bundle.js'
 import { importBroughtGame } from './imports/service.js'
 import { validateGameSpec } from './ai/gamespec.js'
+import { validateWorldSpec } from './blocks/spec.js'
+import { loadEdits, loadSparks, saveEdit, saveSpark } from './blocks/store.js'
 import { generateIdea } from './ai/idea.js'
 import { restyleTemplate } from './templates/generate.js'
 import { TAGS, tagsFor } from './ai/tags.js'
@@ -46,6 +48,7 @@ import {
   moderateGame,
   moderationQueue,
   publicGame,
+  readCredit,
   recordEvent,
   recordHold,
   resetWorld,
@@ -264,6 +267,15 @@ async function stampListing(fields, body, previous, env, fetchImpl, safetyModel)
   return verdict
 }
 
+async function publishedForResearch(db) {
+  try {
+    const result = await db.query(`select name, description, tags, credit from games where status = 'published' order by created_at desc limit 200`)
+    return result.rows
+  } catch {
+    return []
+  }
+}
+
 function generationOf(value, fallback = 'manual') {
   return GENERATIONS.has(value) ? value : fallback
 }
@@ -277,7 +289,7 @@ function present(config, game, options = {}) {
   if (out.tier === 'freeform') {
     out.sandboxUrl = `${config.usercontentOrigin}/g/${game.id}`
     if (options.canEdit) out.html = game.freeformHtml || ''
-    if (templateMarker(game.freeformHtml)) out.remix = true
+    if (game.type === 'world' || templateMarker(game.freeformHtml)) out.remix = true
   }
   return out
 }
@@ -298,12 +310,14 @@ function fieldsForSave(body, previous) {
       if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
       fields.freeformHtml = checked.html
     }
+    if (body.credit && typeof body.credit === 'object') fields.credit = readCredit(body.credit)
     return { fields, spec: null }
   }
   const fields = validateGameInput(body)
   fields.generation = generationOf(body.generation, previous?.generation || 'manual')
   fields.tier = 'spec'
   fields.freeformHtml = null
+  if (body.credit && typeof body.credit === 'object') fields.credit = readCredit(body.credit)
   return { fields, spec: savedSpec(fields, body, previous) }
 }
 
@@ -393,7 +407,9 @@ function generationPayload(result, prompt) {
     templateName: result.templateName || null,
     fallback: Boolean(result.fallback),
     tags,
-    safety: { flagged: Boolean(blocked), reason: blocked }
+    safety: { flagged: Boolean(blocked), reason: blocked },
+    research: result.research || null,
+    credit: result.credit || null
   }
 }
 
@@ -547,20 +563,24 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
         const result = await generateIdea({
           prompt: body.prompt,
           tier: body.tier,
+          kind: body.kind,
           env: config.env,
           fetchImpl,
-          onProgress: (info) => sseSend(res, 'progress', info)
+          onProgress: (info) => sseSend(res, 'progress', info),
+          published: await publishedForResearch(db)
         })
         sseSend(res, 'result', generationPayload(result, body.prompt))
         res.end()
         return 200
       } catch (err) {
+        // The 200 is already sent, so log the stream error here or it never reaches the server log.
+        log(err.status ? 'warn' : 'error', 'ai generate stream failed', { requestId: ctx.requestId, status: err.status || 500, code: err.code || 'server_error', message: err.message, upstream: err.upstream || null })
         sseSend(res, 'error', { error: err.status ? err.message : 'Server error', code: err.code || 'server_error', upstream: err.upstream || null })
         res.end()
         return err.status || 500
       }
     }
-    const result = await generateIdea({ prompt: body.prompt, tier: body.tier, env: config.env, fetchImpl })
+    const result = await generateIdea({ prompt: body.prompt, tier: body.tier, kind: body.kind, env: config.env, fetchImpl, published: await publishedForResearch(db) })
     return sendJson(res, 200, generationPayload(result, body.prompt), ctx)
   }
 
@@ -592,8 +612,12 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   if (method === 'POST' && pathname === '/api/freeform/preview') {
     const user = await requireCreator(req, ctx, db)
     const body = await readJson(req, HTML_LIMIT)
-    const checked = assertFreeform(body.html)
-    if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')
+    const imported = body.generation === 'import'
+    const importErrors = imported ? inspectImport(body.html) : null
+    const checked = imported
+      ? { ok: importErrors.length === 0, html: body.html, errors: importErrors }
+      : assertFreeform(body.html)
+    if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), imported ? 'import_rejected' : 'freeform_rejected')
     const token = await savePreview(db, checked.html, user.id)
     return sendJson(res, 200, { token, url: `${config.usercontentOrigin}/preview/${token}` }, ctx)
   }
@@ -845,6 +869,28 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     const user = await requireCreator(req, ctx, db)
     await readJson(req)
     const source = await publishedOrNull(db, remixMatch[1])
+    if (source?.type === 'world' && source.spec?.runtime === 'world') {
+      let spec
+      try { spec = validateWorldSpec(source.spec) } catch { spec = source.spec }
+      const fields = validateGameInput({
+        name: `${source.name} fork`.slice(0, 45),
+        description: source.description,
+        type: 'world',
+        duration: source.duration,
+        accent: source.accent
+      })
+      fields.generation = source.generation || 'rule-based-template'
+      fields.tier = 'spec'
+      fields.credit = readCredit({
+        builtOn: { name: source.name, author: 'Playground', license: 'MIT', source: '' },
+        inspiredBy: source.credit?.inspiredBy || []
+      })
+      spec = { ...spec, name: fields.name, description: fields.description, duration: fields.duration, accent: fields.accent }
+      const { game, version } = await createGame(db, fields, spec, user.id)
+      for (const edit of await loadEdits(db, source.id)) await saveEdit(db, game.id, edit, 'fork')
+      for (const sparkId of await loadSparks(db, source.id)) await saveSpark(db, game.id, sparkId, 'fork')
+      return sendJson(res, 201, { game: present(config, game, { canEdit: true }), url: `/g/${game.id}`, version }, ctx)
+    }
     if (!source || !templateMarker(source.freeformHtml)) throw new HttpError(404, 'Game not found', 'not_found')
     const checked = assertFreeform(source.freeformHtml)
     if (!checked.ok) throw new HttpError(400, checked.errors.join('; '), 'freeform_rejected')

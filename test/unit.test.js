@@ -7,9 +7,10 @@ import { test } from 'node:test'
 import { EXAMPLE_GAMES } from '../src/arcade/examples.js'
 import { classifyTier, heuristicTier, normalizeTier } from '../src/ai/classify.js'
 import { generateIdea } from '../src/ai/idea.js'
-import { FREEFORM_PROMPT, generateFreeform, playabilityNotes, templateFreeform } from '../src/ai/freeform.js'
+import { clearResearchCache } from '../src/ai/research.js'
+import { ensureHowToPlay, FREEFORM_PROMPT, generateFreeform, playabilityNotes, templateFreeform } from '../src/ai/freeform.js'
 import { inspectFreeform } from '../src/ai/freeform-check.js'
-import { generateGame, parseModelJson, requestModelText, SYSTEM_PROMPT } from '../src/ai/generate.js'
+import { generateGame, parseModelJson, requestModelText, streamIsThinking, streamPayloadChars, SYSTEM_PROMPT, THINKING_STALL_MS } from '../src/ai/generate.js'
 import { sandboxCsp } from '../src/usercontent.js'
 import { geminiResponseSchema, validateGameSpec } from '../src/ai/gamespec.js'
 import { createSimulation } from '../public/arcade-sim.js'
@@ -815,10 +816,22 @@ test('freeform prompt asks for touch, visuals, and a best score', () => {
 })
 
 test('an unsure idea asks the model which tier to use', async () => {
+  clearResearchCache()
   let calls = 0
-  const fetchImpl = async () => {
+  const fetchImpl = async (_url, init) => {
     calls += 1
-    const text = calls === 1 ? '{"tier":"spec"}' : JSON.stringify(validSpec)
+    const body = String(init?.body || '')
+    let text = JSON.stringify(validSpec)
+    if (body.includes('coreLoop')) {
+      text = JSON.stringify({
+        coreLoop: 'Walk the picnic and tap a snack.',
+        controls: 'Tap the blanket.',
+        juice: 'A soft pop on each hit.',
+        fun: 'A short calm round is enough.'
+      })
+    } else if (body.includes('"tier"')) {
+      text = '{"tier":"spec"}'
+    }
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 })
   }
   const result = await generateIdea({
@@ -827,9 +840,10 @@ test('an unsure idea asks the model which tier to use', async () => {
     env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
     fetchImpl
   })
-  assert.equal(calls, 2)
+  assert.equal(calls, 3)
   assert.equal(result.tier, 'spec')
   assert.match(result.tierReason, /model/)
+  assert.equal(result.research.brief.source, 'model')
 })
 
 test('tags follow the mechanic and the idea', () => {
@@ -1098,4 +1112,45 @@ test('freeform self-check asks again when the game cannot score', async () => {
   assert.equal(calls, 2)
   assert.match(result.html, /press Space/i)
   assert.equal(playabilityNotes(quiet).length > 0, true)
+})
+
+test('a playable game missing the how-to-play line keeps the shell overlay', async () => {
+  let calls = 0
+  const playing = `<!DOCTYPE html><html><body><canvas id="c"></canvas><script>
+let score = 0
+function draw(){ const c = document.getElementById('c').getContext('2d'); c.fillText('score '+score, 8, 16) }
+addEventListener('keydown', () => { score += 1; parent.postMessage({ type: 'playground-score', points: score }, '*'); draw() })
+addEventListener('pointerdown', () => { score += 1; parent.postMessage({ type: 'playground-score', points: score }, '*'); draw() })
+</script></body></html>`
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ html: playing }) }] } }] }), { status: 200 })
+  }
+  const result = await generateFreeform({
+    prompt: 'tower defense please',
+    env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g', AI_FALLBACKS: '' },
+    fetchImpl
+  })
+  assert.equal(calls, 1)
+  assert.equal(playabilityNotes(playing).length, 0)
+  assert.match(result.html, /id="pg-how"/)
+  assert.match(result.html, /How to play: Press Space, an arrow key, or tap\./)
+  assert.equal(ensureHowToPlay(templateFreeform('pong')), templateFreeform('pong'))
+})
+
+test('tool-use streams wait out Anthropic pings and count real payload tokens', () => {
+  const openTool = [
+    'data: {"type":"message_start"}',
+    'data: {"type":"content_block_start","content_block":{"type":"tool_use","name":"emit_result"}}',
+    'data: {"type":"ping"}'
+  ].join('\n')
+  assert.equal(streamIsThinking(openTool), true)
+  assert.equal(Math.max(25_000, THINKING_STALL_MS), 90_000)
+  const texting = [
+    'data: {"type":"content_block_start","content_block":{"type":"text"}}',
+    'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}',
+    'data: {"type":"content_block_stop"}'
+  ].join('\n')
+  assert.equal(streamIsThinking(texting), false)
+  assert.equal(streamPayloadChars('{"text":"abcd","partial_json":"xy","thinking":"z"}'), 7)
 })

@@ -7,13 +7,39 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'publ
 
 let playTemplate
 
-export function creditMarkup(credit) {
-  if (!credit?.author) return ''
-  const label = `Original by ${escapeHtml(credit.author)} (${escapeHtml(credit.license || 'unspecified')})`
-  if (typeof credit.source === 'string' && /^https:\/\/\S+$/.test(credit.source)) {
-    return `${label} - <a href="${escapeHtml(credit.source)}" rel="noreferrer">source</a>`
+function sourceLink(url) {
+  if (typeof url === 'string' && /^https:\/\/\S+$/.test(url)) {
+    return ` - <a href="${escapeHtml(url)}" rel="noreferrer">source</a>`
   }
-  return label
+  return ''
+}
+
+export function hasCredit(credit) {
+  return Boolean(credit?.author || credit?.builtOn?.name || credit?.inspiredBy?.length)
+}
+
+export function creditMarkup(credit) {
+  if (!credit) return ''
+  const parts = []
+  if (credit.author) {
+    parts.push(`Original by ${escapeHtml(credit.author)} (${escapeHtml(credit.license || 'unspecified')})${sourceLink(credit.source)}`)
+  }
+  if (credit.builtOn?.name) {
+    const license = credit.builtOn.license ? ` (${escapeHtml(credit.builtOn.license)})` : ''
+    parts.push(`Built on ${escapeHtml(credit.builtOn.name)}${license}${sourceLink(credit.builtOn.source)}`)
+  }
+  if (credit.inspiredBy?.length) {
+    const bits = credit.inspiredBy.slice(0, 4).map((item) => {
+      const license = item.license ? ` (${escapeHtml(item.license)})` : ''
+      const name = escapeHtml(item.name || 'a game')
+      if (typeof item.source === 'string' && /^https:\/\/\S+$/.test(item.source)) {
+        return `<a href="${escapeHtml(item.source)}" rel="noreferrer">${name}</a>${license}`
+      }
+      return `${name}${license}`
+    })
+    parts.push(`Inspired by ${bits.join(', ')}`)
+  }
+  return parts.join('. ')
 }
 
 export async function renderPlayPage(game, { embed = false, origin = '', site = '' } = {}) {
@@ -136,7 +162,7 @@ ${tags}
 <p>${description}</p>
 <p class="by">By ${escapeHtml(game.creator || 'Playground')}</p>
 ${sandboxNote}
-${game.credit?.author ? `<p class="hint">${creditMarkup(game.credit)}</p>` : ''}
+${hasCredit(game.credit) ? `<p class="hint">${creditMarkup(game.credit)}</p>` : ''}
 <a class="primary" href="${playPath}">Play</a>
 <a href="${studioPath}">Open in studio</a>
 ${checklist}

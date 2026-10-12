@@ -1,4 +1,4 @@
-import { HOTBAR, blockHex, blockOf, blockRgb, isSolid } from '/blocks/blocks.js'
+import { BLOCKS, HOTBAR, blockHex, blockOf, blockRgb, isSolid } from '/blocks/blocks.js'
 import { goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
 import { meshRegion } from '/blocks/mesh.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
@@ -89,25 +89,57 @@ function compile(gl, type, source) {
   return shader
 }
 
-function makeAtlas() {
+function paintTile(ctx, id, color, texture) {
+  const x0 = id * 16
+  ctx.fillStyle = color
+  ctx.fillRect(x0, 0, 16, 16)
+  if (texture === 'stripe') {
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'
+    for (let y = 2; y < 16; y += 4) ctx.fillRect(x0, y, 16, 1)
+    return
+  }
+  if (texture === 'brick') {
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)'
+    ctx.strokeRect(x0 + 0.5, 0.5, 7, 7)
+    ctx.strokeRect(x0 + 8.5, 8.5, 7, 7)
+    return
+  }
+  if (texture === 'dots') {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'
+    for (let i = 0; i < 6; i++) ctx.fillRect(x0 + (i * 5) % 13 + 1, (i * 7) % 13 + 1, 2, 2)
+    return
+  }
+  if (texture === 'solid') return
+  for (let i = 0; i < 48; i++) {
+    const n = Math.imul(id * 131 + i * 17, 2246822519) >>> 0
+    const dark = (n >>> 16) % 3 === 0
+    ctx.fillStyle = dark ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.16)'
+    ctx.fillRect(x0 + (n % 16), (n >>> 8) % 16, 1, 1)
+  }
+}
+
+function makeAtlas(blockSet) {
   const canvas = document.createElement('canvas')
   canvas.width = 256
   canvas.height = 16
   const ctx = canvas.getContext('2d')
+  const overrides = new Map()
+  for (const block of blockSet || []) {
+    const found = BLOCKS.find((item) => item.name.toLowerCase() === String(block.name || '').toLowerCase())
+    if (found) overrides.set(found.id, block)
+  }
   for (let id = 0; id <= 12; id++) {
-    const [r, g, b] = blockRgb(id)
-    ctx.fillStyle = `rgb(${r},${g},${b})`
-    ctx.fillRect(id * 16, 0, 16, 16)
-    for (let i = 0; i < 48; i++) {
-      const n = Math.imul(id * 131 + i * 17, 2246822519) >>> 0
-      const x = n % 16
-      const y = (n >>> 8) % 16
-      const dark = (n >>> 16) % 3 === 0
-      ctx.fillStyle = dark ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.16)'
-      ctx.fillRect(id * 16 + x, y, 1, 1)
-    }
+    const custom = overrides.get(id)
+    const [r, g, b] = custom?.color ? hexToRgb(custom.color) : blockRgb(id)
+    paintTile(ctx, id, `rgb(${r},${g},${b})`, custom?.texture || 'speckle')
   }
   return canvas
+}
+
+function hexToRgb(hex) {
+  const n = Number.parseInt(String(hex).replace('#', ''), 16)
+  if (!Number.isFinite(n)) return [128, 128, 128]
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
 function packMesh(mesh, rgbOf) {
@@ -195,6 +227,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     </div>
     <p class="world-online" id="world-online">1 online</p>
     <p class="world-with" id="world-with"></p>
+    <p class="world-mood" id="world-mood"></p>
     <p class="world-hint" id="world-hint"></p>
     <button type="button" id="world-start" class="world-start"><span>Play</span></button>
     <div class="crosshair" aria-hidden="true"></div>
@@ -219,6 +252,11 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const stickEl = ui.querySelector('#world-stick')
   const knob = stickEl.querySelector('i')
   hintEl.textContent = coarse ? TOUCH_HINT : HINT
+  const moodEl = ui.querySelector('#world-mood')
+  const npc = spec?.npcs?.[0]
+  const moodBits = [spec?.music ? `${spec.music} mood` : '', npc ? `${npc.name}: ${npc.flavor}` : ''].filter(Boolean)
+  moodEl.textContent = moodBits.join(' · ')
+  moodEl.hidden = moodBits.length === 0
   setTimeout(() => { hintEl.hidden = true }, 6500)
 
   let audioCtx = null
@@ -338,6 +376,15 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   let avatarCount = 0
   let sparkBuf = null
   let sparkCount = 0
+  let moteBuf = null
+  let moteCount = 0
+  let moteAt = 0
+  const motes = Array.from({ length: 14 }, (_, index) => ({
+    x: spawn.x + ((index % 7) - 3) * 0.7,
+    y: spawn.y + 1.2 + (index % 4) * 0.35,
+    z: spawn.z + (index % 5) * 0.4 - 0.8,
+    vy: 0.25 + (index % 3) * 0.08
+  }))
   const proj = new Float32Array(16)
   const view = new Float32Array(16)
   const mvp = new Float32Array(16)
@@ -356,10 +403,12 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       varying vec3 vColor;
       varying vec2 vUv;
       varying float vFog;
+      varying float vTile;
       void main() {
         gl_Position = uMvp * vec4(aPos.x, aPos.y + uBob, aPos.z, 1.0);
         vColor = aColor;
         vUv = vec2((aTile + aUv.x) / 16.0, aUv.y);
+        vTile = aTile;
         vec3 d = aPos - uCam;
         vFog = length(d);
       }`)
@@ -371,12 +420,16 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       uniform float uFogFar;
       uniform float uTex;
       uniform float uLight;
+      uniform float uTime;
       varying vec3 vColor;
       varying vec2 vUv;
       varying float vFog;
+      varying float vTile;
       void main() {
         vec3 tex = texture2D(uAtlas, vUv).rgb;
-        vec3 albedo = mix(vColor, tex * vColor, uTex) * uLight;
+        float shimmer = 0.0;
+        if (vTile > 4.5 && vTile < 5.5) shimmer = sin(vUv.y * 36.0 + uTime * 2.2) * 0.08;
+        vec3 albedo = mix(vColor, tex * vColor, uTex) * (uLight + shimmer);
         float fog = clamp((vFog - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
         gl_FragColor = vec4(mix(albedo, uSky, fog), 1.0);
       }`)
@@ -398,9 +451,10 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     loc.tex = gl.getUniformLocation(program, 'uTex')
     loc.light = gl.getUniformLocation(program, 'uLight')
     loc.bob = gl.getUniformLocation(program, 'uBob')
+    loc.time = gl.getUniformLocation(program, 'uTime')
     atlas = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D, atlas)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, makeAtlas())
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, makeAtlas(spec?.blockSet))
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -996,7 +1050,8 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
 
   function draw(now) {
     resize()
-    const cycle = skyCycle(world.biome, skyPhase(now))
+    const forced = spec?.cycle === 'day' ? 0.18 : spec?.cycle === 'night' ? 0.82 : spec?.cycle === 'dusk' ? 0.55 : null
+    const cycle = skyCycle(world.biome, forced === null ? skyPhase(now) : forced)
     state.sky = cycle.hex
     if (!state.gl) {
       drawFlat(cycle)
@@ -1041,6 +1096,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     gl.uniform1f(loc.near, fogNear)
     gl.uniform1f(loc.far, fogFar)
     gl.uniform1f(loc.light, cycle.light)
+    gl.uniform1f(loc.time, now / 1000)
     gl.uniform1f(loc.bob, 0)
     gl.uniform1f(loc.tex, 1)
     for (const chunk of chunks.values()) {
@@ -1062,7 +1118,47 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       bind(sparkBuf)
       gl.drawArrays(gl.TRIANGLES, 0, sparkCount)
     }
+    if (now - moteAt > 90) {
+      moteAt = now
+      rebuildMotes()
+    }
+    if (moteCount && moteBuf) {
+      gl.uniform1f(loc.tex, 0)
+      gl.uniform1f(loc.light, 1.15)
+      gl.uniform1f(loc.bob, 0)
+      bind(moteBuf)
+      gl.drawArrays(gl.TRIANGLES, 0, moteCount)
+    }
     drawNames()
+  }
+
+  function rebuildMotes() {
+    if (!gl) return
+    const bag = { positions: [], colors: [], uvs: [], tiles: [], count: 0 }
+    for (const mote of motes) {
+      mote.y += mote.vy * 0.08
+      if (mote.y > pos.y + 4) mote.y = pos.y + 0.4
+      mote.x += Math.sin(mote.y * 3) * 0.01
+      pushBox(bag, mote.x, mote.y, mote.z, 0.08, 0.08, 0.08, [255, 236, 160])
+    }
+    const verts = bag.positions.length / 3
+    const data = new Float32Array(verts * 9)
+    for (let i = 0; i < verts; i++) {
+      const o = i * 9
+      data[o] = bag.positions[i * 3]
+      data[o + 1] = bag.positions[i * 3 + 1]
+      data[o + 2] = bag.positions[i * 3 + 2]
+      data[o + 3] = bag.colors[i * 3]
+      data[o + 4] = bag.colors[i * 3 + 1]
+      data[o + 5] = bag.colors[i * 3 + 2]
+      data[o + 6] = 0
+      data[o + 7] = 0
+      data[o + 8] = 0
+    }
+    if (!moteBuf) moteBuf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, moteBuf)
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW)
+    moteCount = verts
   }
 
   function drawFlat(cycle) {

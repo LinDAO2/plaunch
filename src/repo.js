@@ -44,18 +44,39 @@ export function mapGame(row) {
   }
 }
 
-function readCredit(value) {
+function cleanRef(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+  const name = typeof item.name === 'string' ? item.name.replace(/\s+/g, ' ').trim().slice(0, 80) : ''
+  if (!name) return null
+  const source = typeof item.source === 'string' && /^https:\/\/\S+$/.test(item.source) ? item.source.slice(0, 300) : ''
+  return {
+    name,
+    author: typeof item.author === 'string' ? item.author.replace(/\s+/g, ' ').trim().slice(0, 80) : '',
+    license: typeof item.license === 'string' ? item.license.replace(/\s+/g, ' ').trim().slice(0, 40) : '',
+    source
+  }
+}
+
+export function readCredit(value) {
   const parsed = parseJson(value)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+  const licenseText = typeof parsed.licenseText === 'string' ? parsed.licenseText.slice(0, 8000) : ''
   return {
     author: typeof parsed.author === 'string' ? parsed.author : '',
     license: typeof parsed.license === 'string' ? parsed.license : '',
     source: typeof parsed.source === 'string' ? parsed.source : '',
     sha: typeof parsed.sha === 'string' ? parsed.sha : '',
-    origin: parsed.origin === 'curated' || parsed.origin === 'community' ? parsed.origin : '',
+    origin: parsed.origin === 'curated' || parsed.origin === 'community' || parsed.origin === 'research' ? parsed.origin : '',
     copyleftConfirmed: parsed.copyleftConfirmed === true,
-    permissionConfirmed: parsed.permissionConfirmed === true
+    permissionConfirmed: parsed.permissionConfirmed === true,
+    licenseText,
+    builtOn: cleanRef(parsed.builtOn),
+    inspiredBy: Array.isArray(parsed.inspiredBy) ? parsed.inspiredBy.map(cleanRef).filter(Boolean).slice(0, 6) : []
   }
+}
+
+export function hasStoredCredit(credit) {
+  return Boolean(credit?.author || credit?.builtOn?.name || credit?.inspiredBy?.length)
 }
 
 function readTags(value) {
@@ -83,7 +104,7 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     canEdit,
     tags: game.tags || [],
     featured: game.featured === true,
-    credit: game.credit?.author ? game.credit : null,
+    credit: hasStoredCredit(game.credit) ? publicCredit(game.credit) : null,
     poster: posterKind(game)
   }
   if (canEdit) out.flagReason = game.flagReason || ''
@@ -97,6 +118,20 @@ export function publicGame(game, { canEdit = false, assets = null, includeSpec =
     }))
   }
   return out
+}
+
+function publicCredit(credit) {
+  return {
+    author: credit.author || '',
+    license: credit.license || '',
+    source: credit.source || '',
+    sha: credit.sha || '',
+    origin: credit.origin || '',
+    copyleftConfirmed: credit.copyleftConfirmed === true,
+    permissionConfirmed: credit.permissionConfirmed === true,
+    builtOn: credit.builtOn || null,
+    inspiredBy: credit.inspiredBy || []
+  }
 }
 
 function hashToken(token) {

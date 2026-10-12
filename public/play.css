@@ -232,6 +232,20 @@ body.world-play #guess-input { display: none !important; }
   font-family: "Lilita One", sans-serif;
   font-size: 12px;
 }
+.world-mood {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 78px;
+  margin: 0;
+  color: #fff;
+  font-size: 13px;
+  text-shadow: 0 1px 2px #1B1B2F;
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .hotbar button { width: 44px; height: 44px; min-height: 44px; }
+}
 .world-start {
   position: absolute;
   left: 0;

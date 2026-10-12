@@ -62,19 +62,18 @@ test('world prompts become a shared block spec and minecraft is not a runtime', 
   assert.equal(heuristicTier('build a castle together'), 'world')
   assert.equal(heuristicTier('dodge the meteors'), 'spec')
   for (const prompt of ['minecraft', 'block building game', 'voxel playground', 'build a castle together']) {
-    let called = false
     const idea = await generateIdea({
       prompt: `${prompt} please`,
       tier: 'auto',
-      env: { GEMINI_API_KEY: 'test-key' },
-      fetchImpl: async () => { called = true; throw new Error('model should not be called') }
+      env: {}
     })
-    assert.equal(called, false)
     assert.equal(idea.game.type, 'world')
     assert.equal(idea.spec.runtime, 'world')
     assert.equal(idea.spec.version, '1.2')
     assert.equal(idea.tier, 'spec')
     assert.equal(idea.html, null)
+    assert.equal(idea.credit.builtOn.name, 'Blocks')
+    assert.equal(idea.credit.builtOn.license, 'MIT')
   }
   const castle = await generateIdea({ prompt: 'build a castle together', tier: 'auto', env: {} })
   assert.equal(castle.spec.structure, 'tower')

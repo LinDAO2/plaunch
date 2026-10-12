@@ -1,0 +1,4525 @@
+[
+  {
+    "id": "kaplay-advancedbinding",
+    "name": "Advanced Bindings",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/advancedbinding.js",
+    "tags": [
+      "action",
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad"
+    ],
+    "description": "Bind multiple actions to the same key, using modifier keys.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-ai",
+    "name": "AI with State Machines",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/ai.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to create simple game AI using state machines.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-analogtriggers",
+    "name": "Gamepad Analog Triggers",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/analogtriggers.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad"
+    ],
+    "description": "How to read analog triggers on connected gamepads.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-animation",
+    "name": "Animate with animate()",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/animation.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to animate game object properties with animate() component",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-audio",
+    "name": "Audio Playing",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/audio.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "tap",
+      "arrow keys"
+    ],
+    "description": "How to play audio files and change volume, speed, etc.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-automaticcollider",
+    "name": "Create a polygon shape with a sprite",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/automaticCollider.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to make a collider automaticly",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basiceventsobject",
+    "name": "Object Events",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicEventsObject.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Handling events on objects",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basicscomprender",
+    "name": "Render Components",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicsCompRender.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Learn about components that render something",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basicscomponents",
+    "name": "Components",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicsComponents.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "More about components",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basicsevents",
+    "name": "Events",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicsEvents.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "The lifecycle events in KAPLAY",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basicsglobals",
+    "name": "The KAPLAY Context",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicsGlobals.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "What's KAPLAY Context? What are globals?",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basicsobject",
+    "name": "Add game objects",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicsObject.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to create game objects",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-basicsstart",
+    "name": "Create your first game",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/basicsStart.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "All you need to know to get started",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-bbcode",
+    "name": "BBCode Formatting",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/bbcode.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to parameterize text formatting codes.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-binding",
+    "name": "Button Bindings",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/binding.js",
+    "tags": [
+      "shooter",
+      "example"
+    ],
+    "mechanics": [
+      "shoot"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to set common names to different inputs (\"move\", \"shoot\").",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-blend",
+    "name": "Blend modes",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/blend.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use blend mode with blend() comp",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-burp",
+    "name": "Burp",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/burp.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "How to use burp, the engine core",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-button",
+    "name": "Buttons",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/button.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to create simple UI buttons",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-camera",
+    "name": "Camera",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/camera.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to handle and modify the camera",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-children",
+    "name": "Children",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/children.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to create children on game objects.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-clip",
+    "name": "Clipped Lines",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/clip.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Highlight intersecting parts of drawn lines",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-collision",
+    "name": "Collision",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/collision.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to handle collisions betweem game objects.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-collisionshapes",
+    "name": "Collision Shapes",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/collisionshapes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to create different collision shapes.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-component",
+    "name": "Custom Components",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/component.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to create and use components.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-concert",
+    "name": "Concert",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/concert.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Celebrate Kaboom.js v2000 and back to the old days.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-confetti",
+    "name": "Confetti",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/confetti.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to create a confetti effect.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-curves",
+    "name": "Curves",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/curves.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Normalize speed on Bezier curves and track direction using derivatives over time",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-customcompdebug",
+    "name": "Custom Components Debug",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/customCompDebug.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to display custom properties in custom components",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-doublejump",
+    "name": "Double Jump",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/doublejump.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "jump"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to add a double jump",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-drag",
+    "name": "Drag",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/drag.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to make game objects draggable",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-draw",
+    "name": "Draw",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/draw.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use the drawing API",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-drawon",
+    "name": "Drawon Component",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/drawon.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to use Frame Buffers",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-eatlove",
+    "name": "Eat Love",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/eatlove.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "A simple game to eat love",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-egg",
+    "name": "Egg",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/egg.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "A simple game about eggs",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-fadein",
+    "name": "Fade In",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/fadeIn.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to fade in game objects",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-fakemouse",
+    "name": "Fake Mouse",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/fakeMouse.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to create a fake mouse in-game",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-flamebar",
+    "name": "Flame bar",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/flamebar.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "tap",
+      "arrow keys"
+    ],
+    "description": "How to make platform jump-like flamebars",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-flappy",
+    "name": "one-button flyer",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/flappy.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "tap",
+      "arrow keys"
+    ],
+    "description": "How to make a one-button flyer clone",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-frames",
+    "name": "Frames",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/frames.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to define frames in an animation.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-friction",
+    "name": "Friction",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/friction.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to apply friction to objects",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-gacha",
+    "name": "Gacha Machine",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/gacha.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Drops a random item based on assigned probabilities",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-gamepad",
+    "name": "Gamepad",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/gamepad.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad"
+    ],
+    "description": "How to manage gamepad input.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-gamepadmulti",
+    "name": "Multi-Gamepad",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/gamepadMulti.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad"
+    ],
+    "description": "How to manage multiple gamepads at the same.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-ghosthunting",
+    "name": "Ghost hunting",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/ghosthunting.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "A survival game about hunting ghosts",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-gravity",
+    "name": "Gravity",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/gravity.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to make use of gravity in KAPLAY.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-health",
+    "name": "Health",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/health.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to use health to manage the health points of entities",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-hover",
+    "name": "Hover",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/hover.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Understand the different hover methods",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-kaboom",
+    "name": "Kaboom!",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/kaboom.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to KABOOM!",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-kaplaylogoanim",
+    "name": "KAPLAY Logo Animation",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/kaplayLogoAnim.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Multiple animations using animate(), lerp() and modulo",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-layer",
+    "name": "Layer",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/layer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use the z() component for layering",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-layers",
+    "name": "Layers",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/layers.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use layer system",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-lerp",
+    "name": "Lerp",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/lerp.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to use lerp to make simple tweenings",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-lerpangle",
+    "name": "Look Towards the Mouse",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/lerpAngle.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "Use lerpAngle to rotate an object towards a point",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-level",
+    "name": "Level",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/level.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to build levels from ASCII",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-levelmultichar",
+    "name": "Multi-Character Level",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/levelMultichar.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Build levels from ASCII using more 2 or more characters per tile",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-levelraycast",
+    "name": "Level Raycast",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/levelRaycast.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use raycasts in a level environment",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-levelcomp",
+    "name": "Level component",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/levelcomp.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to build levels out of tiles using level",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-lifespan",
+    "name": "Lifespan",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/lifespan.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use the lifespan component.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-linecap",
+    "name": "Lines",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/linecap.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "The different draw options of a line.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-linejoin",
+    "name": "Line join",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/linejoin.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "The different draw options of a line.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-livequery",
+    "name": "Live query",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/livequery.js",
+    "tags": [
+      "action",
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "How to live update a get() action.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-loadingscreen",
+    "name": "Custom Loading Screen",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/loadingScreen.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to customize the loading screen.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-maze",
+    "name": "Maze",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/maze.js",
+    "tags": [
+      "maze",
+      "example"
+    ],
+    "mechanics": [
+      "maze"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to create a maze using math and addLevel().",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-mazeraycastedlight",
+    "name": "Maze Raycasted Light",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/mazeRaycastedLight.js",
+    "tags": [
+      "maze",
+      "example"
+    ],
+    "mechanics": [
+      "maze"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to create a maze and a shadow effect with it.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-movement",
+    "name": "Movement",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/movement.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to make basic movement.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-onloaderror",
+    "name": "Load Error",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/onLoadError.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to handle errors on load.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-out",
+    "name": "Out of Screen",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/out.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to handle objects that are out of screen.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-overlap",
+    "name": "Overlap",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/overlap.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to handle overlapping areas.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-particle",
+    "name": "Particle",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/particle.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to use particles()",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-particletrail",
+    "name": "Particle Trail",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/particleTrail.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to do a mouse-following trail with particles()",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-patrol",
+    "name": "Patrol",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/patrol.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to patrol a sprite.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-pausemenu",
+    "name": "Pause Menu (one-button flyer)",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/pauseMenu.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "tap",
+      "arrow keys"
+    ],
+    "description": "How to make a pause menu and pause a game",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-picture",
+    "name": "Picture",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/picture.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to store static drawing data",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-platformeffector",
+    "name": "One-way Platforms",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/platformEffector.js",
+    "tags": [
+      "platform",
+      "example"
+    ],
+    "mechanics": [
+      "platform"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to create one-way walls or platforms.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-platformer",
+    "name": "Platformer",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/platformer.js",
+    "tags": [
+      "platform",
+      "example"
+    ],
+    "mechanics": [
+      "platform"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "A simple platformer",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-polygon",
+    "name": "Polygon",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/polygon.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to create polygon-shaped objects.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-pong",
+    "name": "Pong",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/pong.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "How to make pong in KAPLAY.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-posteffect",
+    "name": "Post-Effect",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/postEffect.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to use a post effect shaders",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-query",
+    "name": "Query",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/query.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to query for objects",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-raycastobject",
+    "name": "Raycast Object",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/raycastObject.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Raycasting with objects/area",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-raycastshape",
+    "name": "Raycast Shape",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/raycastShape.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Raycasting with shape",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-raycaster3d",
+    "name": "3D",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/raycaster3d.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "Kaplay example: 3D.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-rebinding",
+    "name": "Re-Bind Buttons",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/rebinding.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to re-bind button mappings mid-game",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-restitution",
+    "name": "Restitution",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/restitution.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to make objects bounce",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-retrieve",
+    "name": "Retrieve",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/retrieve.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Using the retrieve function to detect collisions",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-rpg",
+    "name": "RPG",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/rpg.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "A basic RPG game",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-runner",
+    "name": "Runner",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/runner.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "Endless runner (like Chrome Dino)",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-scenes",
+    "name": "Scenes",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/scenes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to use scene system",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-scopes",
+    "name": "Lifetime Scopes",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/scopes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use lifetime scopes",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-shader",
+    "name": "Shaders",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/shader.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use shaders",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-shaperect",
+    "name": "Rect",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/shapeRect.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "The different options for the rect() component.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-shooter",
+    "name": "Shooter",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/shooter.js",
+    "tags": [
+      "shooter",
+      "example"
+    ],
+    "mechanics": [
+      "shoot"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "2D top-down space shooter game",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-singletontags",
+    "name": "Singleton Tags",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/singletonTags.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to make tags unique",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-size",
+    "name": "Keep Aspect Ratio",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/size.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to keep aspect ratio using letterbox",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-slice9",
+    "name": "Slice-9",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/slice9.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to make use of slice-9 sprites.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-slice9tiled",
+    "name": "Slice-9 Tiled",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/slice9Tiled.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use tileMode with 9-slice sprites for tiling edges and center.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-sokoban",
+    "name": "Sokoban",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/sokoban.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to make a sokoban-like game in KAPLAY.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-spriteanim",
+    "name": "Sprite Animations",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/spriteAnim.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to load and animate sprites",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-spriteatlas",
+    "name": "Sprite-Atlas",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/spriteatlas.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to load a sprite atlas in KAPLAY.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-text",
+    "name": "Text",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/text.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "How to add text objects in KAPLAY.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-textinput",
+    "name": "Text Input",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/textInput.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to take input and display it on text",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-tiled",
+    "name": "Tiled",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/tiled.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to use sprites in tiled mode",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-timer",
+    "name": "Timer",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/timer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "How to make count time in KAPLAY.",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-tween",
+    "name": "Tween",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/tween.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to use tweens in KAPLAY",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-tweeneasings",
+    "name": "Tween Easings",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/tweenEasings.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "See all different easings in tween()",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-tweeneasingscustom",
+    "name": "Custom Easings",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/tweenEasingsCustom.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "How to use custom easing functions on tweens",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-video",
+    "name": "Video",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/video.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "How to play videos",
+    "adaptable": false
+  },
+  {
+    "id": "kaplay-vn",
+    "name": "Visual Novel",
+    "author": "KAPLAY Team",
+    "license": "MIT",
+    "repo": "https://github.com/kaplayjs/kaplay",
+    "source": "https://github.com/kaplayjs/kaplay/blob/master/examples/vn.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "Little visual novel with typewriter effect",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-3d",
+    "name": "3d",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/3d/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "LittleJS 3D Example - A tour of the 3D plugin in one scene - Terrain from a height map, shadows, fog and a sky - Meshes built from shapes, an instanced forest, sprites and 3D text - Point lights with lens flares, particl",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-box2d",
+    "name": "box2d",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/box2d/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Little JS Box2d Demo - Demonstrates how to use Box2D with LittleJS - Several scenes to demonstrate Box2D features - Every type of shape and joint - Contact begin and end callbacks - Raycasting and querying - Collision fi",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-breakout",
+    "name": "breakout",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/breakout/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "tap"
+    ],
+    "description": "Little JS Breakout Game - A simple breakout game - Includes sound and particles - Uses a post processing effect - Control with mouse, touch, or gamepad",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-breakouttutorial",
+    "name": "breakoutTutorial",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/breakoutTutorial/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "Little JS Breakout Tutorial - Shows how to make a simple breakout game - Includes sound and particles - Control with mouse or touch",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-htmlmenu",
+    "name": "htmlMenu",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/htmlMenu/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Little JS HTML Menu Example Project - Setup a simple html menu system - Menu can be opened and closed - Pauses game when menu is visible - Shows several input types",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-particles",
+    "name": "particles",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/particles/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "LittleJS particles example.",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-platformer",
+    "name": "platformer",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/platformer/index.html",
+    "tags": [
+      "platform",
+      "example"
+    ],
+    "mechanics": [
+      "platform",
+      "physics"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "tap"
+    ],
+    "description": "Little JS Platforming Game - A basic platforming starter project - Platforming physics and controls - Includes destructible terrain - Control with keyboard, mouse, touch, or gamepad",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-puzzle",
+    "name": "puzzle",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/puzzle/index.html",
+    "tags": [
+      "puzzle",
+      "example"
+    ],
+    "mechanics": [
+      "puzzle",
+      "match"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "Little Puzzle Game - A simple match 3 style puzzle game - Uses a high resolution texture - Tracks high score in local storage - Control with mouse or touch",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-threejs",
+    "name": "threejs",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/threejs/index.html",
+    "tags": [
+      "platform",
+      "example"
+    ],
+    "mechanics": [
+      "platform"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "LittleJS Three.js Platformer Example - A tiny 3D platformer driven entirely by LittleJS game logic - Uses the three.js plugin with a free camera (cameraAlign2D disabled) - LittleJS XY is the ground plane and z is height",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-uisystem",
+    "name": "uiSystem",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/uiSystem/index.html",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Little JS UI System Example - Shows how to use the LittleJS UI plugin - Modal windows, buttons, text, checkboxes, and more",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-animation",
+    "name": "animation",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/animation.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "a SpriteAnimation steps a tile through the frames beside it, driven by",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-audioeffects",
+    "name": "audio Effects",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/audioEffects.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "initialize UI system",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-balltrackgame",
+    "name": "ball Track Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/ballTrackGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "ball"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "project a 3d point to 2d camera space",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-blending",
+    "name": "blending",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/blending.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "additive blending",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-box2d",
+    "name": "box2d",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/box2d.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "LittleJS example: box2d.",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-box2dcar",
+    "name": "box2d Car",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/box2dCar.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "setup box2d and create the objects",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-box2dpool",
+    "name": "box2d Pool",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/box2dPool.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "ball",
+      "physics"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "setup pool ball physics",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-box2dtilelayer",
+    "name": "box2d Tile Layer",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/box2dTileLayer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "LittleJS example: box2d Tile Layer.",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-cameradrag",
+    "name": "camera Drag",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/cameraDrag.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "create some objects",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-clock",
+    "name": "clock",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/clock.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "draw background",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-crescent",
+    "name": "crescent",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/crescent.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "a row of moons stepping through a full lunar cycle",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-customeditor",
+    "name": "custom Editor",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/customEditor.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the dungeon as a Tiled map: a layer of walls, and torches and a start",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-flappygame",
+    "name": "one-button flyer Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/flappyGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "tap",
+      "arrow keys"
+    ],
+    "description": "one-button flyer movement controls",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-grapplegame",
+    "name": "grapple Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/grappleGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "get world position of a node",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-hillglidegame",
+    "name": "hill Glide Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/hillGlideGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "check ground height",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-imagefont",
+    "name": "image Font",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/imageFont.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "draw text with built in engine font image",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-input",
+    "name": "input",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/input.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "tap",
+      "arrow keys"
+    ],
+    "description": "show the touch gamepad, and let touches outside it move the mouse",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-landergame",
+    "name": "lander Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/landerGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "tap",
+      "arrow keys"
+    ],
+    "description": "space ship controls",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-leveleditor",
+    "name": "level Editor",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/levelEditor.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the level as a Tiled map, the editor edits it in place and saves it",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-lightshadows",
+    "name": "light Shadows",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/lightShadows.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "walls cast shadows by default",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-lightsystem",
+    "name": "light System",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/lightSystem.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "draw the world at full brightness",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-lowres",
+    "name": "low Res",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/lowRes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "how many pixels across the canvas is",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-maze",
+    "name": "maze",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/maze.js",
+    "tags": [
+      "maze",
+      "example"
+    ],
+    "mechanics": [
+      "maze"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "get a random position on odd coordinates inside the outer wall",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-medals",
+    "name": "medals",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/medals.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "create example medals",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-music",
+    "name": "music",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/music.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "setup ui system plugin",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-musicplayer",
+    "name": "music Player",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/musicPlayer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "setup ui system plugin",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-nineslice",
+    "name": "nine Slice",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/nineSlice.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "the world panels go in the left half, the screen ones in the right",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-objectcollect",
+    "name": "object Collect",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/objectCollect.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "collect"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "the two areas, a square on the left and a circle on the right",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-objectraycast",
+    "name": "object Raycast",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/objectRaycast.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "create random objects with raycast collision enabled",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-parallax",
+    "name": "parallax",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/parallax.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "the far layers are lighter and higher, follow the camera more,",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-parentchild",
+    "name": "parent Child",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/parentChild.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "rotate self: parent will carry children along",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-particleeffects",
+    "name": "particle Effects",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/particleEffects.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "the effects in a grid of 8 by 3, 3 units apart",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-particleoptions",
+    "name": "particle Options",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/particleOptions.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "4 cells across and 2 down, 5 units apart",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-particles",
+    "name": "particles",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/particles.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "a fire and its smoke, three times the size they are made for",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-pathfinder",
+    "name": "path Finder",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/pathFinder.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "make sparse obstacle field collision for demo",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-physics",
+    "name": "physics",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/physics.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "a box with its own bounce and friction, the two numbers that say how it",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-piano",
+    "name": "piano",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/piano.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "initialize UI system",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-platformphysics",
+    "name": "platform Physics",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/platformPhysics.js",
+    "tags": [
+      "platform",
+      "example"
+    ],
+    "mechanics": [
+      "jump",
+      "platform",
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "run, Up to jump, hold Down to drop through a platform",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-platformer",
+    "name": "platformer",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/platformer.js",
+    "tags": [
+      "platform",
+      "example"
+    ],
+    "mechanics": [
+      "platform"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "apply movement controls",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-ponggame",
+    "name": "pong Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/pongGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "LittleJS example: pong Game.",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-posteffects",
+    "name": "post Effects",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/postEffects.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "a scene with color and bright spots for the effects to work on",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-postprocess",
+    "name": "post Process",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/postProcess.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "LittleJS short example: post Process.",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-raycastinggame",
+    "name": "raycasting Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/raycastingGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "tap"
+    ],
+    "description": "a simple function to create the level",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dambientocclusion",
+    "name": "render3D Ambient Occlusion",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dAmbientOcclusion.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "for each pixel, pairs of depths on opposite sides a short way off;",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dbasics",
+    "name": "render3D Basics",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dBasics.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "setup the 3D rendering environment",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dbillboards",
+    "name": "render3D Billboards",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dBillboards.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "create a billboard object with no mesh",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dcollision",
+    "name": "render3D Collision",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dCollision.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "stay in the arena and bounce off stuff",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3ddodgegame",
+    "name": "render3D Dodge Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dDodgeGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "dodge"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "arrow keys move on the ground",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3ddraw",
+    "name": "render3D Draw",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dDraw.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "a point on a ring around the middle, turning slowly",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dfirstperson",
+    "name": "render3D First Person",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dFirstPerson.js",
+    "tags": [
+      "maze",
+      "example"
+    ],
+    "mechanics": [
+      "maze"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the world position of a maze cell, at a height",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dfocusblur",
+    "name": "render3D Focus Blur",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dFocusBlur.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "grass, then a little town of houses and trees in a loose grid",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dglow",
+    "name": "render3D Glow",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dGlow.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "make floor and pillars",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dheightmap",
+    "name": "render3D Height Map",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dHeightMap.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "roll downhill along the ground normal",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dinstancing",
+    "name": "render3D Instancing",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dInstancing.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "make a cloud of cubes sharing the same mesh, batched again each frame",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dlayers",
+    "name": "render3D Layers",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dLayers.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "coins in front of and behind the 2D bars",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dlensflare",
+    "name": "render3D Lens Flare",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dLensFlare.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "a ground and a ring of pillars for the sun to go behind",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dleveleditor",
+    "name": "render3D Level Editor",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dLevelEditor.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the level as plain data, the editor edits it in place and saves it;",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dlights",
+    "name": "render3D Lights",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dLights.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "move around in a circle while bobbing up and down",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dmaterials",
+    "name": "render3D Materials",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dMaterials.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "brick"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "bricks with mortar between them and a few round dents, a height at",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dmesh",
+    "name": "render3D Mesh",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dMesh.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "an example obj model, a simple house with a roof",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dmeshops",
+    "name": "render3D Mesh Ops",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dMeshOps.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "checkerboard floor",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dparticles",
+    "name": "render3D Particles",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dParticles.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "particle"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "built-in effects, the same ones 2D games use, one line each",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dprefab",
+    "name": "render3D Prefab",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dPrefab.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "a prefab is a level: objects about its own origin, the ground at 0",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dpuzzlegame",
+    "name": "render3D Puzzle Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dPuzzleGame.js",
+    "tags": [
+      "puzzle",
+      "example"
+    ],
+    "mechanics": [
+      "puzzle"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "slide into the new cell",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dracinggame",
+    "name": "render3D Racing Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dRacingGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the center line of the track, a wobbly loop on the ground",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dreflections",
+    "name": "render3D Reflections",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dReflections.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the color of the world each way, d a unit vector: the sky with a",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dshaders",
+    "name": "render3D Shaders",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dShaders.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "animated stripes, lit and shadowed like any surface",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dshapes",
+    "name": "render3D Shapes",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dShapes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "builders use render3D.smoothShading by default",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dsync2d",
+    "name": "render3D Sync2D",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dSync2D.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "physics"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "a box the 2D physics moves, drawn as a 3D object",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dtext",
+    "name": "render3D Text",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dText.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "create 3d text from extruded engine font",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dtextures",
+    "name": "render3D Textures",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dTextures.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "brick"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "paint a brick pattern using an offscreen canvas",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dtrails",
+    "name": "render3D Trails",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dTrails.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "add trail as a child so it follows",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dvoxels",
+    "name": "render3D Voxels",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dVoxels.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "ball"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "a trunk with a ball of leaves on top",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-render3dwater",
+    "name": "render3D Water",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/render3dWater.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "push the water down around a world position, a ring spreads from",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-save",
+    "name": "save",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/save.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "load saved data with defaults on first run",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-scenes",
+    "name": "scenes",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/scenes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "paddle",
+      "ball"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "the paddle, drawn under the balls",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-sequencer",
+    "name": "sequencer",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/sequencer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "sound sequencer instruments",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-shader",
+    "name": "shader",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/shader.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "normalize coordinates",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-shaders",
+    "name": "shaders",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/shaders.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "burn away by a noise threshold that rises and falls, with a glowing edge",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-shapes",
+    "name": "shapes",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/shapes.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "circles and ellipses",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-slidingpuzzle",
+    "name": "sliding Puzzle",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/slidingPuzzle.js",
+    "tags": [
+      "puzzle",
+      "example"
+    ],
+    "mechanics": [
+      "puzzle"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "swap with empty space when clicked on",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-sound",
+    "name": "sound",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/sound.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "initialize UI system",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-spacegame",
+    "name": "space Game",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/spaceGame.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "space ship controls",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-speak",
+    "name": "speak",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/speak.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "setup ui system plugin",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-spriteatlas",
+    "name": "sprite Atlas",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/spriteAtlas.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "each tile in tiles.png has a 1 pixel border, which stops bleeding",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-starfield",
+    "name": "starfield",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/starfield.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "precreate variables to avoid overhead",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-text",
+    "name": "text",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/text.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "size is the height of a line in world units, color is the fill",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-texture",
+    "name": "texture",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/texture.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "show the full texture",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-textureatlas",
+    "name": "texture Atlas",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/textureAtlas.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "the json usually comes from a file, inline here to keep it self contained",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-texturesheet",
+    "name": "texture Sheet",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/textureSheet.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "use a small sheet size so this demo spills onto a second sheet",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-texturewrapped",
+    "name": "texture Wrapped",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/textureWrapped.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "enable wrap mode on the default tile sheet",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-tilelayer",
+    "name": "tile Layer",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/tileLayer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "create tile layer",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-tileraycast",
+    "name": "tile Raycast",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/tileRaycast.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "create tile layer",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-tiltedview",
+    "name": "tilted View",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/tiltedView.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "adjust draw position to be at the bottom of the object",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-timers",
+    "name": "timers",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/timers.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "setup ui system plugin",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-topdown",
+    "name": "top Down",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/topDown.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "apply movement controls",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-tween",
+    "name": "tween",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/tween.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "tween using the Tween class directly",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-tweenadvanced",
+    "name": "tween Advanced",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/tweenAdvanced.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "keyboard"
+    ],
+    "description": "a row: a label and a square the tween moves along it",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-uilayout",
+    "name": "ui Layout",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/uiLayout.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "setup ui system plugin",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-uislice",
+    "name": "ui Slice",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/uiSlice.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "each tile in tiles.png has a 1 pixel border, which stops bleeding",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-uisystem",
+    "name": "ui System",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/uiSystem.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "each tile in tiles.png has a 1 pixel border, which stops bleeding",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-vibrate",
+    "name": "vibrate",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/vibrate.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "gamepad",
+      "mouse",
+      "tap"
+    ],
+    "description": "setup ui system plugin",
+    "adaptable": false
+  },
+  {
+    "id": "littlejs-shorts-videoplayer",
+    "name": "video Player",
+    "author": "Frank Force",
+    "license": "MIT",
+    "repo": "https://github.com/KilledByAPixel/LittleJS",
+    "source": "https://github.com/KilledByAPixel/LittleJS/blob/main/examples/shorts/videoPlayer.js",
+    "tags": [
+      "example"
+    ],
+    "mechanics": [
+      "play"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "video player",
+    "adaptable": false
+  },
+  {
+    "id": "three-games-fps",
+    "name": "Pointer lock walk",
+    "author": "three.js authors",
+    "license": "MIT",
+    "repo": "https://github.com/mrdoob/three.js",
+    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/games_fps.html",
+    "tags": [
+      "action",
+      "example"
+    ],
+    "mechanics": [
+      "explore",
+      "shoot"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "three.js example of a first-person pointer-lock walk through a simple maze of boxes.",
+    "adaptable": false
+  },
+  {
+    "id": "three-pointerlock",
+    "name": "Pointer lock controls",
+    "author": "three.js authors",
+    "license": "MIT",
+    "repo": "https://github.com/mrdoob/three.js",
+    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/misc_controls_pointerlock.html",
+    "tags": [
+      "action",
+      "example"
+    ],
+    "mechanics": [
+      "explore"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "three.js example of mouse-look pointer lock with keyboard movement.",
+    "adaptable": false
+  },
+  {
+    "id": "three-voxel-painter",
+    "name": "Voxel painter",
+    "author": "three.js authors",
+    "license": "MIT",
+    "repo": "https://github.com/mrdoob/three.js",
+    "source": "https://github.com/mrdoob/three.js/blob/dev/examples/webgl_interactive_voxelpainter.html",
+    "tags": [
+      "puzzle",
+      "example"
+    ],
+    "mechanics": [
+      "place"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "three.js example that adds and removes voxels with the pointer.",
+    "adaptable": false
+  },
+  {
+    "id": "gh-2048",
+    "name": "2048",
+    "author": "Gabriele Cirulli",
+    "license": "MIT",
+    "repo": "https://github.com/gabrielecirulli/2048",
+    "source": "https://github.com/gabrielecirulli/2048",
+    "tags": [
+      "puzzle"
+    ],
+    "mechanics": [
+      "merge",
+      "slide"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Slide numbered tiles on a 4 by 4 board so equal values combine.",
+    "adaptable": false
+  },
+  {
+    "id": "gh-javascript-racer",
+    "name": "JavaScript Racer",
+    "author": "Jake Gordon",
+    "license": "MIT",
+    "repo": "https://github.com/jakesgordon/javascript-racer",
+    "source": "https://github.com/jakesgordon/javascript-racer",
+    "tags": [
+      "racing",
+      "arcade"
+    ],
+    "mechanics": [
+      "race",
+      "steer"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Pseudo-3D road race rendered on a canvas. MIT licensed code by Jake Gordon.",
+    "adaptable": false
+  },
+  {
+    "id": "gh-javascript-breakout",
+    "name": "JavaScript Breakout",
+    "author": "Jake Gordon",
+    "license": "MIT",
+    "repo": "https://github.com/jakesgordon/javascript-breakout",
+    "source": "https://github.com/jakesgordon/javascript-breakout",
+    "tags": [
+      "arcade"
+    ],
+    "mechanics": [
+      "paddle",
+      "brick",
+      "ball"
+    ],
+    "controls": [
+      "mouse",
+      "arrow keys"
+    ],
+    "description": "Paddle and ball clear a wall of bricks. MIT licensed code by Jake Gordon.",
+    "adaptable": false
+  },
+  {
+    "id": "gh-javascript-pong",
+    "name": "JavaScript Pong",
+    "author": "Jake Gordon",
+    "license": "MIT",
+    "repo": "https://github.com/jakesgordon/javascript-pong",
+    "source": "https://github.com/jakesgordon/javascript-pong",
+    "tags": [
+      "arcade"
+    ],
+    "mechanics": [
+      "paddle",
+      "ball"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Two paddles keep a ball in play. MIT licensed code by Jake Gordon. The repository is small enough to adapt.",
+    "adaptable": true
+  },
+  {
+    "id": "gh-falling-blocks",
+    "name": "Falling block stack",
+    "author": "Jake Gordon",
+    "license": "MIT",
+    "repo": "https://github.com/jakesgordon/javascript-tetris",
+    "source": "https://github.com/jakesgordon/javascript-tetris",
+    "tags": [
+      "puzzle",
+      "arcade"
+    ],
+    "mechanics": [
+      "stack",
+      "rotate"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Drop and rotate pieces so full rows clear. MIT licensed code by Jake Gordon.",
+    "adaptable": false
+  },
+  {
+    "id": "straker-snake",
+    "name": "Grid snake",
+    "author": "Christopher Straker",
+    "license": "CC0-1.0",
+    "repo": "https://gist.github.com/straker/ff00b4b49669ad3dec890306d348adc4",
+    "source": "https://gist.github.com/straker/ff00b4b49669ad3dec890306d348adc4",
+    "tags": [
+      "arcade"
+    ],
+    "mechanics": [
+      "snake",
+      "collect"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Steer a growing snake toward the apples.",
+    "adaptable": false
+  },
+  {
+    "id": "straker-breakout",
+    "name": "Brick bounce",
+    "author": "Christopher Straker",
+    "license": "CC0-1.0",
+    "repo": "https://gist.github.com/straker/98a2aed6a7686d26c04810f08bfaf66b",
+    "source": "https://gist.github.com/straker/98a2aed6a7686d26c04810f08bfaf66b",
+    "tags": [
+      "arcade"
+    ],
+    "mechanics": [
+      "paddle",
+      "brick",
+      "ball"
+    ],
+    "controls": [
+      "mouse"
+    ],
+    "description": "Bounce a ball and clear the bricks.",
+    "adaptable": false
+  },
+  {
+    "id": "straker-tower",
+    "name": "Tower bounce",
+    "author": "Christopher Straker",
+    "license": "CC0-1.0",
+    "repo": "https://gist.github.com/straker/b96a4a68bd6d79cf75a833d98a2b654f",
+    "source": "https://gist.github.com/straker/b96a4a68bd6d79cf75a833d98a2b654f",
+    "tags": [
+      "arcade",
+      "platform"
+    ],
+    "mechanics": [
+      "jump"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Bounce up a tower of platforms.",
+    "adaptable": false
+  },
+  {
+    "id": "straker-rows",
+    "name": "Row stack",
+    "author": "Christopher Straker",
+    "license": "CC0-1.0",
+    "repo": "https://gist.github.com/straker/3c98304f8a6a9174efd8292800891ea1",
+    "source": "https://gist.github.com/straker/3c98304f8a6a9174efd8292800891ea1",
+    "tags": [
+      "puzzle"
+    ],
+    "mechanics": [
+      "stack"
+    ],
+    "controls": [
+      "arrow keys"
+    ],
+    "description": "Drop pieces and clear full rows. The gist README states CC0.",
+    "adaptable": false
+  }
+]

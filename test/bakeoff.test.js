@@ -86,11 +86,27 @@ test('fixture bakeoff writes a report without a browser', async () => {
   })
   assert.equal(results.length, 4)
   assert.equal(results.every((row) => row.ok), true)
+  assert.equal(results.filter((row) => row.prompt === 'wordle').every((row) => row.strategy === 'remix'), true)
+  assert.equal(results.filter((row) => row.prompt === 'tower defense').every((row) => row.strategy === 'freeform'), true)
   const report = await readFile(path.join(outDir, 'bakeoff.md'), 'utf8')
   assert.match(report, /wordle/)
   assert.match(report, /tower defense/)
   const saved = JSON.parse(await readFile(path.join(outDir, 'bakeoff.json'), 'utf8'))
   assert.equal(saved.results.length, 4)
+})
+
+test('bakeoff can compare a run with research turned off', async () => {
+  const outDir = await mkdtemp(path.join(tmpdir(), 'bakeoff-off-'))
+  const results = await runBakeoff({
+    prompts: ['wordle', 'tower defense'],
+    providers: ['gemini', 'anthropic'],
+    outDir,
+    smoke: false,
+    research: false
+  })
+  assert.equal(results.length, 4)
+  assert.equal(results.every((row) => row.ok), true)
+  assert.equal(results.every((row) => row.strategy === ''), true)
 })
 
 test('a template fallback is not credited to the model', async () => {
