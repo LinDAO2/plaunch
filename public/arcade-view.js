@@ -1,7 +1,7 @@
 import { createSimulation } from '/arcade-sim.js'
 
 const HINT_MS = 3500
-const DISC = { hazard: '#ff5c7a', obstacle: '#ff5c7a', collectible: '#ffd36b', target: '#ffd36b' }
+const DISC = { hazard: '#FF2E63', obstacle: '#FF2E63', collectible: '#FFD23F', target: '#3FB950' }
 
 export function mountArcade(field, spec, hooks) {
   const canvas = document.createElement('canvas')
@@ -21,6 +21,10 @@ export function mountArcade(field, spec, hooks) {
   let prev = performance.now()
   let stopped = false
   let jumpQueued = false
+  const bits = []
+  let squash = 0
+  let prevY = null
+  let prevScore = 0
 
   // Match the drawing buffer to the on-screen size so sprites are not stretched
   // and stay sharp on Retina screens. Game logic works in percentages.
@@ -93,7 +97,28 @@ export function mountArcade(field, spec, hooks) {
     const snap = sim.tick(dt, input)
     input.taps = []
     input.fire = false
-    draw(ctx, spec, snap, view)
+    if (snap.score > prevScore) {
+      const px = (snap.playerX / 100) * view.width
+      const py = ((Number.isFinite(snap.playerY) ? snap.playerY : 70) / 100) * view.height
+      for (let i = 0; i < 8; i++) {
+        bits.push({ x: px, y: py, vx: (Math.random() - 0.5) * 90, vy: -20 - Math.random() * 50, life: 0.45 })
+      }
+    }
+    const pyNow = Number.isFinite(snap.playerY) ? snap.playerY : null
+    if (pyNow != null && prevY != null && (pyNow < prevY - 0.35 || (pyNow > prevY + 0.8 && prevY < 78))) squash = 80
+    prevY = pyNow
+    prevScore = snap.score
+    squash = Math.max(0, squash - dt)
+    const step = dt / 1000
+    for (let i = bits.length - 1; i >= 0; i--) {
+      const bit = bits[i]
+      bit.life -= step
+      bit.x += bit.vx * step
+      bit.y += bit.vy * step
+      bit.vy += 140 * step
+      if (bit.life <= 0) bits.splice(i, 1)
+    }
+    draw(ctx, spec, snap, view, { bits, squash })
     hooks.onScore?.(snap)
     if (snap.over) {
       stop()
@@ -107,7 +132,7 @@ export function mountArcade(field, spec, hooks) {
   return { stop }
 }
 
-function draw(ctx, spec, snap, view) {
+function draw(ctx, spec, snap, view, juice = { bits: [], squash: 0 }) {
   const { width, height, dpr } = view
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   const unit = Math.max(0.9, Math.min(2.6, Math.min(width / 420, height / 320)))
@@ -148,23 +173,32 @@ function draw(ctx, spec, snap, view) {
   }
   if (spec.controls?.scheme !== 'tap') {
     const py = Number.isFinite(snap.playerY) ? snap.playerY : 84
-    sprite(ctx, spec.player?.sprite || '●', (snap.playerX / 100) * width, (py / 100) * height, size, '#9affd9')
+    const squashed = juice.squash > 0
+    sprite(ctx, spec.player?.sprite || '●', (snap.playerX / 100) * width, (py / 100) * height, size, '#FFD23F', squashed ? 1.2 : 1, squashed ? 0.8 : 1)
   }
   for (const entity of snap.entities) {
-    sprite(ctx, entity.sprite || '●', (entity.x / 100) * width, (entity.y / 100) * height, size, DISC[entity.kind] || '#c9b6ff')
+    sprite(ctx, entity.sprite || '●', (entity.x / 100) * width, (entity.y / 100) * height, size, DISC[entity.kind] || '#2F7BFF')
   }
-  ctx.font = `700 ${Math.round(18 * unit)}px Rubik, sans-serif`
+  for (const bit of juice.bits) {
+    ctx.fillStyle = '#FFD23F'
+    ctx.fillRect(bit.x, bit.y, 5, 5)
+  }
+  ctx.font = `700 ${Math.round(14 * unit)}px Rubik, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const scoreLabel = String(snap.score)
+  const scoreWidth = Math.min(200, Math.max(64, ctx.measureText(scoreLabel).width + 28))
+  ctx.fillStyle = '#1B1B2F'
+  ctx.fillRect((width - scoreWidth) / 2, 12, scoreWidth, 32)
+  ctx.fillStyle = '#FFD23F'
+  ctx.fillText(scoreLabel, width / 2, 28)
   ctx.textAlign = 'left'
   ctx.fillStyle = '#1B1B2F'
-  const scoreLabel = String(snap.score)
-  const scoreWidth = Math.max(48, ctx.measureText(scoreLabel).width + 20)
-  ctx.fillRect(12, 10, scoreWidth, 28)
-  ctx.fillStyle = '#FFD23F'
-  ctx.fillText(scoreLabel, 22, 24)
-  ctx.textAlign = 'right'
-  ctx.fillStyle = '#1B1B2F'
-  const tag = primitives.has('maze') ? 'grid' : primitives.has('popup') ? 'hide' : ''
-  ctx.fillText(tag ? `lives ${snap.lives} · ${tag}` : `lives ${snap.lives}`, width - 12, 24)
+  const livesLabel = `♥ ${snap.lives}`
+  const livesWidth = Math.max(44, ctx.measureText(livesLabel).width + 16)
+  ctx.fillRect(12, 12, livesWidth, 32)
+  ctx.fillStyle = '#F4F7FB'
+  ctx.fillText(livesLabel, 12 + livesWidth / 2, 28)
   if (snap.time < HINT_MS && view.hint) {
     ctx.globalAlpha = Math.min(1, (HINT_MS - snap.time) / 600)
     ctx.font = `600 ${Math.round(15 * unit)}px sans-serif`
@@ -180,14 +214,16 @@ function draw(ctx, spec, snap, view) {
 
 // A soft colored disc behind every sprite keeps it visible even when the
 // glyph renders as a dark monochrome symbol (for example ☄ on many systems).
-function sprite(ctx, glyph, x, y, size, color) {
+function sprite(ctx, glyph, x, y, size, color, sx = 1, sy = 1) {
+  const rx = size * 0.62 * sx
+  const ry = size * 0.62 * sy
   ctx.fillStyle = '#1B1B2F'
   ctx.beginPath()
-  ctx.arc(x, y + 3, size * 0.66, 0, Math.PI * 2)
+  ctx.ellipse(x, y + 3, rx + 3, ry + 3, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.arc(x, y, size * 0.62, 0, Math.PI * 2)
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.fillStyle = '#ffffff'
   ctx.fillText(glyph, x, y)

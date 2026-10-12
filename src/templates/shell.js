@@ -13,6 +13,18 @@ let combo = 0
 let comboAt = 0
 let stretch = 1
 let stretchHeld = false
+let stretchUntil = 0
+let freezeUntil = 0
+function nowSec() {
+  return (typeof time === 'function') ? time() : 0
+}
+function reducedMotion() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) } catch (err) { return false }
+}
+function squash() {
+  stretch = 1.2
+  stretchUntil = nowSec() + 0.08
+}
 function stamp(grid, x, y, cell) {
   const rows = grid || []
   const sy = stretch > 1.02 ? 0.8 : 1
@@ -74,10 +86,11 @@ function award(points) {
   comboAt = now
   window.__state.score = Math.max(window.__state.score || 0, n)
   window.__posted = true
-  pops.push({ text: '+' + n, x: 200 + Math.random() * 80, y: 180, life: 0.5 })
+  pops.push({ text: '+' + n, x: 200 + Math.random() * 80, y: 200, life: 0.5 })
   burst(240, 200, ink(THEME.palette.accent))
-  stretch = 1.2
-  try { shake(4) } catch (err) {}
+  squash()
+  if (n > 0) freezeUntil = nowSec() + 0.04
+  if (!reducedMotion()) { try { shake(6) } catch (err) {} }
   try { parent.postMessage({ type: 'playground-score', points: window.__state.score }, '*') } catch (err) {}
   const step = Math.pow(2, combo / 12)
   try { zzfx(0.6, 0.05, n ? 880 * step : 180, 0.02, 0.04, 0.08, 0, 1.1, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0.2, 0.02) } catch (err) {}
@@ -90,6 +103,7 @@ function finish(score) {
   go('over', Math.max(0, Math.floor(Number(score) || 0)))
 }
 function pad() {
+  if (nowSec() < freezeUntil) return { x: 0, y: 0, act: false }
   let x = 0
   let y = 0
   if (held.ArrowLeft || held.a || held.A) x -= 1
@@ -123,14 +137,15 @@ function beginPlay(setup) {
     setup()
     onUpdate(function () {
       const jump = !!(held[' '] || held.ArrowUp || held.w || held.W)
-      if (jump && !stretchHeld) stretch = 1.2
+      if (jump && !stretchHeld) squash()
+      if (!jump && stretchHeld) squash()
       stretchHeld = jump
-      stretch += (1 - stretch) * Math.min(1, dt() * 12)
+      if (nowSec() > stretchUntil) stretch += (1 - stretch) * Math.min(1, dt() * 14)
       stepJuice(dt())
     })
     onDraw(function () {
-      drawRect({ pos: vec2(150, 10), width: 180, height: 28, color: rgb(27, 27, 47) })
-      label(String(window.__state.score || 0), 16, 168, 16, rgb(244, 247, 251), numberFace)
+      drawRect({ pos: vec2(150, 12), width: 180, height: 32, color: rgb(27, 27, 47) })
+      label(String(window.__state.score || 0), 14, 168, 18, rgb(244, 247, 251), numberFace)
       drawCircle({ pos: vec2(86, 438), radius: 28, color: rgb(27, 27, 47) })
       drawRect({ pos: vec2(170, 416), width: 140, height: 48, color: rgb(255, 210, 63) })
       drawRect({ pos: vec2(170, 460), width: 140, height: 4, color: rgb(184, 134, 11) })
@@ -211,11 +226,14 @@ function boot() {
     })
     onDraw(function () {
       drawRect({ pos: vec2(0, 0), width: 480, height: 480, color: rgb(27, 27, 47) })
-      label(THEME.names.over, 36, 24, 120, rgb(244, 247, 251), displayFace)
-      label('Score ' + shown, 28, 24, 180, rgb(255, 210, 63), numberFace)
-      label(finalScore > 0 ? 'Close. One more run.' : 'First run is the warmup.', 16, 24, 230, rgb(244, 247, 251), numberFace)
-      label(window.__share ? String(window.__share) : ('Score ' + finalScore), 14, 24, 270, rgb(227, 179, 65), numberFace)
-      label('Tap or press a key', 14, 24, 320, rgb(244, 247, 251), numberFace)
+      if (!window.__share) window.__share = 'Score ' + finalScore
+      label(THEME.names.over, 36, 24, 96, rgb(244, 247, 251), displayFace)
+      label('Score ' + shown, 28, 24, 156, rgb(255, 210, 63), numberFace)
+      label(finalScore > 0 ? 'Close. One more run.' : 'First run is the warmup.', 16, 24, 206, rgb(244, 247, 251), numberFace)
+      label(String(window.__share), 14, 24, 246, rgb(227, 179, 65), numberFace)
+      label('Post to X', 16, 24, 286, rgb(255, 210, 63), displayFace)
+      label('Play again', 16, 24, 322, rgb(244, 247, 251), displayFace)
+      label('Remix this', 14, 24, 358, rgb(244, 247, 251), numberFace)
       drawJuice()
     })
     onKeyPress(function () { ended = false; window.__share = ''; go('start') })

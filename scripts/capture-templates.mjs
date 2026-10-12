@@ -28,6 +28,7 @@ const port = await server.listen()
 await mkdir(outDir, { recursive: true })
 try {
   for (const spec of TEMPLATES) {
+    if (spec.engine === 'three') continue
     const png = await captureGame(browser, `http://127.0.0.1:${port}/${spec.id}`, spec.id)
     await writeFile(path.join(outDir, `${spec.id}.png`), png)
     console.log(spec.id, png.length)

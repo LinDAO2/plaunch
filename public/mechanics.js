@@ -56,6 +56,7 @@ export function createRuntime(els, hooks = {}) {
   let playStarted = false
   let goalTimer = 0
   let prevArcade = { score: 0, lives: null }
+  let attract = 0
 
   function showGoal() {
     if (!els.goal) return
@@ -83,6 +84,15 @@ export function createRuntime(els, hooks = {}) {
       : game.type === 'reaction' ? `Score ${points} ms` : `Score ${points}`
     const near = points === null ? '' : points > 0 ? ' Close. One more run.' : ' First run is the warmup.'
     els.roundScore.textContent = line + near
+    const shareText = points === null ? '' : (game.type === 'reaction' ? `Score ${points} ms` : `Score ${points}`)
+    let share = els.round?.querySelector('#round-share')
+    if (!share && els.round && els.roundScore) {
+      share = document.createElement('p')
+      share.id = 'round-share'
+      share.className = 'round-share'
+      els.roundScore.insertAdjacentElement('afterend', share)
+    }
+    if (share) share.textContent = shareText
     if (els.goal) els.goal.hidden = true
     els.round.hidden = false
   }
@@ -93,9 +103,15 @@ export function createRuntime(els, hooks = {}) {
     hooks.onPlayStarted?.(game)
   }
 
+  function stopAttract() {
+    if (attract) cancelAnimationFrame(attract)
+    attract = 0
+  }
+
   function clear() {
     clearInterval(timer)
     clearTimeout(timeout)
+    stopAttract()
     cancelAnimationFrame(dodgeFrame)
     arcade?.stop()
     arcade = null
@@ -126,7 +142,42 @@ export function createRuntime(els, hooks = {}) {
 
   function paintIdle() {
     els.display.textContent = ({ tap: '0', reaction: '⚡', guess: '?', dodge: '☄' })[game.type] || '0'
-    if (els.root) els.root.style.borderColor = game.accent || '#a88bff'
+    if (els.root) els.root.style.borderColor = game.accent || '#FF5A3C'
+    stopAttract()
+    if (!els.field || game.tier === 'freeform' || game.type === 'world') return
+    const canvas = document.createElement('canvas')
+    canvas.className = 'arcade-canvas'
+    canvas.width = 480
+    canvas.height = 320
+    els.field.append(canvas)
+    const ctx = canvas.getContext('2d')
+    const accent = /^#[0-9a-fA-F]{6}$/.test(game.accent || '') ? game.accent : '#FFD23F'
+    const started = performance.now()
+    const loop = (now) => {
+      if (!canvas.isConnected) return
+      const t = (now - started) / 1000
+      ctx.fillStyle = '#4FB3FF'
+      ctx.fillRect(0, 0, 480, 176)
+      ctx.fillStyle = '#CDEBFF'
+      ctx.fillRect(0, 176, 480, 144)
+      ctx.fillStyle = '#7BC86C'
+      ctx.fillRect(0, 250, 480, 70)
+      const x = 240 + Math.sin(t * 1.4) * 90
+      const y = 188 + Math.sin(t * 2.2) * 8
+      ctx.fillStyle = '#1B1B2F'
+      ctx.beginPath()
+      ctx.arc(x, y + 4, 22, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(x, y, 22, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = accent
+      ctx.beginPath()
+      ctx.arc(x, y, 16, 0, Math.PI * 2)
+      ctx.fill()
+      attract = requestAnimationFrame(loop)
+    }
+    attract = requestAnimationFrame(loop)
   }
 
   function finish(value, label, opts = {}) {
@@ -328,7 +379,7 @@ export function createRuntime(els, hooks = {}) {
       els.field.style.pointerEvents = 'auto'
       const move = (dir) => {
         dodgeX = Math.min(94, Math.max(6, dodgeX + dir * 9))
-        player.style.left = `calc(${dodgeX}% - 21px)`
+        player.style.left = `calc(${dodgeX}% - 14px)`
       }
       dodgePointer = null
       timer = setInterval(() => {
@@ -364,7 +415,7 @@ export function createRuntime(els, hooks = {}) {
         }
         for (const obstacle of obstacles) {
           obstacle.y += dt * 0.055
-          obstacle.el.style.left = `calc(${obstacle.x}% - 16px)`
+          obstacle.el.style.left = `calc(${obstacle.x}% - 11px)`
           obstacle.el.style.top = `${obstacle.y}%`
           if (obstacle.y > 72 && obstacle.y < 87 && Math.abs(obstacle.x - dodgeX) < 8) {
             els.field.style.pointerEvents = 'none'

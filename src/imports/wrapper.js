@@ -49,6 +49,7 @@ const SHIM = `(function () {
   window.Playground = window.Playground || {};
   window.Playground.submitScore = function (n) {
     var points = Math.max(0, Math.min(100000, Math.floor(Number(n) || 0)));
+    window.__share = 'Score ' + points;
     try { parent.postMessage({ type: 'playground-score', points: points }, '*'); } catch (err) {}
   };
 })();`
@@ -174,18 +175,21 @@ const STYLE = `@font-face{font-family:"Lilita One";src:url("/fonts/lilita-one-la
 html,body{margin:0!important;padding:0!important;height:100%;background:#4FB3FF;overflow:hidden;}
 #pg-root{position:absolute;left:0;top:0;width:max-content;height:max-content;transform-origin:0 0;}
 #pg-start,#pg-credit,#pg-pad{font-family:Rubik,sans-serif;}
-#pg-start{position:fixed;inset:0;z-index:8;display:flex;align-items:flex-end;justify-content:center;padding:0 0 28px;border:0;background:rgba(8,10,16,0);color:#1B1B2F;font-family:"Lilita One",sans-serif;font-size:28px;box-shadow:inset 0 -190px 0 rgba(8,10,16,.72);}
+#pg-start{position:fixed;inset:0;z-index:8;display:flex;align-items:flex-end;justify-content:center;padding:0 0 28px;border:0;background:transparent;color:#1B1B2F;font-family:"Lilita One",sans-serif;font-size:28px;box-shadow:inset 0 -190px 0 rgba(8,10,16,.72);}
 #pg-start span{display:inline-flex;align-items:center;justify-content:center;width:200px;height:64px;background:#FFD23F;border-bottom:4px solid #B8860B;border-radius:14px;}
+#pg-start:active span{transform:translateY(3px);}
 #pg-start[hidden]{display:none;}
-#pg-credit{position:fixed;top:6px;left:8px;z-index:4;margin:0;padding:2px 6px;background:#000;color:#e7e9ea;font-size:12px;}
-#pg-pad{position:fixed;left:8px;right:8px;bottom:8px;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;}
-#pg-pad button{pointer-events:auto;width:52px;height:44px;margin:2px;background:#000;color:#e7e9ea;border:1px solid #2f3336;font-size:16px;}
-#pg-dpad{display:grid;grid-template-columns:52px 52px 52px;grid-template-rows:44px 44px 44px;}
+#pg-credit{position:fixed;top:12px;left:12px;z-index:4;margin:0;padding:4px 8px;background:#1B1B2F;color:#F4F7FB;font-size:12px;border-radius:8px;}
+#pg-pad{position:fixed;left:12px;right:12px;bottom:12px;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;opacity:.35;}
+#pg-pad:has(button:active){opacity:.7;}
+#pg-pad button{pointer-events:auto;width:52px;height:48px;margin:2px;background:#1B1B2F;color:#F4F7FB;border:3px solid #1B1B2F;border-radius:999px;font-family:"Lilita One",sans-serif;font-size:16px;}
+#pg-a{width:72px;height:72px;background:#FFD23F;color:#1B1B2F;border:0;border-bottom:4px solid #B8860B;}
+#pg-dpad{display:grid;grid-template-columns:52px 52px 52px;grid-template-rows:48px 48px 48px;}
 #pg-up{grid-column:2;grid-row:1;}
 #pg-left{grid-column:1;grid-row:2;}
 #pg-right{grid-column:3;grid-row:2;}
 #pg-down{grid-column:2;grid-row:3;}
-#pg-actions{display:flex;gap:8px;}`
+#pg-actions{display:flex;gap:8px;align-items:flex-end;}`
 
 function inner(html, tag) {
   const match = String(html || '').match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*)</${tag}>`, 'i'))

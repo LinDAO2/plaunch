@@ -125,6 +125,14 @@ async function wake(page, id) {
   if (await start.count()) {
     await start.click({ timeout: 3000 }).catch(() => {})
   }
+  const engine = await page.evaluate(() => window.__engine || '').catch(() => '')
+  if (engine === 'kaplay') {
+    await page.waitForFunction(() => window.__state && window.__state.phase === 'start', null, { timeout: 8000 })
+    await page.keyboard.press('Enter')
+    await page.waitForFunction(() => window.__state && window.__state.phase === 'play', null, { timeout: 8000 })
+    await page.waitForTimeout(id === 'word-guess' ? 1400 : 320)
+    return
+  }
   const phase = await page.evaluate(() => (window.__state && window.__state.phase) || '').catch(() => '')
   if (await page.evaluate(() => window.__state && window.__state.engine === 'three').catch(() => false)) {
     await page.waitForFunction(() => window.__arena && window.__arena.ready, null, { timeout: 20000 })

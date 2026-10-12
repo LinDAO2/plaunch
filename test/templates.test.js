@@ -49,6 +49,15 @@ test('the template catalog and word list are complete', () => {
     } else {
       assert.match(html, /src="\/kaplay.js"/)
       assert.match(html, /src="\/zzfx.js"/)
+      assert.match(html, /function squash\(\)/)
+      assert.match(html, /Post to X/)
+      assert.match(html, /shake\(6\)/)
+    }
+    if (item.id === 'word-guess') {
+      assert.match(html, /revealedAt/)
+      assert.match(html, /c \* 0\.1/)
+      assert.match(html, /age < 0\.25/)
+      assert.match(html, /__share/)
     }
     assert.match(html, /PLAYGROUND CONFIG/)
     assert.match(html, /PLAYGROUND THEME/)

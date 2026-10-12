@@ -82,6 +82,7 @@ function mount() {
     if (!pool.length) pool = ['crane'].map(function (word) { return (word + 'planet').slice(0, length) })
     const answer = pool[Math.floor(Math.random() * pool.length)]
     const rows = []
+    const revealedAt = []
     let guess = ''
     let time = 0
     let done = false
@@ -91,6 +92,7 @@ function mount() {
       const word = (text || guess || 'crane').toLowerCase().slice(0, length).padEnd(length, 'a')
       const score = RULES.scoreGuess(word, answer)
       rows.push(word)
+      revealedAt.push(time)
       guess = ''
       award(score)
       if (word === answer || rows.length >= CONFIG.maxGuesses) {
@@ -126,10 +128,23 @@ function mount() {
         const word = rows[r] || (r === rows.length ? guess : '')
         for (let c = 0; c < length; c++) {
           const ch = word[c] || ''
-          const mark = rows[r] ? (rows[r][c] === answer[c] ? '#3FB950' : (answer.indexOf(rows[r][c]) >= 0 ? '#E3B341' : '#3A3F47')) : '#3A3F47'
-          drawRect({ pos: vec2(37 + c * 40, 73 + r * 36), width: 40, height: 38, color: rgb(27, 27, 47) })
-          drawRect({ pos: vec2(40 + c * 40, 70 + r * 36), width: 34, height: 32, color: ink(mark) })
-          if (ch) drawText({ text: ch.toUpperCase(), size: 16, pos: vec2(50 + c * 40, 76 + r * 36), color: ink(THEME.palette.bg) })
+          const settled = rows[r] ? (rows[r][c] === answer[c] ? '#3FB950' : (answer.indexOf(rows[r][c]) >= 0 ? '#E3B341' : '#3A3F47')) : '#3A3F47'
+          let mark = settled
+          let show = ch
+          let scale = 1
+          if (rows[r] && revealedAt[r] != null) {
+            const age = time - revealedAt[r] - c * 0.1
+            if (age < 0.25) {
+              const p = Math.max(0, age) / 0.25
+              scale = Math.abs(Math.cos(p * Math.PI))
+              if (p < 0.5) { mark = '#F4F7FB'; show = '' }
+            }
+          }
+          const h = Math.max(2, 32 * scale)
+          const y = 70 + r * 36 + (32 - h) / 2
+          drawRect({ pos: vec2(37 + c * 40, y + 3), width: 40, height: h + 6, color: rgb(27, 27, 47) })
+          drawRect({ pos: vec2(40 + c * 40, y), width: 34, height: h, color: ink(mark) })
+          if (show) drawText({ text: show.toUpperCase(), size: 16, pos: vec2(50 + c * 40, y + 6), color: ink(THEME.palette.bg) })
         }
       }
     })

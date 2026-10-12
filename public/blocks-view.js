@@ -196,6 +196,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     <p class="world-online" id="world-online">1 online</p>
     <p class="world-with" id="world-with"></p>
     <p class="world-hint" id="world-hint"></p>
+    <button type="button" id="world-start" class="world-start"><span>Play</span></button>
     <div class="crosshair" aria-hidden="true"></div>
     <div class="names" id="world-names"></div>
     <div class="stick touch-only" id="world-stick"><i></i></div>
@@ -221,6 +222,10 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   setTimeout(() => { hintEl.hidden = true }, 6500)
 
   let audioCtx = null
+  let skyProgram = null
+  let skyBuf = null
+  const skyLoc = {}
+  let live = false
   let sparkDirty = true
   function unlockAudio() {
     try {
@@ -402,6 +407,33 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.enable(gl.DEPTH_TEST)
     gl.disable(gl.CULL_FACE)
+    const skyVs = compile(gl, gl.VERTEX_SHADER, `
+      attribute vec2 aPos;
+      void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`)
+    const skyFs = compile(gl, gl.FRAGMENT_SHADER, `
+      precision mediump float;
+      uniform vec3 uZenith;
+      uniform vec3 uHorizon;
+      uniform float uHeight;
+      void main() {
+        float t = clamp(gl_FragCoord.y / max(uHeight, 1.0), 0.0, 1.0);
+        gl_FragColor = vec4(mix(uHorizon, uZenith, t), 1.0);
+      }`)
+    skyProgram = gl.createProgram()
+    gl.attachShader(skyProgram, skyVs)
+    gl.attachShader(skyProgram, skyFs)
+    gl.bindAttribLocation(skyProgram, 0, 'aPos')
+    gl.linkProgram(skyProgram)
+    if (!gl.getProgramParameter(skyProgram, gl.LINK_STATUS)) {
+      skyProgram = null
+    } else {
+      skyLoc.zenith = gl.getUniformLocation(skyProgram, 'uZenith')
+      skyLoc.horizon = gl.getUniformLocation(skyProgram, 'uHorizon')
+      skyLoc.height = gl.getUniformLocation(skyProgram, 'uHeight')
+      skyBuf = gl.createBuffer()
+      gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf)
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+    }
     for (let i = 0; i < 4; i++) gl.enableVertexAttribArray(i)
     buildAll()
     } catch (error) {
@@ -677,9 +709,21 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
   }
 
+  function goLive() {
+    if (live) return
+    live = true
+    const gate = ui.querySelector('#world-start')
+    if (gate) gate.hidden = true
+  }
+  ui.querySelector('#world-start').addEventListener('pointerdown', (event) => {
+    event.preventDefault()
+    unlockAudio()
+    goLive()
+  })
   window.addEventListener('keydown', (event) => {
     unlockAudio()
     if (typing()) return
+    goLive()
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
     if (key >= '1' && key <= '9') { select(Number(key) - 1); event.preventDefault(); return }
     if (key === 'e') { place(); event.preventDefault(); return }
@@ -699,6 +743,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   let lookDrag = null
   canvas.addEventListener('pointerdown', (event) => {
     unlockAudio()
+    goLive()
     if (event.target !== canvas) return
     canvas.focus()
     const rect = canvas.getBoundingClientRect()
@@ -763,8 +808,9 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     if (stickEl.hasPointerCapture?.(event.pointerId)) stickEl.releasePointerCapture(event.pointerId)
     stick.x = 0
     stick.y = 0
-    knob.style.left = '32px'
-    knob.style.top = '32px'
+    knob.style.left = '30px'
+    knob.style.top = '30px'
+    stickEl.classList.remove('on')
   }
   stickEl.addEventListener('pointerup', stopStick)
   stickEl.addEventListener('pointercancel', stopStick)
@@ -776,14 +822,26 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     let dy = event.clientY - cy
     const max = rect.width / 2
     const len = Math.hypot(dx, dy) || 1
+    if (len / max < 0.12) {
+      stick.x = 0
+      stick.y = 0
+      knob.style.left = '30px'
+      knob.style.top = '30px'
+      return
+    }
     if (len > max) { dx = dx / len * max; dy = dy / len * max }
     stick.x = dx / max
     stick.y = -dy / max
-    knob.style.left = `${32 + dx * 0.55}px`
-    knob.style.top = `${32 + dy * 0.55}px`
+    stickEl.classList.add('on')
+    knob.style.left = `${30 + dx * 0.45}px`
+    knob.style.top = `${30 + dy * 0.45}px`
   }
 
   function step(dt) {
+    if (!live) {
+      yaw += dt * 0.35
+      return
+    }
     let ix = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0)
     let iz = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0)
     ix += stick.x
@@ -945,8 +1003,31 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
       return
     }
     const sky = [cycle.r / 255, cycle.g / 255, cycle.b / 255]
-    gl.clearColor(sky[0], sky[1], sky[2], 1)
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    if (skyProgram && skyBuf) {
+      const lift = (sky[0] + sky[1] + sky[2]) / 3
+      const wash = lift > 0.35 ? 0.55 : 0.22
+      const horizon = sky.map((channel) => Math.min(1, channel * (1 - wash) + wash))
+      gl.disable(gl.DEPTH_TEST)
+      gl.useProgram(skyProgram)
+      gl.uniform3f(skyLoc.zenith, sky[0], sky[1], sky[2])
+      gl.uniform3f(skyLoc.horizon, horizon[0], horizon[1], horizon[2])
+      gl.uniform1f(skyLoc.height, canvas.height)
+      gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf)
+      gl.enableVertexAttribArray(0)
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+      gl.disableVertexAttribArray(1)
+      gl.disableVertexAttribArray(2)
+      gl.disableVertexAttribArray(3)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+      gl.enableVertexAttribArray(1)
+      gl.enableVertexAttribArray(2)
+      gl.enableVertexAttribArray(3)
+      gl.enable(gl.DEPTH_TEST)
+      gl.clear(gl.DEPTH_BUFFER_BIT)
+    } else {
+      gl.clearColor(sky[0], sky[1], sky[2], 1)
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    }
     const aspect = canvas.width / Math.max(1, canvas.height)
     perspective(proj, 1.15, aspect, 0.08, far)
     const eye = [pos.x, pos.y + EYE, pos.z]
@@ -989,8 +1070,13 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     if (!ctx) return
     const w = canvas.width
     const h = canvas.height
-    ctx.fillStyle = cycle?.hex || skyHex(world.biome)
-    ctx.fillRect(0, 0, w, h)
+    const skyPaint = cycle?.hex || skyHex(world.biome)
+    ctx.fillStyle = skyPaint
+    ctx.fillRect(0, 0, w, h * 0.62)
+    ctx.fillStyle = skyPaint
+    ctx.globalAlpha = 0.72
+    ctx.fillRect(0, h * 0.62, w, h * 0.38)
+    ctx.globalAlpha = 1
     const scale = Math.min(w, h) / 22
     const ox = w / 2
     const oy = h * 0.72

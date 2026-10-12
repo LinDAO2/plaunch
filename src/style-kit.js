@@ -21,7 +21,8 @@ export const CANDY = {
 export const STYLE_GUIDE = `Art direction for every game:
 - Candy arcade. Flat shapes, a 3px outline in ${CANDY.outline}, a short drop shadow, rounded forms.
 - Family colors: sky ${CANDY.dayZenith} to ${CANDY.dayHorizon}, hot ${CANDY.teamA}, blue ${CANDY.teamB}, pickup ${CANDY.play}, hit ${CANDY.hit}, present ${CANDY.present}, miss ${CANDY.miss}, hazard ${CANDY.hazard}.
-- One yellow Play control (${CANDY.play} with a ${CANDY.playEdge} bottom edge). No sign-in.
-- Juice: squash on jump, a floating +N, particles on a clear, a short shake, confetti when the run ends.
-- Share text is the score only. Never include a secret word, answer, or spoiler.
-- In-game titles use a chunky display face. Numerals are tabular. The launchpad chrome is separate.`
+- One yellow Play control (${CANDY.play} with a ${CANDY.playEdge} bottom edge). No sign-in. Title in a chunky display face. Score in a top-center pill with tabular numerals.
+- Juice: squash to 1.2 by 0.8 for 80ms on jump and land, a floating +N that rises 24px in 500ms, particles on every clear, shake of at most 6px, confetti and a 1.2s count-up when the run ends, plus a near-miss line.
+- Word tiles flip for 250ms, staggered 100ms. Hit, present, and miss stay ${CANDY.hit}, ${CANDY.present}, and ${CANDY.miss}.
+- Share text is the score, or a spoiler-free mark grid. Never include a secret word, answer, or spoiler.
+- Touch targets are at least 44px. Idle controls stay faint and brighten while pressed.`
