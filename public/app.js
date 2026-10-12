@@ -144,7 +144,7 @@ function showSandbox(url) {
     field.replaceChildren()
     frame = document.createElement('iframe')
     frame.className = 'freeform-frame'
-    frame.setAttribute('sandbox', 'allow-scripts')
+    frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock')
     frame.referrerPolicy = 'no-referrer'
     frame.title = 'Freeform game'
     field.append(frame)

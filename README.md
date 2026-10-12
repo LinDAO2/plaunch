@@ -1,8 +1,8 @@
-# Playground — game launchpad v1.3.0
+# Playground — game launchpad v1.3.1
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
-Ideas that do not fit that arcade spec use the freeform tier: one self-contained HTML document, served from `USERCONTENT_ORIGIN`, inside an iframe with `sandbox="allow-scripts"`. The studio picks the tier automatically and the creator can override it. Freeform games still cannot open a network connection.
+Ideas that do not fit that arcade spec use the freeform tier: one self-contained HTML document, served from `USERCONTENT_ORIGIN`, inside an iframe with `sandbox="allow-scripts allow-pointer-lock"`. The studio picks the tier automatically and the creator can override it. Freeform games still cannot open a third-party network connection.
 
 Blocks is a first-party voxel runtime (`world` in GameSpec v1.2). Two featured worlds, Blocks: Grassland and Blocks: Candy Moon, share one map per slug over a same-origin WebSocket. Each world has a landmark to raise and sparks to gather, with the count kept on the HUD. The sky shifts between day and night, and placing, breaking, and picking up a spark play a short tone. Guests play without an account. `WORLD_GUEST_CAP` limits anonymous sockets per IP. A moderator can reset a world from the moderation page.
 
@@ -79,7 +79,7 @@ Auto generation picks a template by keyword. A medium match can ask Gemini which
 
 The studio shows `Built on: <template>` and `Try another style`, which re-rolls `THEME` only.
 
-Kaplay 3001.0.19 and ZzFX are pinned under `vendor/` and served as `/kaplay.js` and `/zzfx.js` from the usercontent origin. three.js r170 is pinned at `vendor/three/three.min.js` and served as `/three.js` the same way. A 3D page never opens a socket. The play page relays input to `/api/arenas/:slug`, and the server decides hits, scores, and bot movement. Rooms hold up to 12 people. Bots fill empty seats. Guests join with the same cookie as Blocks. `WORLD_GUEST_CAP` limits anonymous sockets per IP. Low-power browsers drop the pixel ratio automatically, and the Quality button forces low or high.
+Kaplay 3001.0.19 and ZzFX are pinned under `vendor/` and served as `/kaplay.js` and `/zzfx.js` from the usercontent origin. three.js r170 is pinned at `vendor/three/three.min.js` and served as `/three.js`. That build also exposes `GLTFLoader`, `EffectComposer`, `RenderPass`, `UnrealBloomPass`, `OutputPass`, and `RoomEnvironment`. It does not include Draco, meshopt, or KTX2 decoders. Kenney CC0 glTF files live in `vendor/arena-assets/` and are served as `/assets/*` before the iframe gate. A game loads only the pack for its mode. The blaster meshes embed the Kenney colormap, so they do not need a second texture request. A 3D page never opens a socket. The play page relays input to `/api/arenas/:slug`, and the server decides hits, scores, and bot movement. Rooms hold up to 12 people. Bots fill empty seats. Guests join with the same cookie as Blocks. `WORLD_GUEST_CAP` limits anonymous sockets per IP. Quality is low, medium, or high. The 480 card and coarse pointers start on low (no shadow map, no bloom, Lambert materials). Medium and high add shadow maps and bloom. Colors, fog distances, and the HUD read `THEME` tokens. Palette, HUD layout, menu styling, and poster frames are not a finished art direction.
 
 ### Freeform sandbox (v1.2)
 
@@ -89,15 +89,15 @@ Limits before a document is served:
 
 - One HTML page, at most 150KB, with a canvas and a `playground-score` postMessage
 - No `fetch`, XHR, WebSocket, `eval`, Function constructor, workers, nested frames, or external URLs
-- Script `src` allowlist is only `/kaplay.js` and `/zzfx.js` on the sandbox origin
+- Script `src` allowlist is `/kaplay.js`, `/zzfx.js`, and `/three.js` on the sandbox origin
 - `parent.postMessage` is allowed. `parent.document`, `top.location`, `contentWindow`, and `contentDocument` are refused
 - No `document.cookie`, `localStorage`, `sessionStorage`, or `document.domain`
 
-The play page mounts the game in an iframe whose attribute is exactly `sandbox="allow-scripts"`. That omits `allow-same-origin`, so the frame origin is `"null"`, it cannot read the parent DOM, and it sends no cookies. The parent accepts a score only as `{ type: "playground-score", points }` from `event.origin === "null"`.
+The play page mounts the game in an iframe whose attribute is `sandbox="allow-scripts allow-pointer-lock"`. That omits `allow-same-origin`, so the frame origin is `"null"`, it cannot read the parent DOM, and it sends no cookies. Pointer lock is requested for mouse look. If a parent frame denies it, hold-to-drag still looks. The parent accepts a score only as `{ type: "playground-score", points }` from `event.origin === "null"`.
 
 The sandbox response CSP is exactly:
 
-`default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts; frame-ancestors <app origin> https://x.com https://*.x.com https://twitter.com https://*.twitter.com`
+`default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors <app origin> https://x.com https://*.x.com https://twitter.com https://*.twitter.com`
 
 There is no `unsafe-eval` and no `wasm-unsafe-eval`. `font-src` falls back to `default-src 'none'`. `script-src 'self'` exists so the page can load the pinned Kaplay and ZzFX files on that same origin.
 

@@ -25,8 +25,12 @@ test('Arena plays in the card iframe: move, fire, score, and a throttled frame r
       }
       look()
     })
-    await frame.waitForFunction(() => window.__arena && window.__state.phase === 'play', null, { timeout: 8000 })
-    const boot = await frame.evaluate(() => ({ gl: window.__arena.gl, quality: window.__arena.quality }))
+    await frame.waitForFunction(() => window.__arena && window.__arena.ready, null, { timeout: 20000 })
+    if (await frame.evaluate(() => window.__state.phase !== 'play')) await frame.click('#play')
+    await frame.waitForFunction(() => window.__state.phase === 'play', null, { timeout: 8000 })
+    const boot = await frame.evaluate(() => ({ gl: window.__arena.gl, quality: window.__arena.quality, ratio: window.__arena.ratio }))
+    assert.equal(boot.quality, 'low')
+    assert.equal(boot.ratio, 1)
     assert.equal(boot.gl, true, `WebGL did not start. pageerrors=${errors.join(' | ')}`)
     await frame.evaluate(() => window.__arena.push({ mz: 1, mx: 0, yaw: 0, pitch: 0, fire: 0 }))
     await frame.waitForFunction(() => window.__arena.moved() > 0.4, null, { timeout: 4000 })
@@ -35,6 +39,8 @@ test('Arena plays in the card iframe: move, fire, score, and a throttled frame r
       const text = document.querySelector('#score')?.textContent || ''
       return Number(text.replace(/\D/g, '')) > 0
     }, null, { timeout: 12000 })
+    await frame.waitForFunction(() => window.__arena.fps >= 20, null, { timeout: 8000 })
+    const steady = await frame.evaluate(() => window.__arena.fps)
     const session = await page.context().newCDPSession(page)
     await session.send('Emulation.setCPUThrottlingRate', { rate: 4 })
     await page.waitForTimeout(1200)
@@ -46,7 +52,7 @@ test('Arena plays in the card iframe: move, fire, score, and a throttled frame r
     }))
     assert.equal(perf.score > 0, true)
     assert.equal(Number.isFinite(perf.fps), true)
-    console.log(`ARENA_PERF ${JSON.stringify({ ...perf, gl: boot.gl, errors })}`)
+    console.log(`ARENA_PERF ${JSON.stringify({ ...perf, steady, gl: boot.gl, errors })}`)
 
     const phone = await browser.newPage({ viewport: { width: 390, height: 700 }, hasTouch: true })
     await phone.goto(`${server.base}/play/circuit-dash?embed=1`, { waitUntil: 'domcontentloaded' })

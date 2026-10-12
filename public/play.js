@@ -140,7 +140,7 @@ function mountFreeform(src) {
   field.replaceChildren()
   const frame = document.createElement('iframe')
   frame.className = 'freeform-frame'
-  frame.setAttribute('sandbox', 'allow-scripts')
+  frame.setAttribute('sandbox', 'allow-scripts allow-pointer-lock')
   frame.referrerPolicy = 'no-referrer'
   frame.title = current?.name || 'Game'
   frame.dataset.src = src

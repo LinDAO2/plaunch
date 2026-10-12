@@ -70,7 +70,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Procedural geometry is original. three.js r170 is MIT.'
+      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Colors and HUD read THEME tokens.'
     }
   },
   {
@@ -102,7 +102,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Procedural geometry is original. three.js r170 is MIT.'
+      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Colors and HUD read THEME tokens.'
     }
   },
   {
@@ -134,7 +134,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Procedural geometry is original. three.js r170 is MIT.'
+      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Colors and HUD read THEME tokens.'
     }
   }
 ]

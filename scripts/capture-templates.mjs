@@ -1,7 +1,7 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { captureGame, launchCaptureBrowser, serveCapture } from '../src/capture-browser.js'
+import { arenaAssetFiles, captureGame, launchCaptureBrowser, serveCapture } from '../src/capture-browser.js'
 import { TEMPLATES } from '../src/templates/catalog.js'
 import { renderTemplate } from '../src/templates/render.js'
 
@@ -13,6 +13,7 @@ for (const spec of TEMPLATES) files.set(`/${spec.id}`, renderTemplate(spec))
 files.set('/kaplay.js', await readFile(path.join(root, 'vendor/kaplay/kaplay-3001.0.19.js')))
 files.set('/zzfx.js', await readFile(path.join(root, 'vendor/zzfx/zzfx.js')))
 files.set('/three.js', await readFile(path.join(root, 'vendor/three/three.min.js')))
+for (const [name, body] of arenaAssetFiles()) files.set(name, body)
 
 const browser = await launchCaptureBrowser()
 if (!browser) {

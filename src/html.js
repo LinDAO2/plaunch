@@ -111,7 +111,7 @@ export function renderSharePage(game, { origin, site = '', scores = [], unverifi
   const unverifiedRows = leaderRows(unverified)
   const checklist = worldShareChecklist(game, card)
   const sandboxNote = game.tier === 'freeform'
-    ? '<p class="hint sandbox-note">Sandboxed. This game runs in an iframe with sandbox="allow-scripts" and cannot read this page, cookies, or the network.</p>'
+    ? '<p class="hint sandbox-note">Sandboxed. This game runs in an iframe with sandbox="allow-scripts allow-pointer-lock" and cannot read this page, cookies, or the network. Mouse look uses pointer lock when the frame allows it.</p>'
     : ''
   return `<!doctype html>
 <html lang="en">

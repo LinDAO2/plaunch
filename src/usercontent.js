@@ -1,7 +1,36 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getGameRow } from './repo.js'
 import { takePreview } from './repo.js'
+
+const ASSET_ROOT = fileURLToPath(new URL('../vendor/arena-assets', import.meta.url))
+
+function loadAssets(dir, prefix, into) {
+  for (const name of readdirSync(dir)) {
+    if (name.startsWith('.')) continue
+    const full = path.join(dir, name)
+    if (statSync(full).isDirectory()) loadAssets(full, `${prefix}${name}/`, into)
+    else into.set(`/assets/${prefix}${name}`, readFileSync(full))
+  }
+  return into
+}
+
+const ASSETS = loadAssets(ASSET_ROOT, '', new Map())
+
+function assetBody(pathname) {
+  if (!pathname.startsWith('/assets/')) return null
+  const rel = pathname.slice('/assets/'.length)
+  if (!rel || rel.includes('..') || rel.includes('\\') || rel.includes('\0')) return null
+  return ASSETS.get(pathname) || null
+}
+
+function assetType(pathname) {
+  if (pathname.endsWith('.glb')) return 'model/gltf-binary'
+  if (pathname.endsWith('.png')) return 'image/png'
+  if (pathname.endsWith('.txt')) return 'text/plain; charset=utf-8'
+  return 'application/octet-stream'
+}
 
 const VENDOR = {
   '/kaplay.js': {
@@ -27,8 +56,10 @@ export function sandboxCsp(config) {
     ancestors.push(origin)
   }
   // script-src 'self' loads the pinned Kaplay, ZzFX, and three.js files from this origin.
-  // No 'unsafe-eval' and no 'wasm-unsafe-eval'. The sandbox token keeps the document opaque.
-  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts; frame-ancestors ${ancestors.join(' ')}`
+  // connect-src and img-src 'self' load the CC0 glTF packs from /assets on this origin only.
+  // No 'unsafe-eval' and no 'wasm-unsafe-eval' (no Draco, meshopt, or KTX2 WASM).
+  // allow-pointer-lock lets our play page grant mouse look. Hold-to-drag remains if a parent frame denies it.
+  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors ${ancestors.join(' ')}`
 }
 
 // CSP connect-src does not cover WebRTC, and a live probe sent STUN packets from the sandbox.
@@ -81,6 +112,20 @@ export function createUsercontentApp({ db, config }) {
         })
         res.end(vendor.body)
         return
+      }
+      if ((req.method || 'GET') === 'GET') {
+        const asset = assetBody(url.pathname)
+        if (asset) {
+          res.writeHead(200, {
+            'content-type': assetType(url.pathname),
+            'content-length': String(asset.length),
+            'cache-control': 'public, max-age=86400',
+            'x-content-type-options': 'nosniff',
+            'access-control-allow-origin': '*'
+          })
+          res.end(asset)
+          return
+        }
       }
       if ((req.method || 'GET') === 'GET' && url.pathname === '/health') {
         res.writeHead(200, {

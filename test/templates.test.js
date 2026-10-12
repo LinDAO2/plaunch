@@ -425,7 +425,7 @@ setTimeout(function () {
   try {
     await page.goto(`${server.base}/play/${id}?embed=1`, { waitUntil: 'domcontentloaded' })
     const frame = page.locator('iframe.freeform-frame')
-    assert.equal(await frame.getAttribute('sandbox'), 'allow-scripts')
+    assert.equal(await frame.getAttribute('sandbox'), 'allow-scripts allow-pointer-lock')
     await page.click('#embed-play')
     await page.waitForFunction(() => (window.__probes || []).some((item) => item && item.type === 'playground-probe'), null, { timeout: 15000 })
     const report = await page.evaluate(() => window.__probes.find((item) => item.type === 'playground-probe'))

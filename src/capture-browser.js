@@ -1,9 +1,32 @@
 import http from 'node:http'
 import { once } from 'node:events'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const LAUNCH_ARGS = ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
+
+export function arenaAssetFiles() {
+  const root = fileURLToPath(new URL('../vendor/arena-assets', import.meta.url))
+  const files = new Map()
+  const walk = (dir, prefix) => {
+    for (const name of readdirSync(dir)) {
+      if (name.startsWith('.')) continue
+      const full = path.join(dir, name)
+      if (statSync(full).isDirectory()) walk(full, `${prefix}${name}/`)
+      else files.set(`/assets/${prefix}${name}`, readFileSync(full))
+    }
+  }
+  walk(root, '')
+  return files
+}
+
+function contentType(name) {
+  if (name.endsWith('.js')) return 'text/javascript; charset=utf-8'
+  if (name.endsWith('.glb')) return 'model/gltf-binary'
+  if (name.endsWith('.png')) return 'image/png'
+  return 'text/html; charset=utf-8'
+}
 const VENDOR_FILES = {
   '/three.js': fileURLToPath(new URL('../vendor/three/three.min.js', import.meta.url)),
   '/kaplay.js': fileURLToPath(new URL('../vendor/kaplay/kaplay-3001.0.19.js', import.meta.url)),
@@ -33,8 +56,7 @@ export function serveCapture(files) {
       res.end()
       return
     }
-    const type = name.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8'
-    res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' })
+    res.writeHead(200, { 'content-type': contentType(name), 'cache-control': 'no-store', 'access-control-allow-origin': '*' })
     res.end(body)
   })
   return {
@@ -104,6 +126,12 @@ async function wake(page, id) {
   }
   const phase = await page.evaluate(() => (window.__state && window.__state.phase) || '').catch(() => '')
   if (await page.evaluate(() => window.__state && window.__state.engine === 'three').catch(() => false)) {
+    await page.waitForFunction(() => window.__arena && window.__arena.ready, null, { timeout: 20000 })
+    await page.evaluate(() => {
+      window.__arena.begin()
+      window.__arena.lookAtNearest()
+      window.__arena.push({ mz: 1, mx: 0.2, fire: 1 })
+    })
     await page.waitForTimeout(900)
     return
   }
@@ -171,6 +199,9 @@ export async function captureHtml(browser, html) {
   const files = new Map([['/game.html', html]])
   for (const [name, file] of Object.entries(VENDOR_FILES)) {
     if (html.includes(`src="${name}"`)) files.set(name, readFileSync(file))
+  }
+  if (html.includes('/assets/')) {
+    for (const [name, body] of arenaAssetFiles()) files.set(name, body)
   }
   const server = serveCapture(files)
   const port = await server.listen()

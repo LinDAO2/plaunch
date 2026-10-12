@@ -209,6 +209,20 @@ test('three.js is served from the sandbox origin and arena is on the guest play 
     const bytes = Buffer.byteLength(Buffer.from(await script.arrayBuffer()))
     assert.ok(bytes < 5 * 1024 * 1024, `three.js is ${bytes} bytes`)
     assert.ok(bytes > 100000)
+    const assetNames = ['astronaut.glb', 'alien.glb', 'blaster.glb', 'bolt.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb']
+    let assetBytes = 0
+    for (const name of assetNames) {
+      const asset = await fetch(`${server.usercontentBase}/assets/${name}`)
+      assert.equal(asset.status, 200, name)
+      assert.match(asset.headers.get('content-type'), /model\/gltf-binary/)
+      assert.equal(asset.headers.get('access-control-allow-origin'), '*')
+      const body = Buffer.from(await asset.arrayBuffer())
+      assert.equal(body.subarray(0, 4).toString(), 'glTF')
+      assetBytes += body.length
+    }
+    const blocked = await fetch(`${server.usercontentBase}/assets/../package.json`)
+    assert.notEqual(blocked.headers.get('content-type'), 'application/json')
+    assert.ok(bytes + assetBytes < 4 * 1024 * 1024, `first-load sample is ${bytes + assetBytes} bytes`)
     const page = await client.request('GET', '/play/arena')
     assert.equal(page.status, 200)
     assert.match(page.text, /cannot read this page, cookies, or the network/)

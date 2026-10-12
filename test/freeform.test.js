@@ -57,7 +57,7 @@ test('freeform sandbox blocks parent cookies and the network, and reports a scor
   assert.equal(sandbox.status, 200)
   const csp = sandbox.headers.get('content-security-policy')
   assert.match(csp, /default-src 'none'/)
-  assert.match(csp, /connect-src 'none'/)
+  assert.match(csp, /connect-src 'self'/)
   assert.match(csp, new RegExp(server.base.replace(/[.]/g, '\\.')))
   assert.equal(sandbox.headers.get('set-cookie'), null)
 
@@ -87,7 +87,7 @@ test('freeform sandbox blocks parent cookies and the network, and reports a scor
     const frame = page.locator('iframe.freeform-frame')
     await frame.waitFor()
     const sandboxAttr = await frame.getAttribute('sandbox')
-    assert.equal(sandboxAttr, 'allow-scripts')
+    assert.equal(sandboxAttr, 'allow-scripts allow-pointer-lock')
     assert.equal(sandboxAttr.includes('allow-same-origin'), false)
     await page.click('#embed-play')
     await page.waitForFunction(() => {
