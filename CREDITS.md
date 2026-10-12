@@ -2,6 +2,22 @@
 
 Template games are original Kaplay scripts. They follow the rules of the games below. They are not line copies, and example art from those projects was not copied. Pixel grids in `THEME` are original. Titles stay generic: Word Guess, Block Drop, Flap, Maze Chomper, Jump Up, and the rest. Trademarked names are not used as titles or trade dress.
 
+## Terrain textures
+
+Photoreal color, normal, and roughness maps for the block world are CC0 and were downscaled to 256×256 JPEG. They live in `public/textures/`.
+
+| File prefix | Poly Haven asset | Page |
+| --- | --- | --- |
+| `grass_` | Grass Ground | https://polyhaven.com/a/grass_ground |
+| `dirt_` | Dirt | https://polyhaven.com/a/dirt |
+| `stone_` | Rock Face | https://polyhaven.com/a/rock_face |
+| `sand_` | Coast Sand 01 | https://polyhaven.com/a/coast_sand_01 |
+| `wood_` | Bark Brown 02 | https://polyhaven.com/a/bark_brown_02 |
+| `leaves_` | Leafy Grass | https://polyhaven.com/a/leafy_grass |
+| `snow_` | Snow 01 | https://polyhaven.com/a/snow_01 |
+
+Poly Haven publishes these under CC0. Credit is appreciated and not required. The water color, normal, and roughness maps (`water_diff.jpg`, `water_nor.jpg`, `water_rough.jpg`) are original. The current ambientCG catalog no longer serves the older Water surface packs, so the water surface is a physical shader with those generated maps rather than a photo tile.
+
 ## Engine and sound
 
 - **three.js r170 (0.170.0)** by the three.js authors. The browser build is `vendor/three/three.min.js`, served as `/three.js`. License text is `vendor/three/LICENSE` (MIT). The build includes `GLTFLoader` and the bloom composer from the same release. It does not include Draco, meshopt, or KTX2.

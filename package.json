@@ -9,7 +9,8 @@
     "test": "node --test --test-concurrency=1",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "bakeoff": "node scripts/bakeoff.mjs"
+    "bakeoff": "node scripts/bakeoff.mjs",
+    "world-bakeoff": "node scripts/world-bakeoff.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -7,11 +7,11 @@ const out = '/opt/cursor/artifacts/worlds'
 await mkdir(out, { recursive: true })
 
 const prompts = [
-  ['candy-island', 'a candy island with a pyramid and a playful mood'],
-  ['snow-caves', 'snow caves at dusk, race to the beacon'],
-  ['desert-treasure', 'a desert treasure hunt with a clay house'],
-  ['moon-base', 'a moon base at night with glowing blocks'],
-  ['sky-islands', 'floating sky islands with a calm music mood']
+  ['forest', 'a dense green forest with tall trees'],
+  ['lake-mountains', 'mountains with a lake'],
+  ['beach', 'a sandy beach along the coast'],
+  ['snow-peaks', 'snowy mountain peaks'],
+  ['desert-canyon', 'a desert canyon']
 ]
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader'] })
@@ -63,13 +63,13 @@ for (const [name, prompt] of prompts) {
     })
     const game = await published.json()
     if (!published.ok) throw new Error(game.error || 'publish failed')
-    return { id: game.game.id, biome: result.spec.biome, structure: result.spec.structure, music: result.spec.music, cycle: result.spec.cycle }
+    return { id: game.game.id, biome: result.spec.biome, landform: result.spec.terrain?.landform, structure: result.spec.structure, music: result.spec.music, cycle: result.spec.cycle }
   }, { token: csrf, prompt })
   await page.goto(`${base}/play/${made.id}`, { waitUntil: 'networkidle' })
   const start = page.locator('#world-start')
   if (await start.count() && await start.isVisible()) await start.click()
   try {
-    await page.waitForFunction(() => window.__blocks && (window.__blocks.ready || window.__blocks.gl || window.__blocks.note), null, { timeout: 12000 })
+    await page.waitForFunction(() => window.__blocks && window.__blocks.ready && (window.__blocks.lit || window.__blocks.note), null, { timeout: 20000 })
   } catch (error) {
     const info = await page.evaluate(() => ({
       blocks: window.__blocks || null,
@@ -80,9 +80,9 @@ for (const [name, prompt] of prompts) {
     console.log('fail', name, info)
     throw error
   }
-  await page.waitForTimeout(1200)
+  await page.waitForTimeout(1600)
   await page.screenshot({ path: path.join(out, `${name}.png`) })
-  console.log(name, made.id, made.biome, made.structure, made.music, made.cycle)
+  console.log(name, made.id, made.biome, made.landform, made.structure, made.music, made.cycle)
 }
 if (errors.length) console.log('page errors', errors)
 await browser.close()

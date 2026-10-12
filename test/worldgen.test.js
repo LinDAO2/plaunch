@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
-import { repairWorldSpec } from '../src/blocks/spec.js'
-import { blockAt, surfaceY, worldFromSpec } from '../src/blocks/terrain.js'
+import { repairWorldSpec, chooseWorld } from '../src/blocks/spec.js'
+import { WATER, blockAt, surfaceY, worldFromSpec } from '../src/blocks/terrain.js'
 import { saveEdit } from '../src/blocks/store.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -27,6 +27,47 @@ test('repair keeps a messy model reply inside the world schema', () => {
   assert.equal(spec.quests.some((quest) => quest.kind === 'find'), true)
   assert.equal(spec.quests.some((quest) => quest.kind === 'explode'), false)
   assert.equal(spec.blockSet[0].texture, 'brick')
+})
+
+test('landscape prompts keep distinct biomes and landforms', () => {
+  const prompts = [
+    ['a dense green forest with tall trees', 'grassland', 'forest'],
+    ['mountains with a lake', 'grassland', 'lake'],
+    ['a sandy beach along the coast', 'grassland', 'beach'],
+    ['snowy mountain peaks', 'snow', 'peaks'],
+    ['a desert canyon', 'desert', 'canyon']
+  ]
+  const specs = prompts.map(([prompt, biome, landform]) => {
+    const spec = repairWorldSpec({ biome: 'grassland', terrain: { islands: false, caves: false, sky: 'day', landform: 'rolling' } }, prompt)
+    assert.equal(spec.biome, biome)
+    assert.equal(spec.terrain.landform, landform)
+    assert.equal(chooseWorld(prompt).name.length > 2, true)
+    return spec
+  })
+  const keys = new Set(specs.map((spec) => `${spec.biome}:${spec.terrain.landform}:${spec.terrainSeed}:${spec.name}`))
+  assert.equal(keys.size, prompts.length)
+  const forest = worldFromSpec(specs[0])
+  const lake = worldFromSpec(specs[1])
+  const beach = worldFromSpec(specs[2])
+  const peaks = worldFromSpec(specs[3])
+  const canyon = worldFromSpec(specs[4])
+  const mid = (world) => surfaceY(world.size >> 1, world.size >> 1, world)
+  assert.ok(mid(lake) < WATER)
+  assert.ok(surfaceY(4, 2, beach) < surfaceY(4, beach.size - 4, beach))
+  let canyonLow = 99
+  let canyonHigh = 0
+  let peakHigh = 0
+  for (let i = 2; i < canyon.size; i += 3) {
+    canyonLow = Math.min(canyonLow, surfaceY(i, canyon.size >> 1, canyon))
+    canyonHigh = Math.max(canyonHigh, surfaceY(i, canyon.size >> 1, canyon))
+    peakHigh = Math.max(peakHigh, surfaceY(i, 4, peaks))
+  }
+  assert.ok(canyonHigh - canyonLow > 8)
+  assert.ok(peakHigh > mid(forest))
+  const castle = chooseWorld('build a castle together')
+  assert.equal(castle.structure, 'tower')
+  assert.equal(castle.name, 'Castle Blocks')
+  assert.equal(castle.terrain.landform, 'rolling')
 })
 
 test('islands drop the shore and caves open air under the surface', () => {

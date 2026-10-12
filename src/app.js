@@ -94,6 +94,7 @@ const FILES = new Map([
   ['/juice.js', 'juice.js'],
   ['/icons.js', 'icons.js'],
   ['/blocks-view.js', 'blocks-view.js'],
+  ['/world-render.js', 'world-render.js'],
   ['/arena-bridge.js', 'arena-bridge.js'],
   ['/fonts/bricolage-grotesque-latin-700.woff2', 'fonts/bricolage-grotesque-latin-700.woff2'],
   ['/fonts/source-sans-3-latin-400.woff2', 'fonts/source-sans-3-latin-400.woff2'],
@@ -109,6 +110,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
   '.woff2': 'font/woff2'
 }
 const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'ai:anthropic', 'seed', 'import'])
@@ -908,6 +910,21 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     fields.credit = {}
     const { game, version } = await createGame(db, fields, null, user.id)
     return sendJson(res, 201, { game: present(config, game, { canEdit: true }), url: `/g/${game.id}`, version }, ctx)
+  }
+
+  if (method === 'GET' && (pathname === '/three.js' || pathname.startsWith('/textures/'))) {
+    const file = pathname === '/three.js'
+      ? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'vendor', 'three', 'three.min.js')
+      : path.join(PUBLIC, 'textures', pathname.slice('/textures/'.length))
+    if (pathname.startsWith('/textures/') && !/^[a-z0-9_-]+\.jpg$/.test(pathname.slice('/textures/'.length))) {
+      return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
+    }
+    try {
+      const bytes = await readFile(file)
+      return sendJsonRaw(res, 200, bytes, ctx, pathname === '/three.js' ? '.js' : '.jpg')
+    } catch {
+      return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
+    }
   }
 
   if (method === 'GET' && pathname.startsWith('/blocks/')) {

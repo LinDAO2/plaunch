@@ -64,7 +64,7 @@ export async function renderPlayPage(game, { embed = false, origin = '', site = 
     MECHANIC: escapeHtml(String(game.type || '').toUpperCase()),
     BODY_CLASS: classes.join(' '),
     GATE_ATTR: embed ? '' : 'hidden',
-    CREDIT: creditMarkup(game.credit),
+    CREDIT: `${creditMarkup(game.credit)}${game.type === 'world' ? ' <span class="tex-credit">Terrain photos from Poly Haven, CC0: Grass Ground, Dirt, Rock Face, Coast Sand 01, Bark Brown 02, Leafy Grass, Snow 01. Water is an original physical surface.</span>' : ''}`,
     SHARE_META: card ? card.tags : '',
     SANDBOX_NOTE: sandboxNote
   }

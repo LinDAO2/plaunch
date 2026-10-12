@@ -6,9 +6,9 @@ import { heuristicTier } from '../src/ai/classify.js'
 import { validateGameSpec } from '../src/ai/gamespec.js'
 import { aoFactor, meshRegion } from '../src/blocks/mesh.js'
 import { validateEdit } from '../src/blocks/rules.js'
-import { goalCopy, goalProgress, goalTargets, skyCycle, sparkHit, sparkSpots } from '../src/blocks/goals.js'
+import { goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, sparkHit, sparkSpots } from '../src/blocks/goals.js'
 import { featuredWorlds, wantsWorld } from '../src/blocks/spec.js'
-import { blockAt, worldFromSpec } from '../src/blocks/terrain.js'
+import { blockAt, spawnPoint, worldFromSpec } from '../src/blocks/terrain.js'
 import { validSpec } from '../testing/helpers.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -84,6 +84,32 @@ test('world prompts become a shared block spec and minecraft is not a runtime', 
   assert.equal(seeded[0].spec.biome, 'grassland')
   assert.equal(seeded[1].spec.biome, 'candy')
   assert.notEqual(seeded[0].spec.terrainSeed, seeded[1].spec.terrainSeed)
+})
+
+test('spawn is open high ground facing the landmark', () => {
+  const worlds = [
+    worldFromSpec(featuredWorlds()[0].spec),
+    worldFromSpec(featuredWorlds()[1].spec),
+    worldFromSpec({ biome: 'grassland', terrainSeed: 2201, worldSize: 'medium', structure: 'none', terrain: { landform: 'forest' } }),
+    worldFromSpec({ biome: 'desert', terrainSeed: 2202, worldSize: 'medium', structure: 'none', terrain: { landform: 'canyon' } })
+  ]
+  for (const world of worlds) {
+    const spawn = spawnPoint(world)
+    const x = Math.floor(spawn.x)
+    const z = Math.floor(spawn.z)
+    const gy = Math.floor(spawn.y) - 1
+    assert.ok(Math.hypot(spawn.x - (world.size >> 1), spawn.z - (world.size >> 1)) > 6)
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        assert.equal(blockAt(x + dx, gy + 1, z + dz, world), 0)
+        assert.equal(blockAt(x + dx, gy + 2, z + dz, world), 0)
+        assert.equal(blockAt(x + dx, gy + 3, z + dz, world), 0)
+      }
+    }
+    const yaw = lookYaw(world, spawn.x, spawn.z)
+    const dot = Math.sin(yaw) * ((world.size >> 1) - spawn.x) + Math.cos(yaw) * ((world.size >> 1) - spawn.z)
+    assert.ok(dot > 0)
+  }
 })
 
 test('landmark height and sparks score a shared goal', () => {

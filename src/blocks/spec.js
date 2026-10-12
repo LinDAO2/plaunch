@@ -17,6 +17,7 @@ const SKIES = ['day', 'dusk', 'night', 'cycle']
 const QUEST_KINDS = ['collect', 'build', 'find', 'race', 'survive']
 const PREFAB_KINDS = ['tower', 'house', 'pyramid', 'bridge', 'arch', 'beacon']
 const MOODS = ['bright', 'calm', 'playful', 'night', 'tense']
+const LANDFORMS = ['rolling', 'forest', 'mountains', 'lake', 'beach', 'peaks', 'canyon']
 const NPCS = {
   grassland: ['Bramble', 'Keeps the meadow and waves at builders.'],
   desert: ['Dune', 'Trades clay pots for stories.'],
@@ -60,12 +61,26 @@ function hashString(value) {
   return h >>> 0
 }
 
+export function landformFor(prompt) {
+  const p = String(prompt || '').toLowerCase()
+  if (/canyon|gorge|ravine/.test(p)) return 'canyon'
+  if (/beach|coast|shore|seaside/.test(p)) return 'beach'
+  if (/lake|lagoon/.test(p)) return 'lake'
+  if (/forest|woods|grove/.test(p) || /tall trees|dense trees/.test(p)) return 'forest'
+  if (/peak|alpine/.test(p) || (/snow|ice|frost|winter/.test(p) && /mountain|summit|peak/.test(p))) return 'peaks'
+  if (/mountain|highland|ridge/.test(p)) return 'mountains'
+  return 'rolling'
+}
+
 export function chooseWorld(prompt) {
   const p = String(prompt || '').toLowerCase()
+  const landform = landformFor(p)
   let biome = 'grassland'
   if (/candy|sweet/.test(p)) biome = 'candy'
   else if (/moon|lunar/.test(p)) biome = 'moon'
-  else if (/snow|ice|frost|winter/.test(p)) biome = 'snow'
+  else if (landform === 'canyon') biome = 'desert'
+  else if (landform === 'beach') biome = 'grassland'
+  else if (/snow|ice|frost|winter/.test(p) || landform === 'peaks') biome = 'snow'
   else if (/desert|dune|sand/.test(p)) biome = 'desert'
   let structure = 'none'
   if (/pyramid/.test(p)) structure = 'pyramid'
@@ -78,11 +93,17 @@ export function chooseWorld(prompt) {
   const questKind = /race/.test(p) ? 'race' : /survive/.test(p) ? 'survive' : /find|treasure|seek/.test(p) ? 'find' : /collect|gather|gem|spark/.test(p) ? 'collect' : 'build'
   const castle = /castle/.test(p)
   const name = castle ? 'Castle Blocks'
-    : biome === 'candy' ? 'Candy Blocks'
-      : biome === 'moon' ? 'Moon Blocks'
-        : biome === 'snow' ? 'Frost Blocks'
-          : biome === 'desert' ? 'Dune Blocks'
-            : 'Block World'
+    : landform === 'canyon' ? 'Canyon Blocks'
+      : landform === 'beach' ? 'Shore Blocks'
+        : landform === 'lake' ? 'Lake Blocks'
+          : landform === 'forest' ? 'Grove Blocks'
+            : landform === 'peaks' ? 'Peak Blocks'
+              : landform === 'mountains' ? 'Ridge Blocks'
+                : biome === 'candy' ? 'Candy Blocks'
+                  : biome === 'moon' ? 'Moon Blocks'
+                    : biome === 'snow' ? 'Frost Blocks'
+                      : biome === 'desert' ? 'Dune Blocks'
+                        : 'Block World'
   const goal = castle
     ? 'Build a castle together.'
     : 'Shape this world. Everyone here shares it.'
@@ -98,7 +119,7 @@ export function chooseWorld(prompt) {
     palette: PALETTES[biome].slice(),
     accent: PALETTES[biome][0],
     goal,
-    terrain: { islands, caves, sky },
+    terrain: { islands, caves, sky, landform },
     cycle: sky,
     music: musicFor(p, biome),
     quests: [{ kind: questKind, text: goal }],
@@ -158,14 +179,16 @@ function readBlockSet(value, spec) {
 }
 
 function readTerrain(value) {
-  if (value === undefined) return { islands: false, caves: false, sky: 'cycle' }
+  if (value === undefined) return { islands: false, caves: false, sky: 'cycle', landform: 'rolling' }
   if (!isObject(value)) throw new Error('terrain must be an object')
-  assertOnly(value, ['islands', 'caves', 'sky'], 'terrain')
+  assertOnly(value, ['islands', 'caves', 'sky', 'landform'], 'terrain')
   const sky = value.sky === undefined ? 'cycle' : value.sky
   if (!SKIES.includes(sky)) throw new Error('terrain.sky is invalid')
   if (value.islands !== undefined && typeof value.islands !== 'boolean') throw new Error('terrain.islands must be a boolean')
   if (value.caves !== undefined && typeof value.caves !== 'boolean') throw new Error('terrain.caves must be a boolean')
-  return { islands: value.islands === true, caves: value.caves === true, sky }
+  const landform = value.landform === undefined ? 'rolling' : value.landform
+  if (!LANDFORMS.includes(landform)) throw new Error('terrain.landform is invalid')
+  return { islands: value.islands === true, caves: value.caves === true, sky, landform }
 }
 
 function readPrefabs(value) {
@@ -339,7 +362,6 @@ export function worldSpecFromFields(game = {}) {
 export function repairWorldSpec(raw, prompt = '') {
   const base = chooseWorld(prompt || (isObject(raw) ? raw.name : '') || 'block world')
   const src = isObject(raw) ? raw : {}
-  const biome = BIOMES.includes(src.biome) ? src.biome : base.biome
   const structure = STRUCTURES.includes(src.structure) ? src.structure : base.structure
   const worldSize = Object.prototype.hasOwnProperty.call(WORLD_SIZES, src.worldSize) ? src.worldSize : base.worldSize
   let terrainSeed = Number(src.terrainSeed)
@@ -348,6 +370,11 @@ export function repairWorldSpec(raw, prompt = '') {
     ? src.palette.filter((color) => /^#[0-9a-fA-F]{6}$/.test(String(color))).map((color) => String(color).toLowerCase()).slice(0, 6)
     : []
   const sky = SKIES.includes(src.cycle) ? src.cycle : SKIES.includes(src.terrain?.sky) ? src.terrain.sky : base.cycle
+  const hinted = landformFor(prompt)
+  const fromSrc = LANDFORMS.includes(src.terrain?.landform) ? src.terrain.landform : null
+  const landform = hinted !== 'rolling' ? hinted : (fromSrc || base.terrain.landform)
+  const promptHits = /candy|sweet|moon|lunar|snow|ice|frost|winter|desert|dune|sand|beach|coast|shore|canyon|gorge|forest|woods|mountain|lake|peak|alpine/.test(String(prompt || '').toLowerCase())
+  const biome = promptHits ? base.biome : (BIOMES.includes(src.biome) ? src.biome : base.biome)
   const quests = Array.isArray(src.quests) ? src.quests.filter((item) => isObject(item) && QUEST_KINDS.includes(item.kind)).slice(0, 4) : base.quests
   const prefabs = Array.isArray(src.prefabs) ? src.prefabs.filter((item) => isObject(item) && PREFAB_KINDS.includes(item.kind)).slice(0, 6) : base.prefabs
   const npcs = Array.isArray(src.npcs) ? src.npcs.filter((item) => isObject(item)).slice(0, 4) : base.npcs
@@ -375,7 +402,8 @@ export function repairWorldSpec(raw, prompt = '') {
       terrain: {
         islands: typeof src.terrain?.islands === 'boolean' ? src.terrain.islands : base.terrain.islands,
         caves: typeof src.terrain?.caves === 'boolean' ? src.terrain.caves : base.terrain.caves,
-        sky
+        sky,
+        landform
       },
       prefabs,
       quests: quests.length ? quests : base.quests,

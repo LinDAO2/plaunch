@@ -22,11 +22,12 @@ const WORLD_SCHEMA = {
     terrain: {
       type: 'object',
       additionalProperties: false,
-      required: ['islands', 'caves', 'sky'],
+      required: ['islands', 'caves', 'sky', 'landform'],
       properties: {
         islands: { type: 'boolean' },
         caves: { type: 'boolean' },
-        sky: { type: 'string' }
+        sky: { type: 'string' },
+        landform: { type: 'string' }
       }
     },
     blockSet: {
@@ -88,6 +89,7 @@ Rules:
 - worldSize is small, medium, or large
 - terrainSeed is an integer from 1 to 100000
 - terrain.islands and terrain.caves are booleans. terrain.sky is day, dusk, night, or cycle
+- terrain.landform is rolling, forest, mountains, lake, beach, peaks, or canyon. Match the idea: forest, mountains with a lake, beach, snowy peaks, or desert canyon must not all become rolling grassland
 - cycle matches terrain.sky
 - palette is 2 to 6 #RRGGBB colors. accent is one of them
 - blockSet is 2 to 6 blocks. texture is solid, speckle, stripe, brick, or dots
