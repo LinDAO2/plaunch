@@ -71,7 +71,7 @@ for (const [name, prompt] of prompts) {
     if (!published.ok) throw new Error(game.error || 'publish failed')
     return { id: game.game.id, biome: result.spec.biome, landform: result.spec.terrain?.landform, structure: result.spec.structure, music: result.spec.music, cycle: result.spec.cycle }
   }, { token: csrf, prompt })
-  await page.goto(`${base}/play/${made.id}`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}/play/${made.id}`, { waitUntil: 'domcontentloaded', timeout: 45000 })
   const start = page.locator('#world-start')
   if (await start.count() && await start.isVisible()) await start.click()
   try {
@@ -102,8 +102,9 @@ for (const [name, prompt] of prompts) {
     if (!problem) break
   }
   const thumbs = await page.evaluate(() => [...document.querySelectorAll('.hotbar button')].map((button) => button.style.backgroundImage))
-  if (thumbs.length < 9 || thumbs.some((url) => !url.includes('textures/') && !url.includes('data:image'))) {
-    problem = problem || `${name}: hotbar is missing texture thumbnails`
+  const labels = await page.evaluate(() => [...document.querySelectorAll('.hotbar button')].map((button) => button.getAttribute('aria-label')))
+  if (thumbs.length !== 7 || labels.includes('Petal') || labels.includes('Candy') || thumbs.some((url) => !url.includes('/textures/'))) {
+    problem = problem || `${name}: hotbar should be seven terrain textures (${labels.join(', ')})`
   }
   await page.screenshot({ path: path.join(out, `${name}.png`) })
   const pose = await page.evaluate(() => window.__blocks.pos())

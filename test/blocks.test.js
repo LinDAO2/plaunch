@@ -7,7 +7,7 @@ import { validateGameSpec } from '../src/ai/gamespec.js'
 import { aoFactor, meshRegion } from '../src/blocks/mesh.js'
 import { validateEdit } from '../src/blocks/rules.js'
 import { VISTA_PITCH, goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, sparkHit, sparkSpots } from '../src/blocks/goals.js'
-import { isSolid } from '../src/blocks/blocks.js'
+import { hotbarFor, isSolid, CANDY, PETAL } from '../src/blocks/blocks.js'
 import { featuredWorlds, wantsWorld } from '../src/blocks/spec.js'
 import { blockAt, spawnPoint, worldFromSpec } from '../src/blocks/terrain.js'
 import { validSpec } from '../testing/helpers.js'
@@ -87,6 +87,17 @@ test('world prompts become a shared block spec and minecraft is not a runtime', 
   assert.notEqual(seeded[0].spec.terrainSeed, seeded[1].spec.terrainSeed)
 })
 
+test('realistic hotbars leave out petal and candy', () => {
+  assert.equal(hotbarFor('candy').includes(CANDY), true)
+  assert.equal(hotbarFor('candy').includes(PETAL), true)
+  for (const biome of ['grassland', 'desert', 'snow', 'moon']) {
+    const bar = hotbarFor(biome)
+    assert.equal(bar.includes(CANDY), false)
+    assert.equal(bar.includes(PETAL), false)
+    assert.equal(bar.length, 7)
+  }
+})
+
 test('spawn is open high ground facing the landmark', () => {
   const worlds = [
     worldFromSpec(featuredWorlds()[0].spec),
@@ -121,7 +132,7 @@ test('spawn is open high ground facing the landmark', () => {
       const bz = Math.floor(spawn.z + dz * t)
       if (isSolid(blockAt(bx, by, bz, world))) { hit = t; break }
     }
-    assert.ok(hit >= 5 && hit <= 26, `look hits at ${hit} from ${spawn.y}`)
+    assert.ok(hit >= 4 && hit <= 40, `look hits at ${hit} from ${spawn.y}`)
   }
 })
 

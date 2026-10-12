@@ -106,33 +106,34 @@ function landformHeight(x, z, world) {
   const n2 = noise(x / 6, z / 6, seed + 19)
   let h = 10
   if (landform === 'forest') {
-    h = Math.round(10 + (n - 0.45) * 8 + (n2 - 0.5) * 3)
-    const riverZ = cz + Math.sin(x * 0.33 + seed) * 3.2
-    const river = Math.abs(z - riverZ)
-    if (river < 1.7) h = WATER - 1
-    else if (river < 3.1) h = WATER + 1
+    h = Math.round(11 + (n - 0.5) * 3 + (n2 - 0.5) * 2)
+    const south = (z - cz) / size
+    if (south > 0.16) h += Math.round((south - 0.16) * 34)
   } else if (landform === 'mountains') {
     const ridge = Math.pow(Math.abs(Math.sin(x * 0.16 + z * 0.05 + seed)), 0.65)
     h = Math.round(8 + n * 18 + ridge * 12 + n2 * 4)
     if (Math.abs(z - cz) < 1.8) h = Math.min(h, WATER)
   } else if (landform === 'lake') {
-    const basin = dist < 0.16 ? 0 : dist < 0.3 ? (dist - 0.16) / 0.14 : 1
-    h = Math.round(WATER - 2 + basin * (8 + n * 20 + (dist > 0.34 ? 8 : 0)))
-    if (dist < 0.15) h = WATER - 2
+    if (dist < 0.16) h = 4
+    else if (dist < 0.26) h = Math.round(4 + ((dist - 0.16) / 0.1) * 3)
+    else if (dist < 0.34) h = WATER + (dist > 0.3 ? 1 : 0)
+    else h = Math.round(WATER + 3 + n * 8 + Math.max(0, dist - 0.38) * 26)
   } else if (landform === 'beach') {
     const shore = z / size
-    if (shore < 0.26) h = 3
-    else if (shore < 0.42) h = Math.round(3 + ((shore - 0.26) / 0.16) * (WATER + 2))
-    else h = Math.round(WATER + 3 + (shore - 0.42) * 22 + (n - 0.4) * 5)
+    const along = Math.abs(x - cx) / size
+    if (shore < 0.22) h = 3
+    else if (shore < 0.5 && along < 0.28) h = 4
+    else if (shore < 0.66) h = WATER + 1
+    else h = Math.round(WATER + 4 + (shore - 0.66) * 46 + (n - 0.5) * 3)
   } else if (landform === 'peaks') {
     const north = 1 - z / size
     const ridge = Math.pow(n, 0.75)
     h = Math.round(12 + ridge * 16 + north * 12 + n2 * 4)
   } else if (landform === 'canyon') {
-    const gorge = Math.abs((x - cx) + Math.sin(z * 0.18 + seed) * 3.5)
-    if (gorge < 2.4) h = 4
-    else if (gorge < 6.5) h = Math.round(4 + ((gorge - 2.4) / 4.1) * (16 + n * 8))
-    else h = Math.round(20 + n * 8 + n2 * 3)
+    const gorge = Math.abs((x - cx) + Math.sin(z * 0.11 + seed) * 2.2)
+    if (gorge < 8) h = 8
+    else if (gorge < 13) h = Math.round(8 + ((gorge - 8) / 5) * (14 + n * 6))
+    else h = Math.round(24 + n * 8 + n2 * 3)
   }
   h = clampHeight(h, WORLD_HEIGHT - 10)
   return islandFalloff(h, x, z, world)
@@ -150,6 +151,11 @@ export function surfaceY(x, z, world) {
 
 function center(world) {
   return { cx: world.size >> 1, cz: world.size >> 1 }
+}
+
+function distFromCenter(x, z, world) {
+  const { cx, cz } = center(world)
+  return Math.hypot(x - cx, z - cz) / world.size
 }
 
 function nearStructure(x, z, world) {
@@ -184,7 +190,7 @@ function treeHere(x, z, world) {
   }
   if (world.landform === 'canyon' || world.biome === 'moon') return false
   if (world.biome === 'desert' && world.landform !== 'beach') return false
-  const spacing = world.landform === 'forest' ? 4 : 5
+  const spacing = world.landform === 'forest' ? 3 : world.landform === 'lake' ? 6 : 5
   const gx = Math.floor(x / spacing)
   const gz = Math.floor(z / spacing)
   const ox = Math.floor(hash2(gx, gz, world.seed + 5) * spacing)
@@ -193,8 +199,9 @@ function treeHere(x, z, world) {
   const h = surfaceY(x, z, world)
   if (h <= WATER + 1) return false
   if (world.landform === 'beach' && z < world.size * 0.48) return false
-  if ((world.landform === 'peaks' || world.landform === 'mountains') && h > 28) return false
-  if (world.landform === 'lake' && h < WATER + 2) return false
+  if (world.landform === 'forest' && h >= 16) return false
+  if ((world.landform === 'peaks' || world.landform === 'mountains') && h > 24) return false
+  if (world.landform === 'lake' && (h < WATER + 2 || distFromCenter(x, z, world) < 0.36)) return false
   return true
 }
 
@@ -218,32 +225,48 @@ function classicTreeBlock(x, y, z, world) {
   return 0
 }
 
+function crownBlock(dx, dz, dy, layers) {
+  const rad = layers[dy]
+  if (!rad) return false
+  if (Math.max(Math.abs(dx), Math.abs(dz)) > rad) return false
+  if (Math.abs(dx) === rad && Math.abs(dz) === rad) return false
+  return true
+}
+
 function shapedTreeBlock(x, y, z, world) {
-  const leaf = LEAF[world.biome] || CANOPY
-  const wood = WOOD[world.biome] || TIMBER
-  const pine = world.biome === 'snow' || world.landform === 'peaks' || world.landform === 'mountains'
-  for (let dx = -3; dx <= 3; dx++) {
-    for (let dz = -3; dz <= 3; dz++) {
+  const leaf = world.biome === 'candy' ? CANDY : CANOPY
+  const wood = world.biome === 'candy' ? GLOW : TIMBER
+  for (let dx = -4; dx <= 4; dx++) {
+    for (let dz = -4; dz <= 4; dz++) {
       const tx = x + dx
       const tz = z + dz
       if (!hasTree(tx, tz, world)) continue
       const h = surfaceY(tx, tz, world)
       const roll = hash2(tx, tz, world.seed + 17)
-      if (pine || roll > 0.72) {
-        const top = 11
-        if (dx === 0 && dz === 0 && y > h && y <= h + 8) return wood
+      const pine = world.biome === 'snow' || world.landform === 'peaks' || (world.landform === 'mountains' && roll > 0.4) || roll > 0.84
+      const extra = world.landform === 'forest' ? 3 : 0
+      if (pine) {
+        const trunk = 7 + extra + Math.floor(hash2(tx, tz, world.seed + 23) * 4)
+        const top = trunk + 7
+        if (dx === 0 && dz === 0 && y > h && y <= h + trunk) return wood
         const dy = y - h
-        if (dy >= 4 && dy <= top) {
-          const rad = Math.max(0, Math.ceil((top - dy) * 0.42))
-          if (Math.abs(dx) + Math.abs(dz) <= rad && !(dx === 0 && dz === 0 && dy <= 8)) return leaf
+        if (dy >= trunk - 1 && dy <= top) {
+          const tier = top - dy
+          const rad = Math.max(1, Math.ceil(tier * 0.42))
+          if (dx === 0 && dz === 0) continue
+          if (Math.max(Math.abs(dx), Math.abs(dz)) <= rad && !(Math.abs(dx) === rad && Math.abs(dz) === rad && tier % 2 === 0)) return leaf
         }
         continue
       }
-      const trunk = 5
+      const trunk = 6 + extra + Math.floor(hash2(tx, tz, world.seed + 29) * 3)
       if (dx === 0 && dz === 0 && y > h && y <= h + trunk) return wood
-      const cy = h + 6.2
-      const rr = (dx * dx) + ((y - cy) * (y - cy) * 0.82) + (dz * dz)
-      if (y > h + 2 && rr <= 7.4 && !(dx === 0 && dz === 0 && y <= h + trunk)) return leaf
+      const branch = h + trunk - 2
+      if (y === branch && ((dz === 0 && Math.abs(dx) === 1) || (dx === 0 && Math.abs(dz) === 1))) return wood
+      const dy = y - (h + trunk)
+      const wide = roll > 0.45
+        ? { 0: 3, 1: 2, 3: 2, 4: 1, 6: 1 }
+        : { 0: 2, 1: 2, 2: 1, 4: 2, 5: 1, 7: 1 }
+      if (crownBlock(dx, dz, dy, wide) && !(dx === 0 && dz === 0 && dy <= 0)) return leaf
     }
   }
   return 0
@@ -292,7 +315,11 @@ function structureAt(x, y, z, world) {
 function surfaceBlock(world, x, z, h) {
   const { biome, seed, landform } = world
   if (landform === 'canyon') return h < 9 ? DUNE : ROCK
-  if (landform === 'peaks') return h >= 22 ? FROST : ROCK
+  if (landform === 'peaks') {
+    const gully = noise(x / 3.2, z / 4.6, seed + 4)
+    if (h < 22 || gully < 0.24) return ROCK
+    return FROST
+  }
   if (landform === 'beach') return h <= WATER + 2 ? DUNE : TURF
   if (landform === 'lake' && h <= WATER + 1) return DUNE
   if ((landform === 'mountains' || landform === 'lake') && h >= 20) return ROCK
@@ -377,6 +404,43 @@ function columnClear(world, edits, x, z, gy) {
 
 const LOOK_PITCH = -13 * Math.PI / 180
 
+export function vistaGlance(world, x, feetY, z) {
+  const { cx, cz } = center(world)
+  const gy = Math.floor(feetY) - 1
+  const yaw = Math.atan2(cx - x, cz - z)
+  const eyeY = feetY + 1.62
+  const out = { water: 0, leaf: 0, wood: 0, sand: 0, snow: 0, drop: 0 }
+  const pitches = [-0.06, -0.2, -0.36]
+  const offsets = [-0.32, 0, 0.32]
+  for (const pitch of pitches) {
+    for (const off of offsets) {
+      const cp = Math.cos(pitch)
+      const dx = Math.sin(yaw + off) * cp
+      const dy = Math.sin(pitch)
+      const dz = Math.cos(yaw + off) * cp
+      for (let t = 3; t <= 32; t += 2) {
+        const bx = Math.floor(x + dx * t)
+        const by = Math.floor(eyeY + dy * t)
+        const bz = Math.floor(z + dz * t)
+        if (bx < 0 || bz < 0 || bx >= world.size || bz >= world.size || by < 0 || by >= world.height) break
+        const id = blockAt(bx, by, bz, world)
+        if (id === POOL) out.water += 1
+        else if (id === CANOPY) out.leaf += 1
+        else if (id === TIMBER) out.wood += 1
+        else if (id === DUNE) out.sand += 1
+        else if (id === FROST) out.snow += 1
+        if (isSolid(id)) break
+      }
+      const gx = Math.floor(x + Math.sin(yaw + off) * 10)
+      const gz = Math.floor(z + Math.cos(yaw + off) * 10)
+      if (gx > 1 && gz > 1 && gx < world.size - 1 && gz < world.size - 1) {
+        if (gy - surfaceY(gx, gz, world) > 6) out.drop += 1
+      }
+    }
+  }
+  return out
+}
+
 function lookReach(world, edits, x, z, gy, cx, cz) {
   const yaw = Math.atan2(cx - (x + 0.5), cz - (z + 0.5))
   const cp = Math.cos(LOOK_PITCH)
@@ -396,13 +460,13 @@ function lookReach(world, edits, x, z, gy, cx, cz) {
 
 function vistaHeight(world, edits, x, z) {
   if (x < 2 || z < 2 || x >= world.size - 2 || z >= world.size - 2) return null
-  const gy = groundY(world, x, z, edits)
+  const gy = surfaceY(x, z, world)
   if (gy < WATER) return null
   if (!columnClear(world, edits, x, z, gy)) return null
   for (let dx = -1; dx <= 1; dx++) {
     for (let dz = -1; dz <= 1; dz++) {
       if (!dx && !dz) continue
-      const ny = groundY(world, x + dx, z + dz, edits)
+      const ny = surfaceY(x + dx, z + dz, world)
       if (ny > gy + 1 || gy - ny > 3) return null
       if (!columnClear(world, edits, x + dx, z + dz, gy)) return null
     }
@@ -422,11 +486,15 @@ export function spawnPoint(world, edits) {
     const gy = vistaHeight(world, edits, x, z)
     if (gy === null) return
     const reach = lookReach(world, edits, x, z, gy, cx, cz)
+    const view = vistaGlance(world, x + 0.5, gy + 1, z + 0.5)
     let score = bonus - Math.abs(dist - prefer) * 0.35
-    if (reach >= 9 && reach <= 18) score += 90 + gy * 0.12
-    else if (reach >= 5 && reach < 9) score += 48 + gy * 0.05
-    else if (reach > 18 && reach <= 26) score += 36
-    else score += gy * 0.05
+    if (reach >= 5 && reach <= 34) score += 24 + Math.min(gy, 24) * 0.08
+    else score += gy * 0.04
+    if (world.landform === 'lake') score += view.water * 14 + view.sand * 2
+    else if (world.landform === 'forest') score += view.leaf * 9 + view.wood * 4
+    else if (world.landform === 'beach') score += view.water * 10 + view.sand * 3
+    else if (world.landform === 'peaks') score += view.snow * 7
+    else if (world.landform === 'canyon') score += view.sand * 12 + view.drop * 4
     if (score > bestScore) {
       bestScore = score
       best = { x, z, y: gy }

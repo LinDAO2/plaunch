@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
 import { repairWorldSpec, chooseWorld } from '../src/blocks/spec.js'
-import { WATER, blockAt, surfaceY, worldFromSpec } from '../src/blocks/terrain.js'
+import { WATER, blockAt, spawnPoint, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
 import { saveEdit } from '../src/blocks/store.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -53,6 +53,16 @@ test('landscape prompts keep distinct biomes and landforms', () => {
   const canyon = worldFromSpec(specs[4])
   const mid = (world) => surfaceY(world.size >> 1, world.size >> 1, world)
   assert.ok(mid(lake) < WATER)
+  const at = (world) => {
+    const spawn = spawnPoint(world)
+    return vistaGlance(world, spawn.x, spawn.y, spawn.z)
+  }
+  const lakeView = at(lake)
+  const forestView = at(forest)
+  const beachView = at(beach)
+  assert.ok(lakeView.water >= 4, JSON.stringify(lakeView))
+  assert.ok(forestView.leaf + forestView.wood >= 4, JSON.stringify(forestView))
+  assert.ok(beachView.sand + beachView.water >= 4, JSON.stringify(beachView))
   assert.ok(surfaceY(4, 2, beach) < surfaceY(4, beach.size - 4, beach))
   let canyonLow = 99
   let canyonHigh = 0

@@ -31,6 +31,11 @@ export const BLOCKS = [
 
 export const HOTBAR = [TURF, SOIL, ROCK, DUNE, TIMBER, CANOPY, PETAL, CANDY, FROST]
 
+export function hotbarFor(biome) {
+  if (biome === 'candy') return HOTBAR
+  return HOTBAR.filter((id) => id !== PETAL && id !== CANDY)
+}
+
 export const BIOMES = ['grassland', 'desert', 'snow', 'candy', 'moon']
 export const STRUCTURES = ['tower', 'house', 'pyramid', 'none']
 export const WORLD_SIZES = { small: 32, medium: 48, large: 64 }

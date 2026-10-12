@@ -1,5 +1,6 @@
 import { frameCoverage } from '/blocks/frame-check.js'
 import { meshRegion } from '/blocks/mesh.js'
+import { hash2, WATER } from '/blocks/terrain.js'
 import {
   CANOPY, CANDY, CLAY, DUNE, FROST, GLOW, PETAL, POOL, ROCK, SOIL, TIMBER, TURF
 } from '/blocks/blocks.js'
@@ -51,13 +52,6 @@ transformed.z += cos(position.x * 1.4 + uTime * 1.05) * 0.05;`
 const WATER_SWAY = `transformed.y += sin(position.x * 1.7 + position.z * 1.3 + uTime * 1.6) * 0.045;`
 
 function patchVertex(shader, motion) {
-  shader.vertexShader = shader.vertexShader.replace(
-    '#include <fog_vertex>',
-    `#include <fog_vertex>
-#ifdef USE_FOG
-	vFogDepth *= mix(1.45, 0.72, clamp(position.y / 28.0, 0.0, 1.0));
-#endif`
-  )
   if (!motion) return
   shader.uniforms.uTime = TIME
   shader.vertexShader = `uniform float uTime;\n${shader.vertexShader}`
@@ -246,13 +240,14 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#9ebfd4')
-  scene.fog = new THREE.FogExp2('#b7c9d6', quality.tier === 'low' ? 0.028 : 0.016)
+  const haze = new THREE.Color(world?.biome === 'desert' ? '#d2b48c' : world?.biome === 'snow' ? '#c5d4e6' : '#6f94d4')
+  scene.fog = new THREE.FogExp2(haze, quality.tier === 'low' ? 0.01 : 0.0065)
   const camera = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
   const sky = attachSky(scene)
 
-  const hemi = new THREE.HemisphereLight(0xd5e6f5, 0x6d5a40, 0.62)
+  const hemi = new THREE.HemisphereLight(0xc5daf5, 0x8a623c, 0.34)
   scene.add(hemi)
-  const sun = new THREE.DirectionalLight(0xfff4df, 2.5)
+  const sun = new THREE.DirectionalLight(0xffe0a8, 3.4)
   sun.castShadow = true
   sun.shadow.mapSize.set(quality.shadow, quality.shadow)
   sun.shadow.camera.near = 1
@@ -266,7 +261,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
   sun.shadow.normalBias = 0.04
   scene.add(sun)
   scene.add(sun.target)
-  const fill = new THREE.DirectionalLight(0xc5d4e8, 0.38)
+  const fill = new THREE.DirectionalLight(0xffe6c4, 0.16)
   scene.add(fill)
 
   const loader = new THREE.TextureLoader()
@@ -287,19 +282,26 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     sand: pbrMaterial(loader, 'sand'),
     wood: pbrMaterial(loader, 'wood'),
     leaves: pbrMaterial(loader, 'leaves', { sway: true, roughness: 0.85, side: THREE.DoubleSide }),
+    tuft: pbrMaterial(loader, 'grass', { sway: true, roughness: 0.8, side: THREE.DoubleSide }),
     snow: pbrMaterial(loader, 'snow'),
+    flower: new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.55,
+      metalness: 0,
+      vertexColors: true,
+      side: THREE.DoubleSide
+    }),
     water: new THREE.MeshPhysicalMaterial({
-      color: 0x1c6e86,
+      color: 0x17607a,
       map: loadMap(loader, '/textures/water_diff.jpg', true),
       normalMap: loadMap(loader, '/textures/water_nor.jpg', false),
       roughnessMap: loadMap(loader, '/textures/water_rough.jpg', false),
-      roughness: 0.08,
-      metalness: 0.04,
+      roughness: 0.04,
+      metalness: 0.02,
       transmission: 0,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.9,
       vertexColors: true,
-      envMapIntensity: 1.35,
       side: THREE.DoubleSide
     }),
     petal: flatMaterial(0xd98cab, { roughness: 0.55 }),
@@ -311,9 +313,30 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       if (tex) tex.anisotropy = aniso
     }
   }
+  const reflectTarget = new THREE.WebGLRenderTarget(quality.tier === 'low' ? 256 : 512, quality.tier === 'low' ? 256 : 512)
+  reflectTarget.texture.colorSpace = THREE.SRGBColorSpace
+  const reflectCam = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
+  const reflectOn = { value: 0 }
+  const reflectRes = { value: new THREE.Vector2(reflectTarget.width, reflectTarget.height) }
   materials.water.customProgramCacheKey = () => 'water'
   materials.water.onBeforeCompile = (shader) => {
     patchVertex(shader, WATER_SWAY)
+    shader.uniforms.uReflect = { value: reflectTarget.texture }
+    shader.uniforms.uReflectOn = reflectOn
+    shader.uniforms.uResolution = reflectRes
+    shader.fragmentShader = `uniform sampler2D uReflect;
+uniform float uReflectOn;
+uniform vec2 uResolution;
+${shader.fragmentShader}`
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `#include <opaque_fragment>
+      if (uReflectOn > 0.5) {
+        vec2 suv = gl_FragCoord.xy / uResolution;
+        vec3 mirrored = texture2D(uReflect, suv).rgb;
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, mirrored, 0.58);
+      }`
+    )
   }
   materials.leaves.color = new THREE.Color(0xc5d2b0)
 
@@ -420,12 +443,115 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       geo.setAttribute('color', new THREE.Float32BufferAttribute(bag.colors, 3))
       const view = new THREE.Mesh(geo, materials[key] || materials.stone)
       view.castShadow = key !== 'water' && key !== 'leaves'
-      view.receiveShadow = true
-      if (key === 'water') view.renderOrder = 2
+      view.receiveShadow = key !== 'water'
+      if (key === 'water') {
+        view.renderOrder = 2
+        view.userData.water = true
+      }
       scene.add(view)
       list.push(view)
     }
+    addDecor(list, x0, z0, Math.min(world.size, x0 + 16), Math.min(world.size, z0 + 16))
     return list
+  }
+
+  function pushQuad(bag, corners, color) {
+    const [a, b, c, d] = corners
+    const ax = b[0] - a[0]
+    const ay = b[1] - a[1]
+    const az = b[2] - a[2]
+    const bx = c[0] - a[0]
+    const by = c[1] - a[1]
+    const bz = c[2] - a[2]
+    let nx = ay * bz - az * by
+    let ny = az * bx - ax * bz
+    let nz = ax * by - ay * bx
+    const len = Math.hypot(nx, ny, nz) || 1
+    nx /= len
+    ny /= len
+    nz /= len
+    const pts = [a, b, c, d]
+    const uvs = [[0, 0], [1, 0], [1, 1], [0, 1]]
+    for (const index of [0, 1, 2, 0, 2, 3]) {
+      const p = pts[index]
+      bag.positions.push(p[0], p[1], p[2])
+      bag.normals.push(nx, ny, nz)
+      bag.uvs.push(uvs[index][0], uvs[index][1])
+      bag.colors.push(color[0], color[1], color[2])
+    }
+  }
+
+  function pushCross(bag, x, z, y, height, spread, color) {
+    const y1 = y + height
+    pushQuad(bag, [
+      [x + 0.5 - spread, y, z + 0.5 - spread],
+      [x + 0.5 + spread, y, z + 0.5 + spread],
+      [x + 0.5 + spread, y1, z + 0.5 + spread],
+      [x + 0.5 - spread, y1, z + 0.5 - spread]
+    ], color)
+    pushQuad(bag, [
+      [x + 0.5 - spread, y, z + 0.5 + spread],
+      [x + 0.5 + spread, y, z + 0.5 - spread],
+      [x + 0.5 + spread, y1, z + 0.5 - spread],
+      [x + 0.5 - spread, y1, z + 0.5 + spread]
+    ], color)
+  }
+
+  function addDecor(list, x0, z0, x1, z1) {
+    if (world?.biome === 'candy' || world?.biome === 'moon') return
+    const bags = new Map()
+    const take = (key) => {
+      let bag = bags.get(key)
+      if (!bag) {
+        bag = { positions: [], normals: [], uvs: [], colors: [] }
+        bags.set(key, bag)
+      }
+      return bag
+    }
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
+        let h = 0
+        let hid = 0
+        for (let y = 1; y < world.height; y++) {
+          const id = sample(x, y, z) | 0
+          if (!id || id === POOL) {
+            h = y - 1
+            break
+          }
+          h = y
+          hid = id
+        }
+        if (h < 1 || hid === TIMBER || hid === CANOPY || hid === POOL) continue
+        if ((sample(x, h + 1, z) | 0) !== 0) continue
+        const ground = sample(x, h, z) | 0
+        const n = hash2(x, z, (world.seed || 1) + 41)
+        if (ground === TURF && n > 0.55) {
+          pushCross(take('tuft'), x, z, h + 1, 0.62, 0.22, [0.85 + n * 0.15, 0.95, 0.75])
+        }
+        if (ground === TURF && hash2(x, z, (world.seed || 1) + 47) > 0.93) {
+          const palette = [[0.96, 0.86, 0.42], [0.94, 0.95, 0.9], [0.58, 0.74, 0.9], [0.84, 0.7, 0.36]]
+          const tint = palette[Math.floor(hash2(x, z, (world.seed || 1) + 48) * palette.length) % palette.length]
+          pushCross(take('flower'), x, z, h + 1, 0.48, 0.12, tint)
+        }
+        if ((ground === TURF || ground === DUNE || ground === ROCK || ground === FROST) && hash2(x, z, (world.seed || 1) + 53) > 0.92) {
+          pushCross(take('rock'), x, z, h + 1, 0.28, 0.2, [0.75, 0.75, 0.75])
+        }
+      }
+    }
+    for (const [key, bag] of bags) {
+      if (!bag.positions.length) continue
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(bag.positions, 3))
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(bag.normals, 3))
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(bag.uvs, 2))
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(bag.colors, 3))
+      const material = key === 'flower' ? materials.flower : key === 'rock' ? materials.stone : materials.tuft
+      const view = new THREE.Mesh(geo, material)
+      view.castShadow = false
+      view.receiveShadow = false
+      scene.add(view)
+      list.push(view)
+    }
   }
 
   function remeshKey(key) {
@@ -537,13 +663,47 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     const elev = -0.08 + light * 1.15
     sunDir.set(0.55, Math.sin(elev), 0.35 * Math.cos(elev)).normalize()
     sky.material.uniforms.uSun.value.copy(sunDir)
-    scene.fog.color.copy(horizon)
+    scene.fog.color.copy(haze).lerp(horizon, light > 0.5 ? 0.18 : 0.4)
     scene.background.copy(horizon)
     hemi.color.copy(zenith)
-    hemi.intensity = 0.22 + light * 0.5
-    sun.intensity = 0.15 + light * 2.7
-    sun.color.set(light > 0.55 ? 0xfff4df : 0xffc2a1)
-    renderer.toneMappingExposure = 0.45 + light * 0.55
+    hemi.groundColor.set(0x8a5a32)
+    hemi.intensity = 0.12 + light * 0.22
+    sun.intensity = 0.45 + light * 3.6
+    sun.color.set(light > 0.55 ? 0xffe2b0 : 0xffc49a)
+    renderer.toneMappingExposure = 0.62 + light * 0.55
+  }
+
+  function renderReflection() {
+    const plane = WATER + 1
+    const waters = []
+    for (const list of chunks.values()) {
+      for (const mesh of list) {
+        if (!mesh.userData.water) continue
+        waters.push(mesh)
+        mesh.visible = false
+      }
+    }
+    reflectCam.fov = camera.fov
+    reflectCam.aspect = camera.aspect
+    reflectCam.near = camera.near
+    reflectCam.far = camera.far
+    reflectCam.position.set(camera.position.x, plane - (camera.position.y - plane), camera.position.z)
+    reflectCam.up.set(0, -1, 0)
+    reflectCam.lookAt(look.x, plane - (look.y - plane), look.z)
+    reflectCam.updateProjectionMatrix()
+    const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -plane)
+    renderer.localClippingEnabled = true
+    renderer.clippingPlanes = [clip]
+    sky.mesh.position.copy(reflectCam.position)
+    renderer.setRenderTarget(reflectTarget)
+    renderer.clear()
+    renderer.render(scene, reflectCam)
+    renderer.setRenderTarget(null)
+    renderer.clippingPlanes = []
+    renderer.localClippingEnabled = false
+    for (const mesh of waters) mesh.visible = true
+    reflectOn.value = 1
+    reflectRes.value.set(canvas.width || 2, canvas.height || 2)
   }
 
   function render(frame) {
@@ -554,6 +714,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     look.set(frame.eye.x + frame.dir.x, eyeY + frame.dir.y, frame.eye.z + frame.dir.z)
     camera.lookAt(look)
     applyCycle(frame.cycle)
+    renderReflection()
     sky.mesh.position.copy(camera.position)
     ahead.copy(camera.position)
     sun.position.set(ahead.x + sunDir.x * 48, ahead.y + Math.max(18, sunDir.y * 60), ahead.z + sunDir.z * 48)

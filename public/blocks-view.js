@@ -1,4 +1,4 @@
-import { CANOPY, CANDY, DUNE, FROST, HOTBAR, PETAL, ROCK, SOIL, TIMBER, TURF, blockOf, isSolid } from '/blocks/blocks.js'
+import { CANOPY, DUNE, FROST, ROCK, SOIL, TIMBER, TURF, blockOf, hotbarFor, isSolid } from '/blocks/blocks.js'
 import { VISTA_PITCH, goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
 import { createWorldRenderer } from '/world-render.js'
@@ -163,11 +163,10 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     [DUNE]: '/textures/sand_diff.jpg',
     [TIMBER]: '/textures/wood_diff.jpg',
     [CANOPY]: '/textures/leaves_diff.jpg',
-    [FROST]: '/textures/snow_diff.jpg',
-    [PETAL]: speckThumb('#c46a5a', '#f2a3c7'),
-    [CANDY]: speckThumb('#8a3048', '#e8c4a8')
+    [FROST]: '/textures/snow_diff.jpg'
   }
-  const buttons = HOTBAR.map((id, index) => {
+  const bar = hotbarFor(world.biome)
+  const buttons = bar.map((id, index) => {
     const button = document.createElement('button')
     button.type = 'button'
     button.style.backgroundImage = `url("${thumbUrl[id] || speckThumb('#6d6256', '#c4b8a4')}")`
@@ -183,7 +182,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   })
 
   function select(index) {
-    slot = (index + HOTBAR.length) % HOTBAR.length
+    slot = (index + bar.length) % bar.length
     buttons.forEach((button, i) => button.classList.toggle('on', i === slot))
   }
 
@@ -321,7 +320,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     send(msg)
   }
 
-  function place() { requestEdit(placeCell(), HOTBAR[slot]) }
+  function place() { requestEdit(placeCell(), bar[slot]) }
   function dig() { requestEdit(breakCell(), 0) }
   state.place = place
   state.break = dig
