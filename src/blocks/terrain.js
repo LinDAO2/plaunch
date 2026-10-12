@@ -285,15 +285,20 @@ function treeBlock(x, y, z, world) {
   return shapedTreeBlock(x, y, z, world)
 }
 
+function dryStep(world, cx, cz, dir) {
+  for (let step = 0; step < world.size; step++) {
+    const z = cz + dir * step
+    if (z < 2 || z > world.size - 5) break
+    if (surfaceY(cx, z, world) >= WATER + 1) return z
+  }
+  return null
+}
+
 function shoreLine(world, cx, cz) {
-  let shore = Math.min(world.size - 4, cz + 6)
-  for (let z = cz; z < world.size - 4; z++) {
-    if (surfaceY(cx, z, world) >= WATER + 1) return z
-  }
-  for (let z = cz - 1; z >= 2; z--) {
-    if (surfaceY(cx, z, world) >= WATER + 1) return z
-  }
-  return shore
+  const dir = world.landform === 'beach' ? 1 : -1
+  const shore = dryStep(world, cx, cz, dir) ?? dryStep(world, cx, cz, -dir)
+  if (shore == null) return { shore: Math.min(world.size - 5, cz + 6), face: 1 }
+  return { shore, face: -dir }
 }
 
 export function structureOrigin(world) {
@@ -302,8 +307,9 @@ export function structureOrigin(world) {
   let origin = { x: cx, z: cz }
   const kind = world.structure
   if (kind === 'cabin' || kind === 'dock' || kind === 'lighthouse') {
-    const shore = shoreLine(world, cx, cz)
-    const inland = Math.min(world.size - 5, shore + 3)
+    const { shore, face } = shoreLine(world, cx, cz)
+    world._face = face
+    const inland = Math.min(world.size - 5, Math.max(3, shore - face * 3))
     if (kind === 'dock') origin = { x: Math.max(4, cx - 7), z: shore }
     else if (kind === 'cabin') origin = { x: Math.min(world.size - 5, cx + 7), z: inland }
     else origin = { x: Math.min(world.size - 5, cx + 8), z: inland }
@@ -323,9 +329,11 @@ function structureAt(x, y, z, world) {
   const ax = Math.abs(dx)
   const az = Math.abs(dz)
   if (world.structure === 'dock') {
-    if (ax > 1 || dz > 0 || dz < -9) return null
+    const face = world._face || 1
+    const along = dz * face
+    if (ax > 1 || along < 0 || along > 9) return null
     if (y === WATER) return TIMBER
-    if (dx === 0 && dz % 3 === 0) {
+    if (dx === 0 && along % 3 === 0) {
       const bed = surfaceY(x, z, world)
       if (y > bed && y < WATER) return TIMBER
     }
@@ -336,7 +344,8 @@ function structureAt(x, y, z, world) {
     if (y === h + 4) return ax <= 1 && az <= 1 ? TIMBER : null
     if (y === h + 3 || y === h) return TIMBER
     const wall = ax === 2 || az === 2
-    if (wall && !(z === oz - 2 && x === ox && y > h && y < h + 3)) return TIMBER
+    const face = world._face || 1
+    if (wall && !(z === oz + face * 2 && x === ox && y > h && y < h + 3)) return TIMBER
     return AIR
   }
   if (world.structure === 'lighthouse') {

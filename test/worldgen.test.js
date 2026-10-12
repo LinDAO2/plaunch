@@ -91,8 +91,9 @@ test('landscape prompts keep distinct biomes and landforms', () => {
   for (let y = 1; y < 24; y++) {
     if (blockAt(origin.x, y, origin.z, shore) === TIMBER) timber += 1
   }
-  for (let dz = -10; dz <= 2; dz++) {
-    if (surfaceY(origin.x, origin.z + dz, shore) < WATER) wet += 1
+  for (let dz = -12; dz <= 12; dz++) {
+    const z = origin.z + dz
+    if (z > 0 && z < shore.size && surfaceY(origin.x, z, shore) < WATER) wet += 1
   }
   assert.ok(timber > 0)
   assert.ok(wet > 0)
