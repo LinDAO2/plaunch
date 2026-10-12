@@ -14,7 +14,7 @@ const providers = String(arg('--providers', 'gemini,openai,anthropic')).split(',
 const text = await readFile(path.resolve(promptsPath), 'utf8')
 const prompts = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#'))
 const outDir = path.resolve(arg('--out', 'artifacts/bakeoff'))
-const smoke = process.argv.includes('--smoke')
+const smoke = !process.argv.includes('--no-smoke')
 const results = await runBakeoff({ prompts, providers, outDir, smoke })
 if (smoke) {
   const browser = await launchCaptureBrowser()
@@ -47,17 +47,55 @@ if (smoke) {
       const page = await browser.newPage({ viewport: { width: 480, height: 480 } })
       const errors = []
       page.on('pageerror', (err) => errors.push(String(err)))
+      await page.addInitScript(() => {
+        window.__scores = []
+        window.__inputSeen = false
+        window.addEventListener('message', (event) => {
+          const data = event.data
+          if (data && data.type === 'playground-score' && Number.isFinite(Number(data.points))) {
+            window.__scores.push(Number(data.points))
+          }
+        })
+        window.addEventListener('keydown', () => { window.__inputSeen = true }, true)
+        window.addEventListener('pointerdown', () => { window.__inputSeen = true }, true)
+      })
       try {
         await page.goto(`http://127.0.0.1:${port}/game.html`, { waitUntil: 'domcontentloaded', timeout: 20000 })
-        await page.waitForTimeout(400)
+        await page.waitForTimeout(300)
+        const beforeScores = await page.evaluate(() => (window.__scores || []).length)
         await page.keyboard.press('Enter')
-        await page.mouse.click(240, 240).catch(() => {})
-        await page.waitForTimeout(500)
+        await page.keyboard.press('ArrowRight')
+        await page.keyboard.press('Space')
+        await page.mouse.click(240, 320).catch(() => {})
+        await page.evaluate(() => {
+          if (window.__arena && window.__arena.push) {
+            window.__arena.begin()
+            window.__arena.lookAtNearest()
+            window.__arena.push({ mz: 1, mx: 0.2, fire: 1 })
+            window.__inputSeen = true
+          }
+        }).catch(() => {})
+        await page.waitForFunction(() => {
+          const scores = window.__scores || []
+          const input = window.__inputSeen || (window.__state && window.__state.input > 0)
+          return input && (window.__posted === true || scores.length > 0)
+        }, null, { timeout: 15000 }).catch(() => {})
+        const probe = await page.evaluate((startCount) => ({
+          input: window.__inputSeen || (window.__state && window.__state.input > 0),
+          scores: window.__scores || [],
+          grew: (window.__scores || []).length > startCount || window.__posted === true
+        }), beforeScores)
         const shot = path.join(shotDir, row.file.replace(/\.json$/, '.png'))
         await page.screenshot({ path: shot })
-        row.smoke = errors.length ? `errors: ${errors[0]}` : 'ok'
+        const scoreOk = probe.scores.length > 0 || probe.grew
         row.poster = shot
-        if (errors.length) row.ok = false
+        row.input = Boolean(probe.input)
+        row.score = probe.scores.at(-1) ?? null
+        if (errors.length) row.smoke = `errors: ${errors[0]}`
+        else if (!probe.input) row.smoke = 'no-input'
+        else if (!scoreOk) row.smoke = 'no-score'
+        else row.smoke = 'ok'
+        if (row.smoke !== 'ok') row.ok = false
       } catch (err) {
         row.smoke = err.message
         row.ok = false
@@ -73,9 +111,9 @@ if (smoke) {
       '',
       'Token counts are from the fixture usage field. USD is omitted when the model has no confirmed price.',
       '',
-      '| Prompt | Provider | OK | Mode | Smoke | ms | in | out |',
-      '| --- | --- | --- | --- | --- | --- | --- | --- |',
-      ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.smoke} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
+      '| Prompt | Provider | OK | Mode | Smoke | Score | ms | in | out |',
+      '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+      ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.smoke} | ${row.score ?? ''} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
     ].join('\n')
     await writeFile(path.join(outDir, 'bakeoff.md'), markdown)
     await writeFile(path.join(outDir, 'bakeoff.json'), JSON.stringify({ results }, null, 2))

@@ -59,9 +59,20 @@ export function fixtureFetch(prompt) {
   return { fetchImpl, totals }
 }
 
+const KEY_FOR = {
+  gemini: 'GEMINI_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  xai: 'XAI_API_KEY'
+}
+
 function providerEnv(id) {
   return {
     AI_PROVIDER: id,
+    AI_FALLBACKS: '',
+    AI_PROVIDER_SPEC: '',
+    AI_PROVIDER_FREEFORM: '',
+    AI_PROVIDER_SAFETY: '',
     GEMINI_API_KEY: id === 'gemini' ? 'fixture' : '',
     OPENAI_API_KEY: id === 'openai' ? 'fixture' : '',
     ANTHROPIC_API_KEY: id === 'anthropic' ? 'fixture' : '',
@@ -69,7 +80,40 @@ function providerEnv(id) {
   }
 }
 
-export async function runBakeoff({ prompts, providers, outDir, smoke = false }) {
+export function providerRunEnv(id, env = process.env) {
+  const key = env[KEY_FOR[id]]
+  if (key && key !== 'fixture' && env.BAKEOFF_FIXTURES !== '1') {
+    return {
+      live: true,
+      env: {
+        ...env,
+        AI_PROVIDER: id,
+        AI_FALLBACKS: '',
+        AI_PROVIDER_SPEC: '',
+        AI_PROVIDER_FREEFORM: '',
+        AI_PROVIDER_SAFETY: ''
+      }
+    }
+  }
+  return { live: false, env: providerEnv(id) }
+}
+
+export function meteringFetch(inner, totals) {
+  return async (url, init) => {
+    const response = await inner(url, init)
+    try {
+      const payload = await response.clone().json()
+      const used = tokensFrom(payload)
+      totals.input += used.input
+      totals.output += used.output
+    } catch {
+      // A non-JSON error body still counts as a provider call.
+    }
+    return response
+  }
+}
+
+export async function runBakeoff({ prompts, providers, outDir, smoke = false, env = process.env, fetchImpl } = {}) {
   const results = []
   await mkdir(outDir, { recursive: true })
   const gamesDir = path.join(outDir, 'games')
@@ -77,9 +121,18 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false }) 
   for (const prompt of prompts) {
     for (const id of providers) {
       const started = Date.now()
-      const { fetchImpl, totals } = fixtureFetch(prompt)
+      const run = providerRunEnv(id, env)
+      const totals = { input: 0, output: 0 }
+      const fixture = run.live ? null : fixtureFetch(prompt)
+      if (fixture) {
+        totals.input = 0
+        totals.output = 0
+      }
+      const call = run.live
+        ? meteringFetch(fetchImpl || globalThis.fetch, totals)
+        : meteringFetch(fixture.fetchImpl, totals)
       try {
-        const idea = await generateIdea({ prompt, tier: 'auto', env: providerEnv(id), fetchImpl })
+        const idea = await generateIdea({ prompt, tier: 'auto', env: run.env, fetchImpl: call })
         const html = idea.html || idea.game?.freeformHtml || ''
         const problems = []
         if (html) problems.push(...inspectFreeform(html))

@@ -6,7 +6,7 @@ import test from 'node:test'
 import { anthropicRequest, openAiResponsesRequest, schemaIsStrict } from '../src/ai/providers.js'
 import { FREEFORM_SCHEMA } from '../src/ai/freeform.js'
 import { EDIT_SCHEMA } from '../src/templates/cheatsheet.js'
-import { runBakeoff } from '../src/ai/bakeoff.js'
+import { providerRunEnv, runBakeoff } from '../src/ai/bakeoff.js'
 import { generateGame } from '../src/ai/generate.js'
 import { validSpec } from '../testing/helpers.js'
 
@@ -57,6 +57,13 @@ test('a 429 falls through to the next provider and a 401 does not', async () => 
     fetchImpl: async () => { denied += 1; return new Response('nope', { status: 401 }) }
   }), (err) => err.code === 'ai_provider_auth')
   assert.equal(denied, 1)
+})
+
+test('bakeoff uses a live key when one is set and fixtures otherwise', () => {
+  assert.equal(providerRunEnv('anthropic', { ANTHROPIC_API_KEY: 'sk-ant-live' }).live, true)
+  assert.equal(providerRunEnv('anthropic', { ANTHROPIC_API_KEY: 'sk-ant-live', BAKEOFF_FIXTURES: '1' }).live, false)
+  assert.equal(providerRunEnv('gemini', {}).live, false)
+  assert.equal(providerRunEnv('openai', { OPENAI_API_KEY: 'fixture' }).live, false)
 })
 
 test('fixture bakeoff writes a report without a browser', async () => {
