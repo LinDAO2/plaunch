@@ -199,6 +199,7 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     const error = new HttpError(502, err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
     // A freeform stall or overall cap should not start a second full wait.
     error.retry = options.stream ? false : true
+    error.cause = err
     throw error
   }
   const maxChars = options.maxResponseChars || 20_000
@@ -275,7 +276,7 @@ function withUpstream(error, source) {
 }
 
 // One delayed retry for transient upstream failures (503, 500, 504, transport). Never for 4xx.
-export async function requestModelText(provider, messages, fetchImpl, options = {}) {
+export async function requestModelText(provider, messages, fetchImpl = globalThis.fetch, options = {}) {
   const opts = { maxResponseChars: 262144, ...options }
   options.onUse?.(provider)
   const once = (msgs, extra) => callProvider(provider, msgs, fetchImpl, {

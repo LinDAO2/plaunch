@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
+import { generateWorldFromPrompt } from '../src/ai/worldgen.js'
 import { repairWorldSpec, chooseWorld } from '../src/blocks/spec.js'
 import { WATER, blockAt, spawnPoint, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
 import { saveEdit } from '../src/blocks/store.js'
@@ -116,22 +117,100 @@ test('create always writes a world, and a bad model reply falls back', async () 
   assert.equal(forced.game.type, 'world')
   assert.equal(forced.html, null)
   let called = false
-  const fallen = await generateIdea({
-    prompt: 'a candy island with a pyramid',
-    kind: 'world',
-    tier: 'auto',
-    env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key', AI_FALLBACKS: '' },
-    fetchImpl: async () => {
-      called = true
-      throw new Error('offline')
-    }
-  })
+  const lines = []
+  const write = console.log
+  console.log = (line) => { lines.push(String(line)) }
+  let fallen
+  try {
+    fallen = await generateIdea({
+      prompt: 'a candy island with a pyramid',
+      kind: 'world',
+      tier: 'auto',
+      env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key', AI_FALLBACKS: '' },
+      fetchImpl: async () => {
+        called = true
+        throw new Error('offline')
+      }
+    })
+  } finally {
+    console.log = write
+  }
   assert.equal(called, true)
   assert.equal(fallen.fallback, true)
   assert.equal(fallen.spec.biome, 'candy')
   assert.equal(fallen.spec.terrain.islands, true)
   assert.equal(fallen.spec.structure, 'pyramid')
   assert.equal(fallen.credit.inspiredBy.some((item) => item.license === 'CC0-1.0' || item.license === 'MIT'), true)
+  assert.ok(lines.some((line) => line.includes('world generation fell back') && line.includes('offline')))
+})
+
+test('live world generation does not fall back while a key is set', async () => {
+  const previous = globalThis.fetch
+  const spec = {
+    version: '1.2',
+    name: 'Repeated House',
+    description: 'A shared build.',
+    theme: 'grass',
+    runtime: 'world',
+    biome: 'grassland',
+    terrainSeed: 48213,
+    worldSize: 'medium',
+    structure: 'house',
+    goal: 'Build together.',
+    palette: ['#5ea84a', '#8a5a32'],
+    accent: '#5ea84a',
+    terrain: { islands: false, caves: false, sky: 'day', landform: 'rolling' },
+    blockSet: [
+      { name: 'Turf', color: '#5ea84a', texture: 'speckle' },
+      { name: 'Soil', color: '#8a5a32', texture: 'solid' }
+    ],
+    prefabs: [],
+    quests: [{ kind: 'build', text: 'Raise a landmark.' }],
+    npcs: [],
+    music: 'calm',
+    cycle: 'day'
+  }
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    return new Response(JSON.stringify({
+      content: [{ type: 'tool_use', name: 'emit_result', input: spec }]
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  const env = { AI_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'test-key', AI_FALLBACKS: '' }
+  const open = [
+    'a dense green forest with tall trees',
+    'mountains with a lake',
+    'a sandy beach along the coast',
+    'snowy mountain peaks',
+    'a desert canyon'
+  ]
+  try {
+    const worlds = []
+    for (const prompt of open) {
+      const idea = await generateWorldFromPrompt({ prompt, env })
+      assert.equal(idea.fallback, false, prompt)
+      assert.equal(idea.provider, 'anthropic')
+      assert.notEqual(idea.spec.terrainSeed, 48213)
+      assert.ok(idea.spec.terrainSeed >= 1 && idea.spec.terrainSeed <= 100000)
+      worlds.push(idea.spec)
+    }
+    assert.equal(calls, open.length)
+    assert.equal(new Set(worlds.map((item) => item.terrainSeed)).size, open.length)
+    const structures = new Set(worlds.map((item) => item.structure))
+    assert.ok(structures.size >= 3, [...structures].join(','))
+    assert.notEqual(structures.size, 1)
+    const pyramid = await generateWorldFromPrompt({ prompt: 'a candy island with a pyramid', env })
+    const castle = await generateWorldFromPrompt({ prompt: 'build a castle together', env })
+    assert.equal(pyramid.fallback, false)
+    assert.equal(castle.fallback, false)
+    assert.equal(pyramid.spec.structure, 'pyramid')
+    assert.equal(castle.spec.structure, 'tower')
+    assert.notEqual(pyramid.spec.terrainSeed, 48213)
+    assert.notEqual(castle.spec.terrainSeed, 48213)
+  } finally {
+    globalThis.fetch = previous
+  }
 })
 
 test('remix forks a world spec and its placed blocks', async () => {

@@ -1,4 +1,6 @@
+import { randomInt } from 'node:crypto'
 import { generateWorldIdea, repairWorldSpec } from '../blocks/spec.js'
+import { log } from '../log.js'
 import { aiStatus, parseModelJson, requestModelText } from './generate.js'
 import { resolveProviderChain } from './providers.js'
 
@@ -85,9 +87,9 @@ const WORLD_PROMPT = `You design one shared Minecraft-style voxel world for a br
 Rules:
 - version is "1.2" and runtime is "world"
 - biome is grassland, desert, snow, candy, or moon
-- structure is tower, house, pyramid, or none
+- structure is tower, house, pyramid, or none. Use none for open land. Do not default every world to house; pick tower, pyramid, house, or none to match the idea, and prefer none unless a building is the point
 - worldSize is small, medium, or large
-- terrainSeed is an integer from 1 to 100000
+- terrainSeed is an integer from 1 to 100000. The server replaces it, so do not reuse one favorite number
 - terrain.islands and terrain.caves are booleans. terrain.sky is day, dusk, night, or cycle
 - terrain.landform is rolling, forest, mountains, lake, beach, peaks, or canyon. Match the idea: forest, mountains with a lake, beach, snowy peaks, or desert canyon must not all become rolling grassland
 - cycle matches terrain.sky
@@ -122,11 +124,45 @@ function ideaFrom(spec, extra = {}) {
   return idea
 }
 
-export async function generateWorldFromPrompt({ prompt, env, fetchImpl, onProgress }) {
+const STRUCTURES = ['tower', 'house', 'pyramid', 'none']
+
+function hashString(value) {
+  let h = 2166136261
+  const str = String(value || '')
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+function askedStructure(prompt) {
+  const p = String(prompt || '').toLowerCase()
+  if (/pyramid/.test(p)) return 'pyramid'
+  if (/house|cabin|cottage/.test(p)) return 'house'
+  if (/castle|tower/.test(p)) return 'tower'
+  return null
+}
+
+function diversify(spec, prompt) {
+  const asked = askedStructure(prompt)
+  return {
+    ...spec,
+    terrainSeed: randomInt(1, 100001),
+    structure: asked || STRUCTURES[hashString(prompt) % STRUCTURES.length]
+  }
+}
+
+function fallbackReason(err) {
+  const parts = [err?.message, err?.cause?.message].filter((part) => typeof part === 'string' && part.length)
+  return parts.join(': ') || 'unknown'
+}
+
+export async function generateWorldFromPrompt({ prompt, env, fetchImpl = globalThis.fetch, onProgress }) {
   const rule = () => ideaFrom(repairWorldSpec(null, prompt), { fallback: aiStatus(env).mode === 'ai' })
   if (aiStatus(env).mode !== 'ai') return ideaFrom(repairWorldSpec(null, prompt))
   const chain = resolveProviderChain(env, 'spec')
-  if (!chain.length) return rule()
+  if (!chain.length) {
+    log('warn', 'world generation fell back', { reason: 'no provider configured' })
+    return rule()
+  }
   onProgress?.({ phase: 'writing', outputTokens: 0, label: 'Writing the world…' })
   try {
     const text = await requestModelText(chain[0], [
@@ -138,9 +174,11 @@ export async function generateWorldFromPrompt({ prompt, env, fetchImpl, onProgre
       fallbacks: chain.slice(1),
       onProgress
     })
-    const spec = repairWorldSpec(parseModelJson(text), prompt)
+    const spec = diversify(repairWorldSpec(parseModelJson(text), prompt), prompt)
     return ideaFrom(spec, { provider: chain[0].id, model: chain[0].model })
-  } catch {
+  } catch (err) {
+    const reason = fallbackReason(err)
+    log('warn', 'world generation fell back', { reason, code: err?.code || null })
     return rule()
   }
 }
