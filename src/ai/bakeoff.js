@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { generateIdea } from './idea.js'
-import { templateFreeform, titleFromPrompt } from './freeform.js'
+import { templateFreeform } from './freeform.js'
 import { inspectFreeform } from './freeform-check.js'
 import { foldProviderStream } from './providers.js'
 import { validateGameSpec } from './gamespec.js'
@@ -15,7 +15,8 @@ export function fixtureObject(prompt, body) {
   }
   if (blob.includes('templateId')) return { templateId: 'flap', confidence: 0.55, changes: ['candy colors'] }
   if (blob.includes('"html"')) return { html: templateFreeform(idea) }
-  return { THEME: { names: { title: titleFromPrompt(idea).slice(0, 24) } } }
+  // A trademark in the title is rejected by the splicer, which would look like a fallback.
+  return { THEME: { names: { title: 'Candy Round' } } }
 }
 
 export function fixtureResponse(url, body, prompt) {
