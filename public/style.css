@@ -34,15 +34,15 @@
   font-display: swap;
 }
 
-/* Acid yellow is the one brand mark: an arcade score on true black.
-   X stays black and hairline; each game keeps its own accent. */
+/* Clean like X. Games bring the color. Chrome stays neutral. */
 :root {
   --bg: #000;
+  --surface: #16181c;
   --text: #e7e9ea;
-  --muted: #8b98a5;
+  --muted: #71767b;
   --line: #2f3336;
-  --brand: #e6ff3a;
-  --ink: #000;
+  --brand: #1d9bf0;
+  --ink: #0f1419;
   --danger: #f4212e;
   --ok: #00ba7c;
   font-family: "Source Sans 3", sans-serif;
@@ -109,7 +109,8 @@ p { margin: 0; }
   gap: 16px;
 }
 .ask textarea { min-height: 148px; font-size: 20px; line-height: 1.35; }
-.ideas { display: flex; flex-wrap: wrap; gap: 8px; }
+.ideas, .skies { display: flex; flex-wrap: wrap; gap: 8px; }
+.sky { min-width: 72px; color: #fff; border: 1px solid var(--line); border-bottom-width: 8px; }
 .idea {
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -178,16 +179,26 @@ input[type="color"] { padding: 4px; height: 40px; }
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
-.card { position: relative; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+@media (min-width: 560px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.card { position: relative; border: 1px solid var(--line); border-top: 4px solid var(--line); border-radius: 16px; background: var(--surface); min-width: 0; overflow: hidden; }
+.card:hover { transform: translateY(-2px); }
 .card-link { color: inherit; text-decoration: none; display: flex; flex-direction: column; min-width: 0; }
 .card-frame { border-bottom: 1px solid var(--line); background: #000; }
 .live-poster { display: block; width: 100%; height: auto; }
-.poster-shot { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; background: #000; }
+.poster-shot, .live-poster { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: #000; }
 .card-body { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
-.card h3 { font-size: 20px; color: var(--text); }
+.card h3 { font-size: 17px; font-weight: 700; color: var(--text); }
 .card p { font-size: 15px; color: var(--muted); }
 .mini, .tag-list, .card-bottom small { font-size: 13px; color: var(--muted); }
 .card-bottom { justify-content: space-between; }

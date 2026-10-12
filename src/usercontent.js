@@ -32,6 +32,13 @@ function assetType(pathname) {
   return 'application/octet-stream'
 }
 
+const FONT_DIR = fileURLToPath(new URL('../public/fonts', import.meta.url))
+const FONTS = new Map([
+  ['/fonts/lilita-one-latin.woff2', 'lilita-one-latin.woff2'],
+  ['/fonts/rubik-latin-700.woff2', 'rubik-latin-700.woff2'],
+  ['/fonts/chakra-petch-latin-600.woff2', 'chakra-petch-latin-600.woff2']
+].map(([route, file]) => [route, readFileSync(path.join(FONT_DIR, file))]))
+
 const VENDOR = {
   '/kaplay.js': {
     body: readFileSync(fileURLToPath(new URL('../vendor/kaplay/kaplay-3001.0.19.js', import.meta.url))),
@@ -59,7 +66,7 @@ export function sandboxCsp(config) {
   // connect-src and img-src 'self' load the CC0 glTF packs from /assets on this origin only.
   // No 'unsafe-eval' and no 'wasm-unsafe-eval' (no Draco, meshopt, or KTX2 WASM).
   // allow-pointer-lock lets our play page grant mouse look. Hold-to-drag remains if a parent frame denies it.
-  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors ${ancestors.join(' ')}`
+  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; font-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors ${ancestors.join(' ')}`
 }
 
 // CSP connect-src does not cover WebRTC, and a live probe sent STUN packets from the sandbox.
@@ -111,6 +118,18 @@ export function createUsercontentApp({ db, config }) {
           'x-vendor-version': vendor.version
         })
         res.end(vendor.body)
+        return
+      }
+      if ((req.method || 'GET') === 'GET' && FONTS.has(url.pathname)) {
+        const body = FONTS.get(url.pathname)
+        res.writeHead(200, {
+          'content-type': 'font/woff2',
+          'content-length': String(body.length),
+          'cache-control': 'public, max-age=86400',
+          'x-content-type-options': 'nosniff',
+          'access-control-allow-origin': '*'
+        })
+        res.end(body)
         return
       }
       if ((req.method || 'GET') === 'GET') {

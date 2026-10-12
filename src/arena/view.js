@@ -15,7 +15,13 @@ function pickQuality() {
 }
 
 let qualityName = pickQuality()
-let pixelRatio = qualityName === 'high' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1
+function ratioFor(name) {
+  const dpr = window.devicePixelRatio || 1
+  if (name === 'high') return Math.min(dpr, 2)
+  if (name === 'medium') return Math.min(dpr, 1.25)
+  return 1
+}
+let pixelRatio = ratioFor(qualityName)
 const canvas = document.querySelector('#view')
 const mini = document.querySelector('#mini')
 const miniCtx = mini.getContext('2d')
@@ -38,10 +44,9 @@ const bootBar = document.querySelector('#boot-bar')
 const floatsEl = document.querySelector('#floats')
 document.querySelector('#boot-title').textContent = titleText
 document.querySelector('#start-title').textContent = titleText
-document.querySelector('#start-hint').textContent = THEME.names.hint || ''
+document.querySelector('#start-hint').textContent = coarse ? 'Drag to look · Tap FIRE' : 'WASD + mouse'
 document.querySelector('#nameplate').textContent = titleText
 document.body.classList.toggle('touch', coarse || innerWidth < 700)
-document.body.style.background = THEME.palette.bg || '#07081a'
 
 const held = Object.create(null)
 const stick = { mx: 0, mz: 0, yaw: 0, pitch: 0 }
@@ -62,7 +67,16 @@ let playing = false
 let assetsReady = false
 let animT = 0
 let recoil = 0
-let shake = 0
+let trauma = 0
+let kickP = 0
+let kickY = 0
+let driftT = 0
+let dropY = 0
+let attracted = false
+let coachStep = 0
+let coachYaw = 0
+let hitStop = 0
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
 let flashLeft = 0
 let footT = 0
 let prevAmmo = -1
@@ -96,25 +110,39 @@ let netSnap = null
 let shownScore = -1
 let lastRender = 0
 
-const SKY_GRADE = {
-  day: { exp: 1.05, near: 28, far: 80, stars: 0, sunI: 1.3, sunY: 280, sunR: 40 },
-  dusk: { exp: 1.08, near: 18, far: 62, stars: 0, sunI: 1.1, sunY: 340, sunR: 46 },
-  night: { exp: 1.2, near: 16, far: 52, stars: 40, sunI: 0.75, sunY: 140, sunR: 20 },
-  neon: { exp: 1.1, near: 14, far: 50, stars: 20, sunI: 1, sunY: 240, sunR: 26 }
+const SKY_LOOK = {
+  day: { zenith: '#4FB3FF', horizon: '#CDEBFF', fog: '#CDEBFF', near: 40, far: 140, sun: '#FFF4E0', sunI: 3, elev: 50, azim: 35, hemi: '#BFE3FF', ground: '#C8B79A', hemiI: 1.2, bloom: 0.35, bloomR: 0.4, exp: 1, neutral: true, stars: 0, teamA: '#FF5A3C', teamB: '#2F7BFF', pickup: '#FFD23F', hazard: '#FF2E63', floor: '#E9E4D8', wall: '#7C8FA6', trim: '#FFD23F' },
+  dusk: { zenith: '#2B2A6B', horizon: '#FF9E6B', fog: '#E58A6E', near: 30, far: 110, sun: '#FFB27A', sunI: 2.4, elev: 14, azim: 250, hemi: '#8A7BD8', ground: '#4A3550', hemiI: 1, bloom: 0.55, bloomR: 0.5, exp: 1, neutral: true, stars: 0, teamA: '#FF6B3D', teamB: '#4CC9F0', pickup: '#FFE066', hazard: '#FF3B6B', floor: '#5B4B6E', wall: '#3B3355', trim: '#FFB86B' },
+  night: { zenith: '#0B1640', horizon: '#24407A', fog: '#1E3466', near: 25, far: 90, sun: '#AFC8FF', sunI: 1.2, elev: 40, azim: 300, hemi: '#5470B8', ground: '#1A1F33', hemiI: 0.9, bloom: 0.8, bloomR: 0.5, exp: 1.1, neutral: false, stars: 40, teamA: '#FF5A5F', teamB: '#3EE0FF', pickup: '#FFE45C', hazard: '#FF3B8D', floor: '#2A3558', wall: '#3A4A78', trim: '#3EE0FF' },
+  neon: { zenith: '#1A0633', horizon: '#4B0F6B', fog: '#3A0F5C', near: 20, far: 80, sun: '#FF7BD9', sunI: 1, elev: 30, azim: 200, rim: '#3EF0FF', rimI: 1.2, hemi: '#7A3CFF', ground: '#140A26', hemiI: 0.8, bloom: 1, bloomR: 0.6, exp: 1.1, neutral: false, stars: 24, teamA: '#FF2FB4', teamB: '#2BF3FF', pickup: '#E8FF3B', hazard: '#FF4D4D', floor: '#1C1234', wall: '#2A1D4D', trim: '#FF2FB4' }
 }
-const grade = SKY_GRADE[theme.sky] || SKY_GRADE.dusk
+const skyKey = ((location.hash || '').match(/sky=(day|dusk|night|neon)/) || [])[1] || theme.sky || 'day'
+const grade = SKY_LOOK[skyKey] || SKY_LOOK.day
 const sky = {
-  zenith: THEME.palette.bg || '#10141c',
-  mid: THEME.palette.sky || '#1a2744',
-  horizon: accent,
-  fog: THEME.palette.sky || '#1a2744',
-  sun: ink,
-  glow: 'rgba(255,255,255,.4)',
-  hemi: THEME.palette.sky || accent,
-  ground: THEME.palette.floor || '#1a2030',
-  light: ink,
-  ...grade
+  zenith: grade.zenith,
+  mid: grade.horizon,
+  horizon: grade.horizon,
+  fog: grade.fog,
+  sun: grade.sun,
+  glow: 'rgba(255,255,255,.55)',
+  hemi: grade.hemi,
+  ground: grade.ground,
+  light: grade.sun,
+  near: grade.near,
+  far: grade.far,
+  sunI: grade.sunI,
+  exp: grade.exp,
+  neutral: grade.neutral,
+  stars: grade.stars,
+  sunY: 210,
+  sunR: 36,
+  bloom: grade.bloom,
+  bloomR: grade.bloomR,
+  hemiI: grade.hemiI,
+  elev: grade.elev,
+  azim: grade.azim
 }
+document.body.style.background = grade.zenith
 
 let renderer = null
 let scene = null
@@ -164,9 +192,23 @@ function packFiles() {
   return ['blaster.glb', 'bolt.glb', 'astronaut.glb', 'alien.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb']
 }
 
-function tune(root) {
+const TOON = new Set(['astronaut', 'alien', 'blaster', 'bolt', 'car'])
+
+function toonMap() {
+  if (toonMap.tex) return toonMap.tex
+  const data = new Uint8Array([0, 0, 0, 255, 89, 89, 89, 255, 178, 178, 178, 255, 255, 255, 255, 255])
+  const tex = new THREE.DataTexture(data, 4, 1)
+  tex.magFilter = THREE.NearestFilter
+  tex.minFilter = THREE.NearestFilter
+  tex.generateMipmaps = false
+  tex.needsUpdate = true
+  toonMap.tex = tex
+  return tex
+}
+
+function tune(root, role) {
   root.traverse((obj) => {
-    if (!obj.isMesh) return
+    if (!obj.isMesh || obj.userData.hull || obj.userData.rim) return
     obj.castShadow = qualityName !== 'low'
     obj.receiveShadow = true
     const list = Array.isArray(obj.material) ? obj.material : [obj.material]
@@ -176,33 +218,67 @@ function tune(root) {
         next.push(material)
         continue
       }
+      const base = {
+        color: material.color || '#ffffff',
+        map: material.map || null,
+        transparent: !!material.transparent,
+        opacity: material.opacity === undefined ? 1 : material.opacity,
+        side: THREE.FrontSide
+      }
       if (qualityName === 'low') {
-        const simple = new THREE.MeshLambertMaterial({
-          color: material.color || '#ffffff',
-          map: material.map || null,
+        next.push(new THREE.MeshLambertMaterial({
+          ...base,
           emissive: material.emissive,
           emissiveMap: material.emissiveMap || null,
-          emissiveIntensity: material.emissiveIntensity || 0,
-          transparent: !!material.transparent,
-          opacity: material.opacity === undefined ? 1 : material.opacity,
-          side: THREE.FrontSide
-        })
-        next.push(simple)
+          emissiveIntensity: material.emissiveIntensity || 0
+        }))
         continue
       }
-      if (material.metalness > 0.2) material.metalness = 0.08
-      if (material.roughness !== undefined && material.roughness > 0.8) material.roughness = 0.58
-      material.envMapIntensity = 0.45
-      material.side = THREE.FrontSide
-      next.push(material)
+      if (role === 'toon' && THREE.MeshToonMaterial) {
+        next.push(new THREE.MeshToonMaterial({ ...base, gradientMap: toonMap() }))
+        continue
+      }
+      next.push(new THREE.MeshStandardMaterial({
+        ...base,
+        roughness: 0.8,
+        metalness: 0,
+        emissive: material.emissive || '#000000',
+        emissiveIntensity: material.emissiveIntensity || 0
+      }))
     }
     if (next.length) obj.material = Array.isArray(obj.material) ? next : next[0]
   })
 }
 
-function prepare(gltf) {
+function addShell(mesh, amount, color, flags) {
+  if (!mesh.geometry) return
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.BackSide,
+    transparent: !!flags.transparent,
+    opacity: flags.opacity === undefined ? 1 : flags.opacity,
+    depthWrite: flags.depthWrite !== false
+  })
+  const shell = new THREE.Mesh(mesh.geometry, mat)
+  shell.scale.setScalar(1 + amount)
+  shell.castShadow = false
+  shell.userData.hull = !!flags.hull
+  shell.userData.rim = !!flags.rim
+  mesh.add(shell)
+}
+
+function prepare(gltf, name) {
   const root = gltf.scene
-  tune(root)
+  const role = TOON.has(name) ? 'toon' : 'world'
+  tune(root, role)
+  if (role === 'toon') {
+    const thick = name === 'blaster' || name === 'bolt' ? 0.015 : 0.025
+    root.traverse((obj) => {
+      if (!obj.isMesh || obj.userData.hull || obj.userData.rim) return
+      addShell(obj, thick, '#3a4254', { hull: true, depthWrite: true })
+      addShell(obj, thick + 0.02, '#ffffff', { rim: true, transparent: true, opacity: 0.34, depthWrite: false })
+    })
+  }
   const box = new THREE.Box3().setFromObject(root)
   const size = box.getSize(new THREE.Vector3())
   const center = box.getCenter(new THREE.Vector3())
@@ -234,15 +310,29 @@ function take(name) {
 
 function lit(color, emissive, intensity) {
   if (qualityName === 'low') {
-    return new THREE.MeshLambertMaterial({ color, emissive: emissive || '#000000', emissiveIntensity: intensity || 0 })
+    return new THREE.MeshLambertMaterial({ color, emissive: emissive || '#000000', emissiveIntensity: Math.min(intensity || 0, 0.8) })
   }
-  return new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.62,
-    metalness: 0.04,
+    roughness: 0.8,
+    metalness: 0,
     emissive: emissive || '#000000',
     emissiveIntensity: intensity || 0
   })
+  if (intensity >= 2) mat.toneMapped = false
+  return mat
+}
+
+function sunVec(elevDeg, azimDeg, dist) {
+  const elev = elevDeg * Math.PI / 180
+  const azim = azimDeg * Math.PI / 180
+  const hyp = Math.cos(elev) * dist
+  return { x: Math.sin(azim) * hyp, y: Math.sin(elev) * dist, z: Math.cos(azim) * hyp }
+}
+
+function teamHex(actor) {
+  if (!actor || actor.kind === 'buoy') return grade.pickup
+  return actor.team === 1 ? grade.teamB : grade.teamA
 }
 
 function skyCanvas() {
@@ -281,7 +371,7 @@ function floorCanvas(mode) {
   c.width = 512
   c.height = 512
   const g = c.getContext('2d')
-  const base = THEME.palette.floor || '#243044'
+  const base = mode === 'explore' ? '#F2D59A' : mode === 'race' ? '#6BCB4B' : grade.floor
   g.fillStyle = base
   g.fillRect(0, 0, 512, 512)
   for (let i = 0; i < 900; i++) {
@@ -289,9 +379,26 @@ function floorCanvas(mode) {
     g.fillStyle = `rgba(${shade},${shade},${shade},${0.025 + rnd() * 0.04})`
     g.fillRect(Math.floor(rnd() * 512), Math.floor(rnd() * 512), 3, 3)
   }
-  if (mode !== 'explore') {
-    g.strokeStyle = accent
-    g.globalAlpha = 0.45
+  if (mode === 'race') {
+    g.fillStyle = '#4A4F5A'
+    g.fillRect(70, 70, 372, 372)
+    for (let i = 78; i < 430; i += 18) {
+      g.fillStyle = i % 36 < 18 ? '#F4F4F4' : '#E23B3B'
+      g.fillRect(i, 70, 16, 8)
+      g.fillRect(i, 434, 16, 8)
+      g.fillRect(70, i, 8, 16)
+      g.fillRect(434, i, 8, 16)
+    }
+  } else if (mode === 'explore') {
+    g.fillStyle = '#7BC86C'
+    for (let i = 0; i < 18; i++) {
+      g.beginPath()
+      g.arc(40 + rnd() * 430, 40 + rnd() * 430, 18 + rnd() * 36, 0, Math.PI * 2)
+      g.fill()
+    }
+  } else {
+    g.strokeStyle = grade.trim
+    g.globalAlpha = 0.35
     g.lineWidth = 2
     for (let i = 0; i <= 512; i += 64) {
       g.beginPath()
@@ -305,9 +412,9 @@ function floorCanvas(mode) {
     }
     g.globalAlpha = 1
   }
-  const vignette = g.createRadialGradient(256, 256, 40, 256, 256, 360)
+  const vignette = g.createRadialGradient(256, 256, 80, 256, 256, 360)
   vignette.addColorStop(0, 'rgba(0,0,0,0)')
-  vignette.addColorStop(1, 'rgba(0,0,0,0.42)')
+  vignette.addColorStop(1, 'rgba(0,0,0,0.12)')
   g.fillStyle = vignette
   g.fillRect(0, 0, 512, 512)
   const tex = new THREE.CanvasTexture(c)
@@ -330,13 +437,13 @@ function markNoShadow(obj) {
 
 function applyQuality() {
   if (!renderer) return
-  pixelRatio = qualityName === 'high' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1
+  pixelRatio = ratioFor(qualityName)
   renderer.setPixelRatio(pixelRatio)
   renderer.shadowMap.enabled = qualityName !== 'low'
   const shadows = qualityName !== 'low'
   if (sun) {
     sun.castShadow = shadows
-    const size = qualityName === 'high' ? 2048 : 1024
+    const size = qualityName === 'high' ? 1024 : 512
     sun.shadow.mapSize.set(size, size)
   }
   if (scene) {
@@ -368,42 +475,42 @@ function bootGL() {
   if (!renderer || !renderer.getContext()) return
   glOk = true
   if (THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace
-  if (THREE.ACESFilmicToneMapping !== undefined) renderer.toneMapping = THREE.ACESFilmicToneMapping
+  const tone = sky.neutral && THREE.NeutralToneMapping !== undefined ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping
+  if (tone !== undefined) renderer.toneMapping = tone
   renderer.toneMappingExposure = sky.exp
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   scene = new THREE.Scene()
   scene.fog = new THREE.Fog(sky.fog, sky.near, sky.far)
-  camera = new THREE.PerspectiveCamera(theme.mode === 'race' ? 74 : 72, 1, 0.08, 120)
+  camera = new THREE.PerspectiveCamera(72, 1, 0.08, sky.far + 20)
   scene.add(camera)
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(96, qualityName === 'low' ? 20 : 28, 16), new THREE.MeshBasicMaterial({ map: skyCanvas(), side: THREE.BackSide, fog: false, depthWrite: false }))
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(Math.max(90, sky.far * 0.92), qualityName === 'low' ? 20 : 28, 16), new THREE.MeshBasicMaterial({ map: skyCanvas(), side: THREE.BackSide, fog: false, depthWrite: false }))
   markNoShadow(dome)
   scene.add(dome)
-  hemi = new THREE.HemisphereLight(sky.hemi, sky.ground, theme.sky === 'night' ? 1.05 : 1.2)
+  hemi = new THREE.HemisphereLight(sky.hemi, sky.ground, sky.hemiI)
   scene.add(hemi)
+  const placed = sunVec(sky.elev, sky.azim, 40)
   sun = new THREE.DirectionalLight(sky.light, sky.sunI)
-  sun.position.set(16, 28, 10)
+  sun.position.set(placed.x, placed.y, placed.z)
   sun.shadow.camera.near = 2
-  sun.shadow.camera.far = 70
-  sun.shadow.camera.left = -26
-  sun.shadow.camera.right = 26
-  sun.shadow.camera.top = 26
-  sun.shadow.camera.bottom = -26
-  sun.shadow.bias = -0.00035
+  sun.shadow.camera.far = 80
+  sun.shadow.camera.left = -15
+  sun.shadow.camera.right = 15
+  sun.shadow.camera.top = 15
+  sun.shadow.camera.bottom = -15
+  sun.shadow.bias = -0.0004
   sun.shadow.normalBias = 0.04
   scene.add(sun)
-  const fill = new THREE.DirectionalLight(sky.hemi, 0.38)
-  fill.position.set(-14, 10, -12)
-  scene.add(fill)
+  if (grade.rim) {
+    const back = sunVec(20, sky.azim + 180, 30)
+    const rimLight = new THREE.DirectionalLight(grade.rim, grade.rimI || 1.2)
+    rimLight.position.set(back.x, back.y, back.z)
+    scene.add(rimLight)
+  }
   if (qualityName !== 'low') {
-    try {
-      const pmrem = new THREE.PMREMGenerator(renderer)
-      scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture
-      pmrem.dispose()
-    } catch (err) {}
     try {
       composer = new THREE.EffectComposer(renderer)
       composer.addPass(new THREE.RenderPass(scene, camera))
-      composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.38, 0.42, 0.84))
+      composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(Math.max(2, innerWidth / 2), Math.max(2, innerHeight / 2)), sky.bloom, sky.bloomR, 0.9))
       composer.addPass(new THREE.OutputPass())
     } catch (err) {
       composer = null
@@ -421,7 +528,8 @@ function loadPack() {
   let done = 0
   return Promise.all(files.map((file) => new Promise((resolve) => {
     loader.load('/assets/' + file, (gltf) => {
-      models[file.replace('.glb', '')] = prepare(gltf)
+      const key = file.replace('.glb', '')
+      models[key] = prepare(gltf, key)
       done += 1
       setBar(done / files.length)
       resolve()
@@ -461,18 +569,23 @@ function buildFloor(mode) {
   const floorMap = floorCanvas(mode)
   const floorMat = qualityName === 'low'
     ? new THREE.MeshLambertMaterial({ map: floorMap })
-    : new THREE.MeshStandardMaterial({ map: floorMap, roughness: 0.92, metalness: 0.02 })
+    : new THREE.MeshStandardMaterial({ map: floorMap, roughness: 0.8, metalness: 0 })
   const mesh = new THREE.Mesh(geo, floorMat)
   mesh.position.y = mode === 'explore' ? -0.15 : -0.25
   mesh.receiveShadow = true
   mesh.userData.noShadow = true
   scene.add(mesh)
   if (mode === 'explore') {
-    const water = new THREE.Mesh(new THREE.CircleGeometry(46, 28), lit(THEME.palette.sky || accent, THEME.palette.bg || '#000000', 0.2))
+    const water = new THREE.Mesh(new THREE.CircleGeometry(46, 28), lit('#3FB7D9', '#7FE7FF', 0.35))
     water.rotation.x = -Math.PI / 2
     water.position.y = -0.85
     markNoShadow(water)
     scene.add(water)
+    const foam = new THREE.Mesh(new THREE.RingGeometry(local.map.radius - 0.8, local.map.radius + 0.35, 40), new THREE.MeshBasicMaterial({ color: '#F7FBFF', side: THREE.DoubleSide }))
+    foam.rotation.x = -Math.PI / 2
+    foam.position.y = -0.42
+    markNoShadow(foam)
+    scene.add(foam)
   }
 }
 
@@ -524,6 +637,12 @@ function decorateArena() {
   }
   addTrim(8, 0.035, 0.06, 0, 0.04, -9)
   addTrim(0.06, 0.035, 8, -9, 0.04, 0)
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.62, 3.4, qualityName === 'low' ? 6 : 10), lit(grade.pickup, grade.pickup, qualityName === 'low' ? 0.6 : 2.8))
+  core.position.set(0, 1.7, 8)
+  scene.add(core)
+  const coreGlow = new THREE.PointLight(grade.pickup, qualityName === 'low' ? 0.4 : 2.2, 14)
+  coreGlow.position.set(0, 2.4, 8)
+  scene.add(coreGlow)
 }
 
 function decorateRace() {
@@ -578,9 +697,11 @@ function decorateIsle() {
       const list = Array.isArray(obj.material) ? obj.material : [obj.material]
       const next = list.map((material) => {
         const copy = material.clone()
-        copy.emissive = new THREE.Color(accent)
-        copy.emissiveIntensity = 0.9
+        copy.emissive = new THREE.Color(grade.pickup)
+        copy.emissiveIntensity = qualityName === 'low' ? 0.7 : 2.6
+        if (qualityName !== 'low') copy.toneMapped = false
         copy.metalness = 0
+        copy.roughness = 0.8
         return copy
       })
       obj.material = Array.isArray(obj.material) ? next : next[0]
@@ -615,14 +736,17 @@ function buildLevel() {
 function buildGun() {
   if (theme.weapon === 'none' || theme.mode === 'race') return
   gun = take('blaster') || new THREE.Group()
-  gun.scale.setScalar(1.25)
-  gun.position.set(0.34, -0.26, -0.48)
-  gun.rotation.y = Math.PI
+  gun.scale.setScalar(1.35)
+  gun.position.set(0.42, -0.32, -0.52)
+  gun.rotation.y = Math.PI - 0.14
   gun.userData.base = { x: gun.position.x, y: gun.position.y, z: gun.position.z, rx: gun.rotation.x }
-  flare = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: ink }))
-  flare.position.set(0, 0.08, 0.28)
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), lit(grade.pickup, grade.pickup, qualityName === 'low' ? 0.8 : 3))
+  tip.position.set(0, 0.06, 0.22)
+  flare = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), new THREE.MeshBasicMaterial({ color: grade.pickup }))
+  flare.position.set(0, 0.08, 0.32)
   flare.visible = false
-  flashLight = new THREE.PointLight(ink, 0, 4.5)
+  flashLight = new THREE.PointLight(grade.pickup, 0, 2)
+  gun.add(tip)
   flashLight.position.copy(flare.position)
   gun.add(flare, flashLight)
   markNoShadow(gun)
@@ -652,17 +776,31 @@ function makeTag(name, color) {
   return sprite
 }
 
+function tintRig(root, hex) {
+  const color = new THREE.Color(hex)
+  root.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return
+    const list = [].concat(obj.material)
+    for (const material of list) {
+      if (!material.color) continue
+      if (obj.userData.rim) material.color.copy(color)
+      else if (!obj.userData.hull) material.color.lerp(color, 0.42)
+    }
+  })
+}
+
 function actorMesh(actor) {
   let rig = meshes.get(actor.id)
   if (rig) return rig
   rig = new THREE.Group()
+  const tint = teamHex(actor)
   rig.rotation.order = 'YXZ'
   const tilt = new THREE.Group()
   rig.add(tilt)
   rig.userData.tilt = tilt
   rig.userData.death = 0
   if (actor.kind === 'buoy') {
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), lit(actor.color || accent, actor.color || accent, 0.7))
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), lit(tint, tint, qualityName === 'low' ? 0.7 : 2.4))
     ball.position.y = 0.7
     const rock = take('pebble')
     if (rock) {
@@ -674,12 +812,13 @@ function actorMesh(actor) {
     const car = take('car') || new THREE.Group()
     car.scale.setScalar(1.65)
     tilt.add(car)
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.18), lit(actor.color || accent, actor.color || accent, 0.8))
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.16), lit(tint, tint, qualityName === 'low' ? 0.7 : 2.6))
     stripe.position.set(0, 0.72, 0)
     tilt.add(stripe)
     rig.userData.parts = car.userData.parts || {}
     rig.userData.spin = rnd() * 3
-    const tag = makeTag(actor.name, actor.color || accent)
+    tintRig(car, tint)
+    const tag = makeTag(actor.name, tint)
     tag.position.y = 1.45
     rig.add(tag)
   } else {
@@ -688,13 +827,14 @@ function actorMesh(actor) {
     const height = body.userData.size ? 1.7 / body.userData.size.y : 1
     body.scale.setScalar(height)
     tilt.add(body)
-    const band = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.045, 6, 14), lit(actor.color || accent, actor.color || accent, 0.9))
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.045, 6, 14), lit(grade.pickup, grade.pickup, qualityName === 'low' ? 0.6 : 2.2))
     band.rotation.x = Math.PI / 2
     band.position.y = 1.05
     body.add(band)
+    tintRig(body, tint)
     rig.userData.parts = body.userData.parts || {}
     rig.userData.base = body.userData.base || {}
-    const tag = makeTag(actor.name, actor.color || accent)
+    const tag = makeTag(actor.name, tint)
     tag.position.y = 2.05
     rig.add(tag)
   }
@@ -766,7 +906,7 @@ function spawnBolt(tracer) {
   const dy = Math.sin(tracer.pitch)
   const dz = Math.cos(tracer.yaw) * Math.cos(tracer.pitch)
   const end = shotEnd(tracer)
-  const streak = new THREE.Mesh(streakGeo || new THREE.BoxGeometry(0.04, 0.04, 1.2), new THREE.MeshBasicMaterial({ color: accent }))
+  const streak = new THREE.Mesh(streakGeo || new THREE.BoxGeometry(0.08, 0.08, 1.2), lit(grade.teamA, grade.teamA, qualityName === 'low' ? 0.8 : 3))
   streak.position.set(tracer.x + dx * 1.5, tracer.y + dy * 1.5, tracer.z + dz * 1.5)
   streak.lookAt(tracer.x + dx * 4, tracer.y + dy * 4, tracer.z + dz * 4)
   markNoShadow(streak)
@@ -793,13 +933,13 @@ function spawnBolt(tracer) {
   if (shooter) shooting.set(shooter.id, animT + 0.22)
   if (end.hit) {
     addSparks(end.x, end.y, end.z)
-    const decal = new THREE.Mesh(decalGeo, new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.8, depthWrite: false }))
+    const decal = new THREE.Mesh(decalGeo, new THREE.MeshBasicMaterial({ color: grade.trim, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }))
     decal.rotation.x = -Math.PI / 2
     decal.position.set(end.x, 0.045, end.z)
     markNoShadow(decal)
     scene.add(decal)
     decals.push(decal)
-    if (decals.length > 16) {
+    if (decals.length > 32) {
       const old = decals.shift()
       scene.remove(old)
     }
@@ -807,17 +947,19 @@ function spawnBolt(tracer) {
   const self = currentYou(authority === 'remote' && netActors ? netActors : local.actors)
   if (self && Math.hypot(tracer.x - self.x, tracer.z - self.z) < 0.8) {
     recoil = 1
-    flashLeft = 0.045
-    shake = Math.max(shake, 0.05)
+    kickP = 0.8 * Math.PI / 180
+    kickY = (rnd() - 0.5) * 0.6 * Math.PI / 180
+    if (!reduceMotion) trauma = Math.min(1, trauma + 0.05)
+    flashLeft = 0.05
     if (flare) flare.visible = true
-    if (flashLight) flashLight.intensity = 8
+    if (flashLight) flashLight.intensity = 4
   }
 }
 
-function addSparks(x, y, z) {
-  const count = qualityName === 'low' ? 3 : 6
+function addSparks(x, y, z, color) {
+  const count = qualityName === 'low' ? 6 : 8
   for (let i = 0; i < count; i++) {
-    const mesh = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: i % 2 ? accent : ink }))
+    const mesh = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: color || (i % 2 ? grade.pickup : grade.trim) }))
     mesh.position.set(x, y, z)
     mesh.userData.v = new THREE.Vector3((rnd() - 0.5) * 3.2, 1.4 + rnd() * 2.4, (rnd() - 0.5) * 3.2)
     mesh.userData.life = 0.28 + rnd() * 0.12
@@ -1026,6 +1168,11 @@ function readKeys() {
     mz = scripted.mz
     if (scripted.yaw !== null) yaw = scripted.yaw
     if (scripted.pitch !== null) pitch = scripted.pitch
+  } else if (theme.mode === 'race' && local.elapsed < 3) {
+    mx = 0
+    mz = 0
+  } else if (theme.mode === 'race' && !held.KeyS && !held.ArrowDown && mz < 0.15) {
+    mz = 1
   }
   const len = Math.hypot(mx, mz)
   if (len > 1) {
@@ -1107,36 +1254,53 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   const moving = self ? Math.hypot((self.x - lastX), (self.z - lastZ)) > 0.012 : false
   if (glOk && self) {
     const speed = Math.hypot(input.mx, input.mz)
-    if (theme.mode === 'race') {
-      const back = 3.1
+    if (!playing) {
+      const orbit = theme.mode === 'explore' ? 18 : 14
+      camera.position.set(Math.sin(animT * 0.35) * orbit, 6.5, Math.cos(animT * 0.35) * orbit)
+      camera.lookAt(0, 1.2, theme.mode === 'race' ? 0 : 2)
+      camera.fov = 72
+      camera.updateProjectionMatrix()
+    } else if (theme.mode === 'race') {
+      const boost = input.fire ? 1 : 0
+      const back = 3.1 + boost * 0.6
       const ox = Math.sin(self.yaw)
       const oz = Math.cos(self.yaw)
-      camera.position.set(self.x - ox * back, 1.55 + self.y, self.z - oz * back)
+      camera.position.set(self.x - ox * back, 1.55 + self.y + dropY, self.z - oz * back)
       camera.lookAt(self.x + ox * 8, 0.7, self.z + oz * 8)
-      const base = theme.mode === 'race' ? 74 : 72
-      camera.fov = base + (input.fire ? 6 : 0)
+      const targetFov = input.fire ? 84 : 72
+      camera.fov += (targetFov - camera.fov) * Math.min(1, dt / (input.fire ? 0.15 : 0.6))
       camera.updateProjectionMatrix()
+      if (Math.abs(input.mx) > 0.45 && input.mz > 0.2) driftT += dt
+      else driftT = Math.max(0, driftT - dt * 1.5)
+      const tier = driftT >= 2 ? '#C04BFF' : driftT >= 1.2 ? '#FF9A1F' : driftT >= 0.6 ? '#3EA8FF' : ''
+      if (tier) addSparks(self.x - ox * 0.8, 0.25, self.z - oz * 0.8, tier)
     } else {
       const eye = 1.55
       const bob = moving ? Math.sin(animT * 10) * 0.025 : 0
       const dx = Math.sin(self.yaw) * Math.cos(self.pitch)
       const dy = Math.sin(self.pitch)
       const dz = Math.cos(self.yaw) * Math.cos(self.pitch)
-      camera.position.set(self.x, self.y + eye + bob, self.z)
+      camera.position.set(self.x, self.y + eye + bob + dropY, self.z)
       camera.lookAt(self.x + dx, self.y + eye + bob + dy, self.z + dz)
     }
-    if (shake > 0) {
-      camera.position.x += (rnd() - 0.5) * shake
-      camera.position.y += (rnd() - 0.5) * shake
-      shake *= 0.84
+    if (!reduceMotion && playing && trauma > 0) {
+      const amount = trauma * trauma
+      const deg = Math.PI / 180
+      camera.rotateX((rnd() - 0.5) * 2 * amount * 1.5 * deg)
+      camera.rotateY((rnd() - 0.5) * 2 * amount * 1.5 * deg)
+      camera.rotateZ((rnd() - 0.5) * 2 * amount * 2 * deg)
+    }
+    if (playing) {
+      camera.rotateX(-kickP)
+      camera.rotateY(kickY)
     }
     if (gun) {
       const base = gun.userData.base
       const bob = speed > 0.1 ? 1 : 0.25
       gun.position.x = base.x + Math.sin(animT * 7.5) * 0.012 * bob
-      gun.position.y = base.y + Math.abs(Math.cos(animT * 7.5)) * 0.014 * bob
-      gun.position.z = base.z + recoil * 0.1
-      gun.rotation.x = base.rx - recoil * 0.4
+      gun.position.y = base.y + Math.abs(Math.cos(animT * 7.5)) * 0.014 * bob + recoil * 0.02
+      gun.position.z = base.z + recoil * 0.05
+      gun.rotation.x = base.rx - recoil * (2 * Math.PI / 180)
     }
     const aliveIds = new Set()
     for (const actor of drawn) {
@@ -1151,7 +1315,7 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
       }
       aliveIds.add(actor.id)
       mesh.visible = true
-      const bob = actor.kind === 'buoy' ? Math.sin(animT * 2 + actor.x) * 0.08 : 0
+      const bob = actor.kind === 'buoy' ? Math.sin(animT * Math.PI * 2 + actor.x) * 0.15 : 0
       mesh.position.set(actor.x, (actor.y || 0) + bob, actor.z)
       mesh.rotation.y = actor.yaw
       if (theme.mode === 'race') mesh.rotation.z = -input.mx * 0.12 * (actor.id === self.id ? 1 : 0)
@@ -1162,12 +1326,17 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
       if (prevHp.has(actor.id) && actor.hp < prevHp.get(actor.id)) {
         const lost = prevHp.get(actor.id) - actor.hp
         if (lost > 0) floatNum(actor, lost)
-        if (actor.id !== self.id) paint.marked = true
+        if (actor.id !== self.id) {
+          paint.marked = true
+          if (actor.hp <= 0) paint.killed = true
+        }
         if (actor.id === self.id) {
           hurtEl.classList.add('pain')
           clearTimeout(paint.pain)
           paint.pain = setTimeout(() => hurtEl.classList.remove('pain'), 180)
-          shake = Math.max(shake, 0.11)
+          if (!reduceMotion) trauma = Math.min(1, trauma + 0.25)
+          if (actor.hp <= 0) hitStop = Math.max(hitStop, 0.12)
+          if (coarse && navigator.vibrate) navigator.vibrate(actor.hp <= 0 ? 40 : 15)
           sfx('hurt')
         }
       }
@@ -1209,6 +1378,7 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   const hp = self ? self.hp : 100
   const ammo = self ? self.ammo : 0
   hpEl.style.setProperty('--p', `${Math.max(0, Math.min(100, hp))}%`)
+  hpEl.dataset.band = hp > 50 ? 'ok' : hp > 25 ? 'mid' : 'low'
   hpEl.querySelector('b').textContent = String(Math.max(0, hp | 0))
   if (theme.weapon === 'none') {
     ammoNum.textContent = input.fire ? 'ON' : 'GO'
@@ -1219,13 +1389,45 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   }
   const score = self ? self.score : 0
   ptsEl.textContent = String(score | 0)
-  timerEl.textContent = over ? 'Round over' : `${left | 0}s`
+  const clockLeft = Math.max(0, left | 0)
+  timerEl.textContent = over ? '0:00' : `${Math.floor(clockLeft / 60)}:${String(clockLeft % 60).padStart(2, '0')}`
+  const placeEl = document.querySelector('#place')
+  if (placeEl) {
+    if (theme.mode === 'race' && self) {
+      const ordered = drawn.slice().sort((a, b) => (b.laps || 0) - (a.laps || 0) || (b.score || 0) - (a.score || 0))
+      const rank = Math.max(1, ordered.findIndex((actor) => actor.id === self.id) + 1)
+      const suffix = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'
+      placeEl.hidden = false
+      placeEl.textContent = `${rank}${suffix}`
+    } else placeEl.hidden = true
+  }
+  const banner = document.querySelector('#banner')
+  if (banner && theme.mode === 'race' && playing && authority !== 'remote' && local.elapsed < 4) {
+    const n = 3 - Math.floor(local.elapsed)
+    banner.hidden = false
+    banner.textContent = n > 0 ? String(n) : 'GO'
+  } else if (banner && theme.mode === 'race') banner.hidden = true
+  const coach = document.querySelector('#coach')
+  if (coach) {
+    const lines = ['Move', 'Look', 'Fire']
+    if (!playing || coachStep > 2) coach.hidden = true
+    else {
+      coach.hidden = false
+      coach.textContent = lines[coachStep]
+      if (coachStep === 0 && travel > 0.5) coachStep = 1
+      if (coachStep === 1 && Math.abs(yaw - coachYaw) > 0.25) coachStep = 2
+      if (coachStep === 2 && ammo < (paint.coachAmmo || ammo)) coachStep = 3
+      paint.coachAmmo = ammo
+    }
+  }
   drawFeed(feed)
   const latest = (feed || []).slice(-1)[0]
   if (latest && self && latest.text && latest.text.indexOf(self.name + ' ') === 0 && latest.text !== paint.lastKill) {
     paint.lastKill = latest.text
     killEl.hidden = false
     killEl.textContent = latest.text
+    if (!reduceMotion) trauma = Math.min(1, trauma + 0.15)
+    hitStop = Math.max(hitStop, 0.045)
     clearTimeout(paint.kill)
     paint.kill = setTimeout(() => { killEl.hidden = true }, 900)
   }
@@ -1242,13 +1444,23 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
   if (self && playing) {
     const didFire = prevAmmo >= 0 && ammo < prevAmmo
     if (didFire) sfx('shot')
+    if (didFire) {
+      const cross = document.querySelector('#cross')
+      if (cross) {
+        cross.classList.add('hot')
+        clearTimeout(paint.cross)
+        paint.cross = setTimeout(() => cross.classList.remove('hot'), 80)
+      }
+    }
     if (didFire && paint.marked) {
+      hitEl.classList.toggle('kill', !!paint.killed)
       hitEl.classList.add('on')
       clearTimeout(paint.hit)
-      paint.hit = setTimeout(() => hitEl.classList.remove('on'), 120)
+      paint.hit = setTimeout(() => hitEl.classList.remove('on', 'kill'), paint.killed ? 200 : 120)
       sfx('hit')
     }
     paint.marked = false
+    paint.killed = false
     if (moving && self.alive) {
       footT += dt
       if (footT > 0.38) {
@@ -1295,10 +1507,15 @@ function loop(now) {
   requestAnimationFrame(loop)
   const dt = Math.min(0.05, clock.getDelta ? clock.getDelta() : 0.016)
   animT += dt
-  recoil = Math.max(0, recoil - dt * 5)
+  recoil = Math.max(0, recoil - dt / 0.07)
+  trauma = Math.max(0, trauma - dt * 1.5)
+  kickP *= Math.exp(-dt / 0.09)
+  kickY *= Math.exp(-dt / 0.09)
+  dropY = Math.max(0, dropY - dt * 7)
   flashLeft = Math.max(0, flashLeft - dt)
   if (flare) flare.visible = flashLeft > 0
-  if (flashLight) flashLight.intensity = flashLeft > 0 ? 8 : 0
+  if (flashLight) flashLight.intensity = flashLeft > 0 ? 4 : 0
+  if (hitStop > 0) hitStop = Math.max(0, hitStop - dt)
   frames += 1
   if (!fpsAt) fpsAt = now
   if (now - fpsAt > 500) {
@@ -1329,8 +1546,8 @@ function loop(now) {
   for (let i = decals.length - 1; i >= 0; i--) {
     const mesh = decals[i]
     mesh.userData.age = (mesh.userData.age || 0) + dt
-    if (mesh.material) mesh.material.opacity = Math.max(0, 0.8 - mesh.userData.age / 4)
-    if (mesh.userData.age > 4) {
+    if (mesh.material) mesh.material.opacity = Math.max(0, 0.85 - mesh.userData.age / 8)
+    if (mesh.userData.age > 8) {
       scene.remove(mesh)
       decals.splice(i, 1)
     }
@@ -1382,9 +1599,15 @@ function loop(now) {
     waitLeft -= dt
     if (waitLeft <= 0) authority = 'local'
   }
-  if (authority === 'local' && playing) {
+  const simDt = hitStop > 0 ? 0 : dt
+  if (!playing && assetsReady && authority === 'local') {
+    stepMatch(local, simDt * 0.6)
+    attracted = true
+    actors = local.actors
+    feed = local.feed
+  } else if (authority === 'local' && playing) {
     applyLocalInput(input)
-    stepMatch(local, dt)
+    stepMatch(local, simDt)
     for (const tracer of local.tracers) spawnBolt(tracer)
     local.tracers = []
     yaw = youLocal.yaw
@@ -1410,12 +1633,22 @@ function bindStick(el, look) {
     const dist = Math.hypot(dx, dy) || 1
     const scale = Math.min(1, max / dist)
     knob.style.transform = `translate(${dx * scale}px, ${dy * scale}px)`
+    if (dist / max < 0.12) {
+      if (look) {
+        stick.yaw = 0
+        stick.pitch = 0
+      } else if (theme.mode !== 'race') {
+        stick.mx = 0
+        stick.mz = 0
+      }
+      return
+    }
     if (look) {
-      stick.yaw = (dx / max) * 0.07
-      stick.pitch = (dy / max) * 0.04
+      stick.yaw = (dx / max) * 0.045
+      stick.pitch = (dy / max) * 0.028
     } else {
       stick.mx = Math.max(-1, Math.min(1, dx / max))
-      stick.mz = Math.max(-1, Math.min(1, -dy / max))
+      stick.mz = theme.mode === 'race' ? 0 : Math.max(-1, Math.min(1, -dy / max))
     }
   }
   const end = () => {
@@ -1447,12 +1680,35 @@ function requestLook() {
   if (lock && lock.catch) lock.catch(() => {})
 }
 
+function hushNearest() {
+  let best = null
+  let dist = 1e9
+  for (const actor of local.actors) {
+    if (!actor.bot || !actor.alive) continue
+    const d = Math.hypot(actor.x - youLocal.x, actor.z - youLocal.z)
+    if (d < dist) {
+      dist = d
+      best = actor
+    }
+  }
+  if (best && dist < 18) best.cool = 4
+}
+
 function begin() {
   if (playing) return
   if (!assetsReady) {
     begin.queued = true
     return
   }
+  if (attracted && authority !== 'remote') {
+    restartMatch(local)
+    yaw = youLocal.yaw
+    attracted = false
+  }
+  hushNearest()
+  dropY = 2
+  coachStep = 0
+  coachYaw = yaw
   playing = true
   document.body.classList.add('playing')
   startEl.hidden = true
@@ -1495,8 +1751,9 @@ addEventListener('mousemove', (event) => {
   if (canvas.dataset.drag !== '1' || coarse) return
   const lx = Number(canvas.dataset.dragX)
   const ly = Number(canvas.dataset.dragY)
-  yaw += (event.clientX - lx) * 0.005
-  pitch = Math.max(-1.05, Math.min(1.05, pitch - (event.clientY - ly) * 0.004))
+  const sens = (0.25 * Math.PI / 180) * (480 / Math.max(1, innerHeight))
+  yaw += (event.clientX - lx) * sens
+  pitch = Math.max(-1.05, Math.min(1.05, pitch - (event.clientY - ly) * sens))
   canvas.dataset.dragX = String(event.clientX)
   canvas.dataset.dragY = String(event.clientY)
 })
@@ -1504,6 +1761,14 @@ document.querySelector('#play').addEventListener('click', () => {
   begin()
   requestLook()
 })
+const jumpBtn = document.querySelector('#jump')
+if (jumpBtn) {
+  jumpBtn.addEventListener('pointerdown', (event) => {
+    event.preventDefault()
+    begin()
+    jumpEdge = true
+  })
+}
 document.querySelector('#fire').addEventListener('pointerdown', (event) => {
   event.preventDefault()
   begin()

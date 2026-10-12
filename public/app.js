@@ -586,6 +586,22 @@ for (const chip of document.querySelectorAll('.idea')) {
     $('prompt').focus()
   })
 }
+for (const sky of document.querySelectorAll('.sky')) {
+  sky.addEventListener('click', () => {
+    const prompt = $('prompt')
+    const note = `${sky.dataset.sky} sky`
+    if (!prompt.value.toLowerCase().includes(note)) prompt.value = `${prompt.value} ${note}`.trim()
+    prompt.focus()
+  })
+}
+const promptExamples = ['a neon cyberpunk arena', 'a bright toy blaster arena', 'a kart race with gates', 'a small island with beacons']
+let promptExample = 0
+setInterval(() => {
+  const prompt = $('prompt')
+  if (!prompt || document.activeElement === prompt || prompt.value) return
+  promptExample = (promptExample + 1) % promptExamples.length
+  prompt.placeholder = promptExamples[promptExample]
+}, 2800)
 
 $('remix')?.addEventListener('click', async () => {
   if (!opened?.id) return

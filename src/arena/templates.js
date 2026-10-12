@@ -56,11 +56,11 @@ export const ARENA_TEMPLATES = [
     },
     config: { speed: 9, bots: 5, seconds: 120, range: 28, damage: 34, quality: 0 },
     theme: {
-      palette: palette('#3ee0ff'),
+      palette: palette('#FF5A3C', { bg: '#4FB3FF', ink: '#1B1B2F', mute: '#7C8FA6', floor: '#E9E4D8', wall: '#7C8FA6', sky: '#CDEBFF' }),
       names: { title: 'Arena', hint: 'WASD moves. Mouse looks. Click fires.', over: 'Round over' },
       mode: 'deathmatch',
       weapon: 'blaster',
-      sky: 'dusk'
+      sky: 'day'
     },
     fields,
     credit: {
@@ -70,7 +70,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Colors and HUD read THEME tokens.'
+      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
     }
   },
   {
@@ -88,7 +88,7 @@ export const ARENA_TEMPLATES = [
     },
     config: { speed: 14, bots: 4, seconds: 90, range: 12, damage: 10, quality: 0 },
     theme: {
-      palette: palette('#ffb020', { bg: '#140c08', ink: '#fff4e4', mute: '#3a2418', floor: '#2a160e', wall: '#5a341c', sky: '#ff8a3d' }),
+      palette: palette('#FF9A1F', { bg: '#4FB3FF', ink: '#1B1B2F', mute: '#4A4F5A', floor: '#4A4F5A', wall: '#F4F4F4', sky: '#CDEBFF' }),
       names: { title: 'Circuit Dash', hint: 'WASD drives. Fire or space boosts.', over: 'Race over' },
       mode: 'race',
       weapon: 'none',
@@ -102,7 +102,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Colors and HUD read THEME tokens.'
+      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
     }
   },
   {
@@ -120,7 +120,7 @@ export const ARENA_TEMPLATES = [
     },
     config: { speed: 8, bots: 2, seconds: 120, range: 24, damage: 34, quality: 0 },
     theme: {
-      palette: palette('#3ddc97', { bg: '#062028', ink: '#e7fff6', mute: '#12343a', floor: '#1d4a3c', wall: '#245046', sky: '#8fd4ff' }),
+      palette: palette('#7BC86C', { bg: '#4FB3FF', ink: '#1B1B2F', mute: '#9AA3AE', floor: '#F2D59A', wall: '#9AA3AE', sky: '#CDEBFF' }),
       names: { title: 'Beacon Isle', hint: 'Walk the shore. Light beacons. Pop buoys.', over: 'Tide turns' },
       mode: 'explore',
       weapon: 'blaster',
@@ -134,7 +134,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Colors and HUD read THEME tokens.'
+      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
     }
   }
 ]

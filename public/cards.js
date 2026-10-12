@@ -158,7 +158,7 @@ function paint(item, now) {
   })
   const px = w / 2 + Math.sin(now / 380 + seed) * (w * 0.28)
   const py = h - 58
-  disc(ctx, px, py, 34, '#e6ff3a')
+  disc(ctx, px, py, 34, accent)
   ctx.fillStyle = '#000000'
   ctx.font = '40px sans-serif'
   ctx.fillText(cast.player, px, py + 2)
@@ -185,7 +185,7 @@ export function livePoster(game) {
   const canvas = document.createElement('canvas')
   canvas.className = 'live-poster'
   canvas.width = 640
-  canvas.height = 360
+  canvas.height = 400
   canvas.setAttribute('aria-hidden', 'true')
   const accent = /^#[0-9a-fA-F]{6}$/.test(game.accent || '') ? game.accent : '#e6ff3a'
   const kind = game.type === 'world' ? 'world' : 'arcade'
@@ -205,6 +205,7 @@ function hash(value) {
 export function gameCard(game, { label, playHref }) {
   const card = document.createElement('article')
   card.className = 'card'
+  if (/^#[0-9a-fA-F]{6}$/.test(game.accent || '')) card.style.borderTopColor = game.accent
   const link = document.createElement('a')
   link.className = 'card-link'
   link.href = playHref || `/play/${game.id}`

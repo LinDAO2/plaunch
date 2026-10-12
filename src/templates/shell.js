@@ -14,7 +14,11 @@ function stamp(grid, x, y, cell) {
     for (let i = 0; i < row.length; i++) {
       const ch = row[i]
       if (ch === '.' || ch === ' ') continue
-      drawRect({ pos: vec2(x + i * cell, y + j * cell), width: Math.max(1, cell - 1), height: Math.max(1, cell - 1), color: ink(THEME.palette[ch] || THEME.palette.accent) })
+      const w = Math.max(1, cell - 1)
+      const h = Math.max(1, cell - 1)
+      const edge = Math.min(3, Math.max(1, Math.round(cell * 0.18)))
+      drawRect({ pos: vec2(x + i * cell - edge, y + j * cell - edge + 2), width: w + edge * 2, height: h + edge * 2, color: rgb(27, 27, 47) })
+      drawRect({ pos: vec2(x + i * cell, y + j * cell), width: w, height: h, color: ink(THEME.palette[ch] || THEME.palette.accent) })
     }
   }
 }

@@ -25,6 +25,7 @@ function contentType(name) {
   if (name.endsWith('.js')) return 'text/javascript; charset=utf-8'
   if (name.endsWith('.glb')) return 'model/gltf-binary'
   if (name.endsWith('.png')) return 'image/png'
+  if (name.endsWith('.woff2')) return 'font/woff2'
   return 'text/html; charset=utf-8'
 }
 const VENDOR_FILES = {

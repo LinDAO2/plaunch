@@ -925,12 +925,14 @@ test('the site palette is black, off-white, and acid yellow', () => {
   const css = `${readFileSync(path.join(process.cwd(), 'public/style.css'), 'utf8')}\n${readFileSync(path.join(process.cwd(), 'public/play.css'), 'utf8')}`
   assert.equal(/radial-gradient|linear-gradient/.test(css), false)
   assert.equal(/#b397ff/i.test(css), false)
-  assert.match(css, /--brand:\s*#e6ff3a/)
+  assert.match(css, /--brand:\s*#1d9bf0/)
+  assert.match(css, /--surface:\s*#16181c/)
+  assert.match(css, /--muted:\s*#71767b/)
   assert.match(css, /--bg:\s*#000/)
   assert.match(css, /bricolage-grotesque-latin-700\.woff2/)
   assert.match(css, /source-sans-3-latin-400\.woff2/)
   assert.match(css, /ibm-plex-mono-latin-400\.woff2/)
-  for (const file of ['OFL-BricolageGrotesque.txt', 'OFL-SourceSans3.txt', 'OFL-IBMPlexMono.txt']) {
+  for (const file of ['OFL-BricolageGrotesque.txt', 'OFL-SourceSans3.txt', 'OFL-IBMPlexMono.txt', 'OFL-LilitaOne.txt', 'OFL-Rubik.txt', 'OFL-ChakraPetch.txt']) {
     assert.match(readFileSync(path.join(process.cwd(), 'public/fonts', file), 'utf8'), /SIL Open Font License/)
   }
 })

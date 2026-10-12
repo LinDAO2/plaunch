@@ -96,7 +96,10 @@ const FILES = new Map([
   ['/fonts/source-sans-3-latin-400.woff2', 'fonts/source-sans-3-latin-400.woff2'],
   ['/fonts/source-sans-3-latin-600.woff2', 'fonts/source-sans-3-latin-600.woff2'],
   ['/fonts/ibm-plex-mono-latin-400.woff2', 'fonts/ibm-plex-mono-latin-400.woff2'],
-  ['/fonts/ibm-plex-mono-latin-600.woff2', 'fonts/ibm-plex-mono-latin-600.woff2']
+  ['/fonts/ibm-plex-mono-latin-600.woff2', 'fonts/ibm-plex-mono-latin-600.woff2'],
+  ['/fonts/lilita-one-latin.woff2', 'fonts/lilita-one-latin.woff2'],
+  ['/fonts/rubik-latin-700.woff2', 'fonts/rubik-latin-700.woff2'],
+  ['/fonts/chakra-petch-latin-600.woff2', 'fonts/chakra-petch-latin-600.woff2']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
