@@ -309,10 +309,10 @@ export function structureOrigin(world) {
   if (kind === 'cabin' || kind === 'dock' || kind === 'lighthouse') {
     const { shore, face } = shoreLine(world, cx, cz)
     world._face = face
-    const inland = Math.min(world.size - 5, Math.max(3, shore - face * 3))
-    if (kind === 'dock') origin = { x: Math.max(4, cx - 7), z: shore }
-    else if (kind === 'cabin') origin = { x: Math.min(world.size - 5, cx + 7), z: inland }
-    else origin = { x: Math.min(world.size - 5, cx + 8), z: inland }
+    const inland = Math.min(world.size - 5, Math.max(3, shore - face))
+    if (kind === 'dock') origin = { x: Math.max(4, cx - 5), z: shore }
+    else if (kind === 'cabin') origin = { x: Math.min(world.size - 5, cx + 4), z: inland }
+    else origin = { x: Math.min(world.size - 5, cx + 6), z: inland }
   }
   world._origin = origin
   return origin
@@ -340,9 +340,11 @@ function structureAt(x, y, z, world) {
     return null
   }
   if (world.structure === 'cabin') {
+    if (x === ox + 1 && z === oz && y > h + 4 && y <= h + 6) return ROCK
     if (ax > 2 || az > 2 || y < h || y > h + 4) return null
-    if (y === h + 4) return ax <= 1 && az <= 1 ? TIMBER : null
-    if (y === h + 3 || y === h) return TIMBER
+    if (y === h + 4) return ax <= 1 && az <= 1 ? ROCK : null
+    if (y === h + 3) return ROCK
+    if (y === h) return TIMBER
     const wall = ax === 2 || az === 2
     const face = world._face || 1
     if (wall && !(z === oz + face * 2 && x === ox && y > h && y < h + 3)) return TIMBER

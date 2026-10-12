@@ -11,6 +11,7 @@ await mkdir(out, { recursive: true })
 const prompts = [
   ['forest', 'a dense green forest with tall trees'],
   ['lake-mountains', 'mountains with a lake'],
+  ['clear-lake', 'mountains surrounding a clear lake'],
   ['beach', 'a sandy beach along the coast'],
   ['snow-peaks', 'snowy mountain peaks'],
   ['desert-canyon', 'a desert canyon']
