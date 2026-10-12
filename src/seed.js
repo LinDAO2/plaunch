@@ -33,7 +33,7 @@ export function templateGames() {
     duration: spec.duration || 60,
     accent: String(spec.theme.palette.accent || '#e6ff3a').toLowerCase(),
     createdAt: new Date(Date.UTC(2026, 9, 10, 18, 0, index)).toISOString(),
-    tags: (spec.tags || TEMPLATE_TAGS[spec.id] || ['arcade']).filter((tag) => TAGS.includes(tag)),
+    tags: (TEMPLATE_TAGS[spec.id] || spec.tags || ['arcade']).filter((tag) => TAGS.includes(tag)),
     freeformHtml: renderTemplate(spec),
     credit: spec.credit || {},
     featured: spec.featured === true
