@@ -182,6 +182,13 @@ async function wake(page, id) {
       await page.keyboard.press('Space')
       await page.waitForTimeout(220)
     }
+    await page.evaluate(() => {
+      const canvas = document.querySelector('canvas')
+      if (!canvas) return
+      canvas.style.width = '420px'
+      canvas.style.height = 'auto'
+      canvas.style.imageRendering = 'pixelated'
+    })
     return
   }
   if (id === 'tower-bounce') {
