@@ -26,7 +26,7 @@ export function sandboxCsp(config) {
   for (const origin of ['https://x.com', 'https://*.x.com', 'https://twitter.com', 'https://*.twitter.com']) {
     ancestors.push(origin)
   }
-  // script-src 'self' loads the pinned Kaplay and ZzFX files from this origin.
+  // script-src 'self' loads the pinned Kaplay, ZzFX, and three.js files from this origin.
   // No 'unsafe-eval' and no 'wasm-unsafe-eval'. The sandbox token keeps the document opaque.
   return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts; frame-ancestors ${ancestors.join(' ')}`
 }
