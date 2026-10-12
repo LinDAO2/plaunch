@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
 import { createClient, startServer, validSpec } from '../testing/helpers.js'
+import { VERSION } from '../src/version.js'
 
 describe('http api', { concurrency: false }, () => {
   let server
@@ -24,7 +25,7 @@ describe('http api', { concurrency: false }, () => {
     const res = await client.request('GET', '/api/health')
     assert.equal(res.status, 200)
     assert.equal(res.data.ok, true)
-    assert.equal(res.data.version, '1.3.1')
+    assert.equal(res.data.version, VERSION)
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
