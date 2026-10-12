@@ -179,9 +179,30 @@ function shapedLand(world) {
   return form !== 'rolling'
 }
 
+function forestGlade(world) {
+  const { cx, cz } = center(world)
+  return { x: cx, z: Math.max(8, cz - 8) }
+}
+
+function inGlade(x, z, world) {
+  if (world.landform !== 'forest') return false
+  const glade = forestGlade(world)
+  return Math.abs(x - glade.x) <= 8 && Math.abs(z - glade.z) <= 8
+}
+
+function lakeOverlook(x, z, world) {
+  if (world.landform !== 'lake') return false
+  const { cx, cz } = center(world)
+  if (z < cz + Math.round(world.size * 0.38)) return false
+  if (Math.abs(x - cx) > 6) return false
+  const h = surfaceY(x, z, world)
+  return h >= 12 && h <= 18
+}
+
 function treeHere(x, z, world) {
   if (x < 2 || z < 2 || x >= world.size - 2 || z >= world.size - 2) return false
   if (nearStructure(x, z, world)) return false
+  if (inGlade(x, z, world) || lakeOverlook(x, z, world)) return false
   if (!shapedLand(world)) {
     if (world.biome === 'desert' || world.biome === 'moon') return false
     const h = surfaceY(x, z, world)
@@ -191,7 +212,7 @@ function treeHere(x, z, world) {
   }
   if (world.landform === 'canyon' || world.biome === 'moon') return false
   if (world.biome === 'desert' && world.landform !== 'beach') return false
-  const spacing = world.landform === 'forest' ? 3 : world.landform === 'lake' ? 6 : 5
+  const spacing = world.landform === 'forest' ? 5 : world.landform === 'lake' ? 6 : 5
   const gx = Math.floor(x / spacing)
   const gz = Math.floor(z / spacing)
   const ox = Math.floor(hash2(gx, gz, world.seed + 5) * spacing)
@@ -226,14 +247,6 @@ function classicTreeBlock(x, y, z, world) {
   return 0
 }
 
-function crownBlock(dx, dz, dy, layers) {
-  const rad = layers[dy]
-  if (!rad) return false
-  if (Math.max(Math.abs(dx), Math.abs(dz)) > rad) return false
-  if (Math.abs(dx) === rad && Math.abs(dz) === rad) return false
-  return true
-}
-
 function shapedTreeBlock(x, y, z, world) {
   const leaf = world.biome === 'candy' ? CANDY : CANOPY
   const wood = world.biome === 'candy' ? GLOW : TIMBER
@@ -245,7 +258,7 @@ function shapedTreeBlock(x, y, z, world) {
       const h = surfaceY(tx, tz, world)
       const roll = hash2(tx, tz, world.seed + 17)
       const pine = world.biome === 'snow' || world.landform === 'peaks' || (world.landform === 'mountains' && roll > 0.4) || roll > 0.84
-      const extra = world.landform === 'forest' ? 3 : 0
+      const extra = 0
       if (pine) {
         const trunk = 7 + extra + Math.floor(hash2(tx, tz, world.seed + 23) * 4)
         const top = trunk + 7
@@ -254,26 +267,32 @@ function shapedTreeBlock(x, y, z, world) {
         if (dy >= trunk - 1 && dy <= top) {
           const tier = top - dy
           const rad = Math.max(1, Math.ceil(tier * 0.42))
-          if (dx === 0 && dz === 0) continue
+          if (dx === 0 && dz === 0) return dy < top ? wood : 0
           if (Math.max(Math.abs(dx), Math.abs(dz)) <= rad && !(Math.abs(dx) === rad && Math.abs(dz) === rad && tier % 2 === 0)) return leaf
         }
         continue
       }
-      const trunk = 6 + extra + Math.floor(hash2(tx, tz, world.seed + 29) * 3)
+      const trunk = (world.landform === 'forest' ? 5 : 6) + extra + Math.floor(hash2(tx, tz, world.seed + 29) * 2)
       if (dx === 0 && dz === 0 && y > h && y <= h + trunk) return wood
       const branch = h + trunk - 2
       if (y === branch && ((dz === 0 && Math.abs(dx) === 1) || (dx === 0 && Math.abs(dz) === 1))) return wood
       const dy = y - (h + trunk)
-      const wide = roll > 0.62
-        ? { 0: 2, 2: 3, 3: 2, 5: 1 }
-        : roll > 0.3
-          ? { 0: 3, 1: 2, 4: 2, 6: 1 }
-          : { 1: 2, 2: 1, 3: 2, 5: 1, 7: 1 }
-      if (crownBlock(dx, dz, dy, wide) && !(dx === 0 && dz === 0 && dy <= 0)) {
-        const rad = wide[dy]
-        const outer = Math.abs(dx) + Math.abs(dz) >= rad
-        if (outer && rad > 1 && hash2(tx + dx * 3, tz + dz * 5, world.seed + dy) > 0.62) return 0
-        return leaf
+      const stacks = world.landform === 'forest'
+        ? [
+            [2, 2, 3, 2, 2, 1],
+            [2, 3, 2, 2, 1, 1],
+            [1, 2, 2, 2, 1, 1]
+          ]
+        : [
+            [2, 3, 3, 2, 1],
+            [3, 3, 2, 2, 1, 1],
+            [2, 2, 3, 2, 1, 1]
+          ]
+      const radii = stacks[Math.floor(roll * stacks.length) % stacks.length]
+      if (dy >= 0 && dy < radii.length) {
+        const rad = radii[dy]
+        if (dx === 0 && dz === 0) return leaf
+        if (Math.max(Math.abs(dx), Math.abs(dz)) <= rad && !(Math.abs(dx) === rad && Math.abs(dz) === rad)) return leaf
       }
     }
   }
@@ -498,8 +517,8 @@ export function vistaGlance(world, x, feetY, z) {
   const yaw = Math.atan2(cx - x, cz - z)
   const eyeY = feetY + 1.62
   const out = { water: 0, leaf: 0, wood: 0, sand: 0, snow: 0, drop: 0 }
-  const pitches = [-0.06, -0.2, -0.36]
-  const offsets = [-0.32, 0, 0.32]
+  const pitches = [0.1, -0.06, -0.2, -0.36]
+  const offsets = [-0.32, -0.16, 0, 0.16, 0.32]
   for (const pitch of pitches) {
     for (const off of offsets) {
       const cp = Math.cos(pitch)
@@ -562,7 +581,33 @@ function vistaHeight(world, edits, x, z) {
   return gy
 }
 
+function southOverlook(world, edits) {
+  const { cx, cz } = center(world)
+  const origin = structureOrigin(world)
+  let best = null
+  let bestScore = -1e9
+  const minZ = cz + Math.round(world.size * 0.38)
+  for (let z = world.size - 3; z >= minZ; z--) {
+    for (let x = cx - 4; x <= cx + 4; x++) {
+      const gy = vistaHeight(world, edits, x, z)
+      if (gy === null || gy < 12) continue
+      const view = vistaGlance(world, x + 0.5, gy + 1, z + 0.5)
+      if (view.water < 4) continue
+      const score = view.water + gy - Math.abs(x + 0.5 - origin.x) * 3
+      if (score > bestScore) {
+        bestScore = score
+        best = { x: x + 0.5, y: gy + 1, z: z + 0.5 }
+      }
+    }
+  }
+  return best
+}
+
 export function spawnPoint(world, edits) {
+  if (world.landform === 'lake') {
+    const pad = southOverlook(world, edits)
+    if (pad) return pad
+  }
   const { cx, cz } = center(world)
   const minDist = world.structure === 'pyramid' ? 9 : 7
   const prefer = world.size * 0.3
@@ -578,8 +623,15 @@ export function spawnPoint(world, edits) {
     let score = bonus - Math.abs(dist - prefer) * 0.35
     if (reach >= 5 && reach <= 34) score += 24 + Math.min(gy, 24) * 0.08
     else score += gy * 0.04
-    if (world.landform === 'lake') score += view.water * 14 + view.sand * 2
-    else if (world.landform === 'forest') score += view.leaf * 9 + view.wood * 4
+    if (world.landform === 'lake') {
+      score += view.water * 14 + view.sand * 2
+      if (z > cz + world.size * 0.38 && gy >= 12) score += 90
+    } else if (world.landform === 'forest') {
+      score += view.leaf * 9 + view.wood * 4
+      const glade = forestGlade(world)
+      if (Math.abs(x - glade.x) <= 3 && Math.abs(z - glade.z) <= 3) score += 160
+      if (gy >= 16) score -= 80
+    }
     else if (world.landform === 'beach') score += view.water * 10 + view.sand * 3
     else if (world.landform === 'peaks') score += view.snow * 7
     else if (world.landform === 'canyon') score += view.sand * 12 + view.drop * 4

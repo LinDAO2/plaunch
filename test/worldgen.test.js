@@ -2,9 +2,43 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
 import { generateWorldFromPrompt } from '../src/ai/worldgen.js'
-import { GLOW, FROST, ROCK, TIMBER } from '../src/blocks/blocks.js'
+import { CANOPY, GLOW, FROST, ROCK, TIMBER } from '../src/blocks/blocks.js'
 import { repairWorldSpec, chooseWorld, structureForPrompt } from '../src/blocks/spec.js'
 import { WATER, blockAt, spawnPoint, structureOrigin, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
+
+function floatingCanopies(world) {
+  const cells = new Set()
+  const trunks = []
+  for (let z = 0; z < world.size; z++) {
+    for (let x = 0; x < world.size; x++) {
+      for (let y = 1; y < world.height; y++) {
+        const id = blockAt(x, y, z, world)
+        if (id !== TIMBER && id !== CANOPY) continue
+        cells.add(`${x},${y},${z}`)
+        if (id === TIMBER) trunks.push([x, y, z])
+      }
+    }
+  }
+  const seen = new Set(trunks.map(([x, y, z]) => `${x},${y},${z}`))
+  const queue = trunks.slice()
+  const steps = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
+  for (let i = 0; i < queue.length; i++) {
+    const [x, y, z] = queue[i]
+    for (const [dx, dy, dz] of steps) {
+      const key = `${x + dx},${y + dy},${z + dz}`
+      if (!cells.has(key) || seen.has(key)) continue
+      seen.add(key)
+      queue.push([x + dx, y + dy, z + dz])
+    }
+  }
+  let bare = 0
+  for (const key of cells) {
+    if (seen.has(key)) continue
+    const [x, y, z] = key.split(',').map(Number)
+    if (blockAt(x, y, z, world) === CANOPY) bare += 1
+  }
+  return bare
+}
 import { saveEdit } from '../src/blocks/store.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -64,6 +98,23 @@ test('landscape prompts keep distinct biomes and landforms', () => {
   const beachView = at(beach)
   assert.ok(lakeView.water >= 4, JSON.stringify(lakeView))
   assert.ok(forestView.leaf + forestView.wood >= 4, JSON.stringify(forestView))
+  const forestSpawn = spawnPoint(forest)
+  const forestGround = surfaceY(Math.floor(forestSpawn.x), Math.floor(forestSpawn.z), forest)
+  assert.equal(forestSpawn.y, forestGround + 1)
+  assert.ok(forestGround < 14, forestGround)
+  assert.ok(forestSpawn.z < forest.size * 0.55)
+  for (let k = 1; k <= 6; k++) assert.equal(blockAt(Math.floor(forestSpawn.x), forestGround + k, Math.floor(forestSpawn.z), forest), 0)
+  const clearWorld = worldFromSpec(chooseWorld('mountains surrounding a clear lake'))
+  const clearSpawn = spawnPoint(clearWorld)
+  const clearGround = surfaceY(Math.floor(clearSpawn.x), Math.floor(clearSpawn.z), clearWorld)
+  const cabin = structureOrigin(clearWorld)
+  assert.equal(clearSpawn.y, clearGround + 1)
+  assert.ok(clearSpawn.z > clearWorld.size / 2)
+  assert.ok(clearGround >= 12)
+  assert.ok(cabin.z < clearWorld.size / 2)
+  assert.ok(vistaGlance(clearWorld, clearSpawn.x, clearSpawn.y, clearSpawn.z).water >= 4)
+  assert.equal(floatingCanopies(forest), 0)
+  assert.equal(floatingCanopies(clearWorld), 0)
   assert.ok(beachView.sand + beachView.water >= 4, JSON.stringify(beachView))
   assert.ok(surfaceY(4, 2, beach) < surfaceY(4, beach.size - 4, beach))
   let canyonLow = 99
