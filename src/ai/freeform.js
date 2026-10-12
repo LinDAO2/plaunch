@@ -3,7 +3,7 @@ import { STYLE_GUIDE } from '../style-kit.js'
 import { cleanText } from '../validate.js'
 import { aiStatus, requestModelText } from './generate.js'
 import { assertFreeform, inspectFreeform } from './freeform-check.js'
-import { resolveProviderChain } from './providers.js'
+import { FREEFORM_MAX_OUTPUT_TOKENS, freeformTimeoutMs, resolveProviderChain } from './providers.js'
 
 export const FREEFORM_SCHEMA = {
   type: 'object',
@@ -24,11 +24,11 @@ Rules:
 - The game runs in a frame about 450x520 CSS pixels. Size the canvas to window.innerWidth and window.innerHeight, handle resize, and keep every control and the in-game HUD inside the canvas
 - The parent page shows best score only. Draw the current score, the best score, and any timer yourself
 - Support touch (tap and drag), mouse, and keyboard. Pointer events cover a finger and a mouse. Do not rely on keyboard focus alone
-- Draw with shapes and gradients. Emoji are allowed. No external images
+- Draw with shapes and gradients. Emoji are allowed. Optional sprites are only /sprites/kenney-chars.png and /sprites/kenney-tiles.png
 - ${STYLE_GUIDE}
 - Track the best score in a variable across in-page restarts. Do not use storage APIs
-- Put CSS and JavaScript inline. No external scripts, stylesheets, fonts, or images
-- No external URLs of any kind. No protocol-relative URLs
+- Write compact code. Target under 8000 output tokens and under 40KB. Do not inline Kaplay, ZzFX, or three.js. If you need one, use <script src="/kaplay.js"></script>, <script src="/zzfx.js"></script>, or <script src="/three.js"></script>. Do not paste a long stylesheet. Use the candy hex colors already listed above
+- No external URLs of any kind. No protocol-relative URLs. No https images or fonts
 - Do not call fetch, XMLHttpRequest, WebSocket, eval, the Function constructor, import, or Worker
 - Do not read document.cookie, localStorage, or sessionStorage
 - Keep the document under 150KB
@@ -170,7 +170,7 @@ function gameFields(prompt, generation) {
   }
 }
 
-export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fetch }) {
+export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fetch, onProgress }) {
   const idea = cleanText(prompt, 600)
   if (idea.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
   const status = aiStatus(env)
@@ -203,9 +203,14 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
     const raw = await requestModelText(provider, messages, fetchImpl, {
       schema: FREEFORM_SCHEMA,
       schemaName: 'freeform_html',
-      maxOutputTokens: 16384,
+      maxOutputTokens: FREEFORM_MAX_OUTPUT_TOKENS,
+      stream: true,
+      continueOnTruncation: true,
+      timeoutMs: freeformTimeoutMs(env),
+      stallMs: 25_000,
       fallbacks: chain.slice(1),
-      onUse: (item) => { provider = item }
+      onUse: (item) => { provider = item },
+      onProgress
     })
     const html = extractHtml(raw)
     errors = inspectFreeform(html)

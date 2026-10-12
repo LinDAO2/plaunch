@@ -15,7 +15,22 @@ const text = await readFile(path.resolve(promptsPath), 'utf8')
 const prompts = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#'))
 const outDir = path.resolve(arg('--out', 'artifacts/bakeoff'))
 const smoke = !process.argv.includes('--no-smoke')
-const results = await runBakeoff({ prompts, providers, outDir, smoke })
+function reopenRow(row) {
+  const errors = Array.isArray(row.errors) ? [...row.errors] : []
+  const fallback = Boolean(row.fallback) || row.mode === 'template'
+  if (fallback && !errors.includes('template fallback')) errors.push('template fallback')
+  return {
+    ...row,
+    errors,
+    fallback,
+    ok: errors.length === 0 && row.mode !== 'error' && !fallback,
+    mode: fallback ? 'template' : row.mode,
+    model: fallback ? null : (row.model ?? null)
+  }
+}
+const results = process.argv.includes('--resmoke')
+  ? JSON.parse(await readFile(path.join(outDir, 'bakeoff.json'), 'utf8')).results.map(reopenRow)
+  : await runBakeoff({ prompts, providers, outDir, smoke })
 if (smoke) {
   const browser = await launchCaptureBrowser()
   if (!browser) {
@@ -29,6 +44,7 @@ if (smoke) {
     for (const name of ['lilita-one-latin.woff2', 'rubik-latin-700.woff2', 'chakra-petch-latin-600.woff2']) {
       shared.set(`/fonts/${name}`, await readFile(path.join(root, 'public/fonts', name)))
     }
+    for (const name of ['kenney-chars.png', 'kenney-tiles.png']) shared.set(`/sprites/${name}`, await readFile(path.join(root, 'public/sprites', name)))
     for (const [name, body] of arenaAssetFiles()) shared.set(name, body)
     const shotDir = path.join(outDir, 'posters')
     const { mkdir } = await import('node:fs/promises')

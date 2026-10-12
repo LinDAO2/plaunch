@@ -123,6 +123,10 @@ p { margin: 0; }
   gap: 16px;
 }
 .ask textarea { min-height: 148px; font-size: 20px; line-height: 1.35; }
+.gen-progress { display: flex; flex-direction: column; gap: 6px; }
+.gen-progress-track { height: 8px; background: #2F3336; border-radius: 99px; overflow: hidden; }
+.gen-progress-bar { height: 100%; width: 0; background: #E6FF3A; }
+.gen-progress-label { margin: 0; color: var(--muted); font-size: 13px; }
 .ideas, .skies { display: flex; flex-wrap: wrap; gap: 8px; }
 .sky { min-width: 72px; color: #fff; border: 1px solid var(--line); border-bottom-width: 8px; }
 .idea {

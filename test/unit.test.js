@@ -9,14 +9,14 @@ import { classifyTier, heuristicTier, normalizeTier } from '../src/ai/classify.j
 import { generateIdea } from '../src/ai/idea.js'
 import { FREEFORM_PROMPT, generateFreeform, templateFreeform } from '../src/ai/freeform.js'
 import { inspectFreeform } from '../src/ai/freeform-check.js'
-import { generateGame, parseModelJson, SYSTEM_PROMPT } from '../src/ai/generate.js'
+import { generateGame, parseModelJson, requestModelText, SYSTEM_PROMPT } from '../src/ai/generate.js'
 import { sandboxCsp } from '../src/usercontent.js'
 import { geminiResponseSchema, validateGameSpec } from '../src/ai/gamespec.js'
 import { createSimulation } from '../public/arcade-sim.js'
 import { checkPlausible, plausibilityFor } from '../src/plausibility.js'
 import { posterPng, POSTER_SIZE } from '../src/poster.js'
 import { resolvePoster, saveStoredPoster, schedulePosterCapture } from '../src/poster-store.js'
-import { aiStatus, geminiRequest, openAiRequest, resolveProvider } from '../src/ai/providers.js'
+import { aiStatus, foldProviderStream, freeformTimeoutMs, geminiRequest, openAiRequest, resolveProvider, resolveProviderChain } from '../src/ai/providers.js'
 import { loadConfig, registrableDomain } from '../src/config.js'
 import { blocklistReason, classifySafety } from '../src/safety.js'
 import { tagsFor } from '../src/ai/tags.js'
@@ -193,7 +193,7 @@ test('GameSpecV1 accepts a valid spec and rejects executable output', () => {
   assert.match(SYSTEM_PROMPT, /1\.1/)
 })
 
-test('provider selection prefers Gemini, then xAI, then OpenAI', () => {
+test('provider selection prefers Anthropic, then Gemini, then xAI, then OpenAI', () => {
   assert.equal(resolveProvider({}), null)
   assert.equal(aiStatus({}).mode, 'template')
   const gemini = resolveProvider({ GEMINI_API_KEY: 'g', XAI_API_KEY: 'x', OPENAI_API_KEY: 'o' })
@@ -203,9 +203,15 @@ test('provider selection prefers Gemini, then xAI, then OpenAI', () => {
   assert.equal(resolveProvider({ AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).model, 'gpt-6-astra')
   assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).id, 'anthropic')
   assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).model, 'claude-sonnet-5-5')
-  assert.equal(resolveProvider({ GEMINI_API_KEY: 'g', XAI_API_KEY: 'x', OPENAI_API_KEY: 'o', ANTHROPIC_API_KEY: 'a' }).id, 'gemini')
+  assert.equal(resolveProvider({ GEMINI_API_KEY: 'g', XAI_API_KEY: 'x', OPENAI_API_KEY: 'o', ANTHROPIC_API_KEY: 'a' }).id, 'anthropic')
   assert.equal(resolveProvider({ AI_PROVIDER_SPEC: 'anthropic', AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }, 'spec').id, 'anthropic')
   assert.equal(resolveProvider({ GEMINI_MODEL: 'custom-gemini', GEMINI_API_KEY: 'g' }).model, 'custom-gemini')
+  const chain = resolveProviderChain({ ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' })
+  assert.deepEqual(chain.map((item) => item.id), ['anthropic', 'gemini'])
+  assert.deepEqual(resolveProviderChain({ ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g', AI_FALLBACKS: '' }).map((item) => item.id), ['anthropic'])
+  assert.equal(freeformTimeoutMs({}), 180000)
+  assert.equal(freeformTimeoutMs({ AI_FREEFORM_TIMEOUT_MS: '90000' }), 90000)
+  assert.equal(resolveProvider({ GEMINI_API_KEY: 'g' }).timeoutMs, 60000)
 })
 
 test('Gemini and OpenAI-compatible requests match the provider contracts', () => {
@@ -799,6 +805,8 @@ test('freeform prompt asks for touch, visuals, and a best score', () => {
   assert.match(FREEFORM_PROMPT, /best score/i)
   assert.match(FREEFORM_PROMPT, /playground-score/)
   assert.match(FREEFORM_PROMPT, /#FFD23F/)
+  assert.match(FREEFORM_PROMPT, /\/kaplay\.js/)
+  assert.match(FREEFORM_PROMPT, /compact code/)
   assert.match(SYSTEM_PROMPT, /#1B1B2F/)
 })
 
@@ -990,4 +998,47 @@ test('freeform generation retries a transient 500 once and surfaces a 400 withou
   )
   assert.equal(calls, 1)
   delete process.env.AI_RETRY_DELAY_MS
+})
+
+test('a truncated Anthropic stream stays nonempty and continues once under 12k tokens', async () => {
+  const partial = [
+    'event: content_block_delta',
+    'data: {"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\\"html\\":\\"<p>"}}',
+    '',
+    'event: message_delta',
+    'data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":8000}}',
+    ''
+  ].join('\n')
+  const folded = foldProviderStream('anthropic', partial)
+  assert.equal(folded.truncated, true)
+  assert.match(folded.text, /<p>/)
+  const bodies = []
+  let calls = 0
+  const fetchImpl = async (_url, init) => {
+    calls += 1
+    bodies.push(JSON.parse(init.body))
+    if (calls === 1) return new Response(partial, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    return new Response(JSON.stringify({
+      content: [{ type: 'tool_use', name: 'emit_result', input: { html: 'rest' } }],
+      stop_reason: 'end_turn',
+      usage: { output_tokens: 20 }
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  const text = await requestModelText({
+    id: 'anthropic',
+    model: 'claude-sonnet-5-5',
+    apiKey: 'sk-ant',
+    base: 'https://api.anthropic.com',
+    timeoutMs: 60000
+  }, [{ role: 'user', content: 'idea' }], fetchImpl, {
+    stream: true,
+    continueOnTruncation: true,
+    maxOutputTokens: 8000
+  })
+  assert.equal(calls, 2)
+  assert.match(text, /<p>/)
+  assert.match(text, /rest/)
+  assert.equal(bodies[1].max_tokens <= 4000, true)
+  assert.equal(bodies[0].stream, true)
+  assert.equal(bodies[1].max_tokens, 4000)
 })

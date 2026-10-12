@@ -35,14 +35,15 @@ async function classifyWithModel(prompt, env, fetchImpl) {
   return tier === 'spec' || tier === 'freeform' ? tier : 'freeform'
 }
 
-export async function generateIdea({ prompt, tier, env, fetchImpl }) {
+export async function generateIdea({ prompt, tier, env, fetchImpl, onProgress }) {
   const explicit = tier === 'spec' || tier === 'freeform' || tier === undefined || tier === null || tier === '' || tier === 'auto'
     ? (tier === 'spec' || tier === 'freeform' ? tier : 'auto')
     : null
   if (!explicit) throw new HttpError(400, 'Generator tier must be auto, spec, or freeform', 'validation_error')
   if (wantsWorld(prompt) && explicit !== 'freeform') return generateWorldIdea(prompt)
   if (explicit !== 'spec') {
-    const templated = await generateTemplateGame({ prompt, env, fetchImpl })
+    onProgress?.({ phase: 'choosing', outputTokens: 0, label: 'Choosing a template…' })
+    const templated = await generateTemplateGame({ prompt, env, fetchImpl, onProgress })
     if (templated) return templated
   }
   let choice = explicit === 'auto' ? heuristicTier(prompt) : explicit
@@ -60,7 +61,9 @@ export async function generateIdea({ prompt, tier, env, fetchImpl }) {
     }
   }
   if (choice === 'freeform') {
-    const result = await generateFreeform({ prompt, env, fetchImpl })
+    onProgress?.({ phase: 'writing', outputTokens: 0, label: 'Writing the game…' })
+    const result = await generateFreeform({ prompt, env, fetchImpl, onProgress })
+    onProgress?.({ phase: 'checking', outputTokens: 0, label: 'Checking the game…' })
     if (explicit === 'freeform') result.tierReason = 'Freeform sandbox, chosen in the studio.'
     else if (via === 'model') result.tierReason = 'Auto asked the model. It picked the freeform sandbox because this idea needs its own rules.'
     return result

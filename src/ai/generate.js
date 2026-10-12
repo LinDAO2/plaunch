@@ -3,7 +3,7 @@ import { cleanText } from '../validate.js'
 import { generateWorldIdea, wantsWorld } from '../blocks/spec.js'
 import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
 import { log } from '../log.js'
-import { DEFAULT_AI_TIMEOUT_MS, aiStatus, anthropicRequest, anthropicText, describeUpstreamError, geminiRequest, geminiText, openAiRequest, openAiResponsesRequest, openAiText, resolveProvider, resolveProviderChain, responsesText } from './providers.js'
+import { DEFAULT_AI_TIMEOUT_MS, FREEFORM_OUTPUT_BUDGET, aiStatus, anthropicRequest, anthropicText, completionMeta, describeUpstreamError, foldProviderStream, geminiRequest, geminiText, openAiRequest, openAiResponsesRequest, openAiText, resolveProvider, resolveProviderChain, responsesText, stitchModelText } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
 import { SAMPLE_SPECS } from './samples.js'
 import { STYLE_GUIDE } from '../style-kit.js'
@@ -88,26 +88,115 @@ function canFallback(err) {
   return err.retry === true || err.code === 'ai_quota_exceeded'
 }
 
+function tooLarge() {
+  const error = new HttpError(502, 'AI response too large', 'ai_provider_error')
+  error.retry = false
+  return error
+}
+
+function isEventStream(response, text) {
+  const type = String(response.headers?.get?.('content-type') || '')
+  if (type.includes('text/event-stream')) return true
+  const sample = String(text || '').trimStart()
+  if (sample.startsWith('{') || sample.startsWith('[')) return false
+  return sample.startsWith('data:') || sample.startsWith('event:')
+}
+
+async function readResponseText(response, { maxChars, stallMs, deadline, onChunk }) {
+  const reader = response.body?.getReader?.()
+  if (!reader) {
+    const text = await response.text()
+    if (text.length > maxChars) throw tooLarge()
+    onChunk?.(text)
+    return text
+  }
+  const decoder = new TextDecoder()
+  let text = ''
+  const fail = (err) => {
+    reader.cancel().catch(() => {})
+    throw err
+  }
+  try {
+    while (true) {
+      const pending = reader.read()
+      const timers = []
+      const racers = [pending]
+      if (stallMs) {
+        racers.push(new Promise((_, reject) => {
+          timers.push(setTimeout(() => {
+            const err = new Error('AI provider stalled')
+            err.name = 'TimeoutError'
+            err.stall = true
+            reject(err)
+          }, stallMs))
+        }))
+      }
+      if (deadline) {
+        const left = Math.max(0, deadline - Date.now())
+        racers.push(new Promise((_, reject) => {
+          timers.push(setTimeout(() => {
+            const err = new Error('AI provider timed out')
+            err.name = 'TimeoutError'
+            reject(err)
+          }, left))
+        }))
+      }
+      const raced = await Promise.race(racers)
+      for (const timer of timers) clearTimeout(timer)
+      if (raced.done) break
+      text += decoder.decode(raced.value, { stream: true })
+      if (text.length > maxChars) fail(tooLarge())
+      onChunk?.(text)
+    }
+  } catch (err) {
+    await reader.cancel().catch(() => {})
+    throw err
+  }
+  text += decoder.decode()
+  return text
+}
+
 async function callProvider(provider, messages, fetchImpl, options = {}) {
   const request = requestFor(provider, messages, options)
+  const limit = options.timeoutMs || provider.timeoutMs || DEFAULT_AI_TIMEOUT_MS
+  const started = Date.now()
+  const controller = options.stream ? new AbortController() : null
+  const killer = controller ? setTimeout(() => controller.abort(), limit) : null
   let response
   try {
     response = await fetchImpl(request.url, {
       method: 'POST',
       headers: request.headers,
       body: JSON.stringify(request.body),
-      signal: AbortSignal.timeout(provider.timeoutMs || DEFAULT_AI_TIMEOUT_MS)
+      signal: controller ? controller.signal : AbortSignal.timeout(limit)
     })
   } catch (err) {
+    if (killer) clearTimeout(killer)
     const error = new HttpError(502, err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
-    error.retry = true
+    // A freeform stall or overall cap should not start a second full wait.
+    error.retry = options.stream ? false : true
     throw error
   }
-  const text = await response.text()
-  if (text.length > (options.maxResponseChars || 20_000)) {
-    const error = new HttpError(502, 'AI response too large', 'ai_provider_error')
-    error.retry = false
+  const maxChars = options.maxResponseChars || 20_000
+  let text
+  try {
+    text = await readResponseText(response, {
+      maxChars,
+      stallMs: options.stream ? (options.stallMs || 0) : 0,
+      deadline: options.stream ? started + limit : 0,
+      onChunk: (buf) => {
+        if (!options.onProgress) return
+        const outputTokens = Math.ceil(buf.length / 4)
+        options.onProgress({ phase: 'writing', outputTokens, label: `Writing the game… ${outputTokens} tokens` })
+      }
+    })
+  } catch (err) {
+    if (err.code === 'ai_provider_error') throw err
+    const error = new HttpError(502, err.stall || err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
+    error.retry = options.stream ? false : true
     throw error
+  } finally {
+    if (killer) clearTimeout(killer)
   }
   if (!response.ok) {
     const info = describeUpstreamError(provider, response.status, text)
@@ -119,21 +208,37 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     if (info.delay) error.retryDelayMs = retryDelay()
     throw error
   }
-  let payload
-  try {
-    payload = JSON.parse(text)
-  } catch {
-    const error = new HttpError(502, 'AI provider returned invalid JSON', 'ai_provider_error')
-    error.retry = true
-    throw error
+  let content = ''
+  let truncated = false
+  let outputTokens = 0
+  if (options.stream && isEventStream(response, text)) {
+    const folded = foldProviderStream(provider.id, text)
+    content = folded.text
+    truncated = folded.truncated
+    outputTokens = folded.outputTokens
+  } else {
+    let payload
+    try {
+      payload = JSON.parse(text)
+    } catch {
+      const error = new HttpError(502, 'AI provider returned invalid JSON', 'ai_provider_error')
+      error.retry = true
+      throw error
+    }
+    content = textFor(provider, payload)
+    const meta = completionMeta(provider, payload, content)
+    truncated = meta.truncated
+    outputTokens = meta.outputTokens
   }
-  const content = textFor(provider, payload)
   if (!content) {
     const error = new HttpError(502, 'AI provider returned an empty response', 'ai_provider_error')
     error.retry = true
     throw error
   }
-  return content
+  if (options.onProgress) {
+    options.onProgress({ phase: 'writing', outputTokens, label: `Writing the game… ${outputTokens} tokens` })
+  }
+  return { text: content, truncated, outputTokens }
 }
 
 function withUpstream(error, source) {
@@ -145,20 +250,45 @@ function withUpstream(error, source) {
 export async function requestModelText(provider, messages, fetchImpl, options = {}) {
   const opts = { maxResponseChars: 262144, ...options }
   options.onUse?.(provider)
-  const once = () => callProvider(provider, messages, fetchImpl, opts)
-  try {
+  const once = (msgs, extra) => callProvider(provider, msgs, fetchImpl, { ...opts, ...extra, continueOnTruncation: false })
+  const attempt = async (msgs, extra) => {
     try {
-      return await once()
+      return await once(msgs, extra)
     } catch (err) {
       if (!err.retry || options.noRetry) throw err
       if (err.retryDelayMs) await sleep(err.retryDelayMs)
-      return await once()
+      return await once(msgs, extra)
     }
+  }
+  let result
+  try {
+    result = await attempt(messages, {})
   } catch (err) {
     const next = (options.fallbacks || [])[0]
     if (!next || !canFallback(err)) throw err
     return requestModelText(next, messages, fetchImpl, { ...options, fallbacks: options.fallbacks.slice(1) })
   }
+  if (options.continueOnTruncation && result.truncated && result.text && result.outputTokens < FREEFORM_OUTPUT_BUDGET) {
+    const room = Math.min(4000, FREEFORM_OUTPUT_BUDGET - result.outputTokens)
+    if (room >= 256) {
+      options.onProgress?.({ phase: 'continuing', outputTokens: result.outputTokens, label: 'Continuing a cut-off answer…' })
+      try {
+        const more = await attempt([
+          ...messages,
+          { role: 'assistant', content: result.text },
+          { role: 'user', content: 'Continue exactly where the text stopped. Do not repeat earlier text. Finish the JSON or HTML document.' }
+        ], { maxOutputTokens: room })
+        result = {
+          text: stitchModelText(result.text, more.text),
+          truncated: Boolean(more.truncated),
+          outputTokens: Math.min(FREEFORM_OUTPUT_BUDGET, result.outputTokens + (more.outputTokens || 0))
+        }
+      } catch {
+        // Keep the partial document. The caller rejects it if it still will not parse.
+      }
+    }
+  }
+  return result.text
 }
 
 function templateResult(prompt) {
@@ -194,7 +324,7 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
   for (let attempt = 1; attempt <= 3; attempt++) {
     let raw
     try {
-      raw = await callProvider(provider, messages, fetchImpl, { maxResponseChars: 262144 })
+      raw = (await callProvider(provider, messages, fetchImpl, { maxResponseChars: 262144 })).text
     } catch (err) {
       lastError = err.message
       code = err.code || 'ai_provider_error'

@@ -370,6 +370,49 @@ async function sendUser(res, ctx, user, csrf, status = 200) {
   }, ctx)
 }
 
+function generationPayload(result, prompt) {
+  const tags = [...new Set([...(result.tags || []), ...tagsFor({
+    prompt,
+    name: result.game?.name,
+    description: result.game?.description,
+    mechanic: result.game?.type,
+    tier: result.tier
+  })])]
+  const blocked = blocklistReason([prompt, result.game?.name, result.game?.description, result.html].filter(Boolean).join('\n'))
+  return {
+    mode: result.mode,
+    provider: result.provider,
+    model: result.model,
+    game: result.game,
+    spec: result.spec,
+    notice: result.notice,
+    tier: result.tier,
+    html: result.html || null,
+    tierReason: result.tierReason || '',
+    templateId: result.templateId || null,
+    templateName: result.templateName || null,
+    fallback: Boolean(result.fallback),
+    tags,
+    safety: { flagged: Boolean(blocked), reason: blocked }
+  }
+}
+
+function startSse(res, ctx) {
+  const headers = {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'strict-origin-when-cross-origin'
+  }
+  if (ctx?.cookies?.length) headers['set-cookie'] = ctx.cookies
+  if (ctx?.requestId) headers['x-request-id'] = ctx.requestId
+  res.writeHead(200, headers)
+}
+
+function sseSend(res, event, data) {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+}
+
 export function createApp({ db, config, fetchImpl, hub = null } = {}) {
   const limits = createRateLimiter(config)
 
@@ -497,31 +540,28 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
         globalLimit: config.aiDailyGlobal
       })
     }
+    const accept = String(req.headers.accept || '')
+    if (accept.includes('text/event-stream')) {
+      startSse(res, ctx)
+      try {
+        const result = await generateIdea({
+          prompt: body.prompt,
+          tier: body.tier,
+          env: config.env,
+          fetchImpl,
+          onProgress: (info) => sseSend(res, 'progress', info)
+        })
+        sseSend(res, 'result', generationPayload(result, body.prompt))
+        res.end()
+        return 200
+      } catch (err) {
+        sseSend(res, 'error', { error: err.status ? err.message : 'Server error', code: err.code || 'server_error', upstream: err.upstream || null })
+        res.end()
+        return err.status || 500
+      }
+    }
     const result = await generateIdea({ prompt: body.prompt, tier: body.tier, env: config.env, fetchImpl })
-    const tags = [...new Set([...(result.tags || []), ...tagsFor({
-      prompt: body.prompt,
-      name: result.game?.name,
-      description: result.game?.description,
-      mechanic: result.game?.type,
-      tier: result.tier
-    })])]
-    const blocked = blocklistReason([body.prompt, result.game?.name, result.game?.description, result.html].filter(Boolean).join('\n'))
-    return sendJson(res, 200, {
-      mode: result.mode,
-      provider: result.provider,
-      model: result.model,
-      game: result.game,
-      spec: result.spec,
-      notice: result.notice,
-      tier: result.tier,
-      html: result.html || null,
-      tierReason: result.tierReason || '',
-      templateId: result.templateId || null,
-      templateName: result.templateName || null,
-      fallback: Boolean(result.fallback),
-      tags,
-      safety: { flagged: Boolean(blocked), reason: blocked }
-    }, ctx)
+    return sendJson(res, 200, generationPayload(result, body.prompt), ctx)
   }
 
   if (method === 'POST' && pathname === '/api/ai/restyle') {

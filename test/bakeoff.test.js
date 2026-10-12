@@ -21,7 +21,8 @@ test('Anthropic uses tool-use and OpenAI uses the Responses API', () => {
   assert.equal(anthropic.headers['x-api-key'], 'sk-ant')
   assert.equal(anthropic.headers['anthropic-version'], '2023-06-01')
   assert.equal(anthropic.body.temperature, undefined)
-  assert.equal(anthropic.body.tool_choice.name, 'emit_result')
+  assert.equal(anthropic.body.tool_choice.type, 'auto')
+  assert.match(anthropic.body.system, /Always answer by calling the emit_result tool exactly once/)
   assert.equal(anthropic.body.tools[0].input_schema.required[0], 'html')
   const openai = openAiResponsesRequest({
     id: 'openai',
@@ -81,4 +82,24 @@ test('fixture bakeoff writes a report without a browser', async () => {
   assert.match(report, /tower defense/)
   const saved = JSON.parse(await readFile(path.join(outDir, 'bakeoff.json'), 'utf8'))
   assert.equal(saved.results.length, 4)
+})
+
+test('a template fallback is not credited to the model', async () => {
+  const outDir = await mkdtemp(path.join(tmpdir(), 'bakeoff-fallback-'))
+  const results = await runBakeoff({
+    prompts: ['wordle'],
+    providers: ['gemini'],
+    outDir,
+    smoke: false,
+    env: { GEMINI_API_KEY: 'sk-live', AI_PROVIDER: 'gemini', AI_FALLBACKS: '' },
+    fetchImpl: async () => new Response(JSON.stringify({ error: { code: 503, status: 'UNAVAILABLE', message: 'overloaded' } }), { status: 503 })
+  })
+  assert.equal(results.length, 1)
+  assert.equal(results[0].ok, false)
+  assert.equal(results[0].fallback, true)
+  assert.equal(results[0].mode, 'template')
+  assert.equal(results[0].model, null)
+  assert.equal(results[0].errors.includes('template fallback'), true)
+  const report = await readFile(path.join(outDir, 'bakeoff.md'), 'utf8')
+  assert.match(report, /template fallback/)
 })

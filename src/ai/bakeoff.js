@@ -3,6 +3,7 @@ import path from 'node:path'
 import { generateIdea } from './idea.js'
 import { templateFreeform, titleFromPrompt } from './freeform.js'
 import { inspectFreeform } from './freeform-check.js'
+import { foldProviderStream } from './providers.js'
 import { validateGameSpec } from './gamespec.js'
 
 export function fixtureObject(prompt, body) {
@@ -98,6 +99,14 @@ export function providerRunEnv(id, env = process.env) {
   return { live: false, env: providerEnv(id) }
 }
 
+function providerIdFromUrl(url) {
+  const value = String(url)
+  if (value.includes('anthropic.com')) return 'anthropic'
+  if (value.includes('generativelanguage') || value.includes(':streamGenerateContent') || value.includes(':generateContent')) return 'gemini'
+  if (value.includes('api.x.ai') || value.includes('/chat/completions')) return 'xai'
+  return 'openai'
+}
+
 export function meteringFetch(inner, totals) {
   return async (url, init) => {
     const response = await inner(url, init)
@@ -107,7 +116,16 @@ export function meteringFetch(inner, totals) {
       totals.input += used.input
       totals.output += used.output
     } catch {
-      // A non-JSON error body still counts as a provider call.
+      try {
+        const raw = await response.clone().text()
+        if (raw.includes('data:')) {
+          const folded = foldProviderStream(providerIdFromUrl(url), raw)
+          totals.input += folded.inputTokens
+          totals.output += folded.outputTokens
+        }
+      } catch {
+        // A non-JSON error body still counts as a provider call.
+      }
     }
     return response
   }
@@ -148,12 +166,15 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false, en
           html: html || null,
           spec: idea.spec || null
         }, null, 2))
+        const fellBack = Boolean(idea.fallback)
+        if (fellBack && !problems.includes('template fallback')) problems.push('template fallback')
         results.push({
           prompt,
           provider: id,
-          ok: problems.length === 0,
-          mode: idea.mode,
-          model: idea.model,
+          ok: problems.length === 0 && !fellBack,
+          mode: fellBack ? 'template' : idea.mode,
+          model: fellBack ? null : idea.model,
+          fallback: fellBack,
           ms: Date.now() - started,
           tokens: { ...totals },
           usd: null,
@@ -182,9 +203,9 @@ export async function runBakeoff({ prompts, providers, outDir, smoke = false, en
     '',
     'Token counts are from the fixture or the provider usage field. USD is omitted when the model has no confirmed price.',
     '',
-    '| Prompt | Provider | OK | Mode | ms | in | out |',
-    '| --- | --- | --- | --- | --- | --- | --- |',
-    ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
+    '| Prompt | Provider | OK | Mode | Fallback | ms | in | out |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.fallback ? 'template fallback' : ''} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
   ].join('\n')
   await writeFile(path.join(outDir, 'bakeoff.json'), JSON.stringify({ results }, null, 2))
   await writeFile(path.join(outDir, 'bakeoff.md'), markdown)

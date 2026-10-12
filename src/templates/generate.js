@@ -47,7 +47,8 @@ function themed(spec, prompt, salt = 0, html = HTML[spec.id]) {
 
 function pack(spec, html, env, provider, prompt, fallback) {
   const status = aiStatus(env)
-  const mode = status.mode === 'ai' ? 'ai' : 'template'
+  const credited = !fallback && status.mode === 'ai'
+  const mode = credited ? 'ai' : 'template'
   const description = cleanText(prompt, 180)
   const notice = fallback
     ? `Built on ${spec.name}. The model did not return a usable edit, so this is the template with a keyword theme.`
@@ -105,7 +106,7 @@ function editMessages(spec, prompt, changes) {
   ]
 }
 
-export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis.fetch }) {
+export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis.fetch, onProgress }) {
   const idea = cleanText(prompt, 600)
   const picked = pickTemplate(idea)
   if (!picked) return null
@@ -118,7 +119,8 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
   if (!provider) return pack(spec, themed(spec, idea, 0), env, null, idea, false)
   if (picked.confidence < 0.84) {
     try {
-      const raw = await requestModelText(provider, pickerMessages(idea), fetchImpl, { schema: PICK_SCHEMA, schemaName: 'template_pick', maxOutputTokens: 300, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item } })
+      onProgress?.({ phase: 'choosing', outputTokens: 0, label: 'Choosing a template…' })
+      const raw = await requestModelText(provider, pickerMessages(idea), fetchImpl, { schema: PICK_SCHEMA, schemaName: 'template_pick', maxOutputTokens: 300, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item }, onProgress })
       const choice = parseModelJson(raw)
       const chosen = templateById(choice.templateId)
       if (chosen && Number(choice.confidence) >= 0.5) {
@@ -130,7 +132,8 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
     }
   }
   try {
-    const raw = await requestModelText(provider, editMessages(spec, idea, changes), fetchImpl, { schema: EDIT_SCHEMA, schemaName: 'template_edit', maxOutputTokens: 2048, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item } })
+    onProgress?.({ phase: 'writing', outputTokens: 0, label: 'Writing the game…' })
+    const raw = await requestModelText(provider, editMessages(spec, idea, changes), fetchImpl, { schema: EDIT_SCHEMA, schemaName: 'template_edit', maxOutputTokens: 2048, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item }, onProgress })
     const edits = parseModelJson(raw)
     const allowed = {}
     if (edits && typeof edits === 'object') {
@@ -177,8 +180,9 @@ export async function restyleTemplate({ templateId, html, prompt, turn = 1, env,
     html: themed(spec, `${prompt || spec.name}:${turn}`, turn, base),
     templateId: spec.id,
     templateName: spec.name,
-    mode: status.mode === 'ai' ? 'ai' : 'template',
+    mode: 'template',
     provider: null,
-    model: null
+    model: null,
+    fallback: status.mode === 'ai'
   }
 }

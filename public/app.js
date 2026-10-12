@@ -640,10 +640,92 @@ $('restyle')?.addEventListener('click', async () => {
   }
 })
 
+function showProgress(label, tokens = 0) {
+  const box = $('gen-progress')
+  if (!box) return
+  box.hidden = false
+  const text = $('gen-progress-label')
+  if (text) text.textContent = label || 'Writing the game…'
+  const bar = $('gen-progress-bar')
+  if (bar) bar.style.width = `${Math.min(100, (Number(tokens) || 0) / 8000 * 100)}%`
+}
+
+function hideProgress() {
+  const box = $('gen-progress')
+  if (box) box.hidden = true
+}
+
+async function readGenerateStream(res) {
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let result = null
+  let failed = null
+  const take = (block) => {
+    let event = 'message'
+    const dataLines = []
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim()
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+    }
+    if (!dataLines.length) return
+    let data = {}
+    try { data = JSON.parse(dataLines.join('\n')) } catch { data = {} }
+    if (event === 'progress') {
+      showProgress(data.label || 'Writing the game…', Number(data.outputTokens) || 0)
+    } else if (event === 'result') {
+      result = data
+    } else if (event === 'error') {
+      failed = new Error(data.error || 'Request failed')
+      failed.status = 502
+      failed.code = data.code
+      failed.upstream = data.upstream || null
+    }
+  }
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let split = buf.indexOf('\n\n')
+    while (split >= 0) {
+      take(buf.slice(0, split))
+      buf = buf.slice(split + 2)
+      split = buf.indexOf('\n\n')
+    }
+  }
+  if (buf.trim()) take(buf)
+  if (failed) throw failed
+  if (!result) throw new Error('The generator stream ended early')
+  return result
+}
+
 $('generate').addEventListener('click', async () => {
   try {
     $('generate').disabled = true
-    const result = await api('/ai/generate', 'POST', { prompt: $('prompt').value, tier: $('tier').value })
+    showProgress('Choosing a template…', 0)
+    const headers = { 'content-type': 'application/json', accept: 'text/event-stream', 'x-csrf-token': await ensureCsrf() }
+    const res = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ prompt: $('prompt').value, tier: $('tier').value })
+    })
+    const type = res.headers.get('content-type') || ''
+    let result
+    if (type.includes('text/event-stream') && res.body) {
+      result = await readGenerateStream(res)
+    } else {
+      const data = await res.json().catch(() => ({}))
+      if (data && data.csrfToken) setCsrf(data.csrfToken)
+      if (!res.ok) {
+        const error = new Error(data.error || 'Request failed')
+        error.status = res.status
+        error.code = data.code
+        error.upstream = data.upstream || null
+        throw error
+      }
+      result = data
+    }
     if (result.mode === 'template' && $('ai-off')) $('ai-off').hidden = false
     lastTier = result.tier === 'freeform' ? 'freeform' : 'spec'
     lastHtml = result.html || null
@@ -672,6 +754,7 @@ $('generate').addEventListener('click', async () => {
     setStatus(error.message + (where && !error.message.includes('HTTP ') ? where : ''), true)
     toast(error.message)
   } finally {
+    hideProgress()
     $('generate').disabled = false
   }
 })

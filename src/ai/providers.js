@@ -4,10 +4,20 @@ import { geminiResponseSchema } from './gamespec.js'
 
 // Live Gemini 3.x Flash latency on the standard tier ranged from 7s to 60s, so 20s timed out often.
 export const DEFAULT_AI_TIMEOUT_MS = 60_000
+// Freeform HTML is slower than a spec. The stall timer resets while tokens arrive.
+export const FREEFORM_TIMEOUT_MS = 180_000
+export const FREEFORM_OUTPUT_BUDGET = 12_000
+export const FREEFORM_MAX_OUTPUT_TOKENS = 8_000
 
 function timeoutEnv(value) {
   const n = Number(value)
-  return Number.isInteger(n) && n >= 1000 && n <= 120_000 ? n : DEFAULT_AI_TIMEOUT_MS
+  return Number.isInteger(n) && n >= 1000 && n <= 300_000 ? n : DEFAULT_AI_TIMEOUT_MS
+}
+
+export function freeformTimeoutMs(env = {}) {
+  const explicit = Number(env.AI_FREEFORM_TIMEOUT_MS)
+  if (Number.isInteger(explicit) && explicit >= 1000 && explicit <= 300_000) return explicit
+  return Math.min(300_000, Math.max(timeoutEnv(env.AI_TIMEOUT_MS), FREEFORM_TIMEOUT_MS))
 }
 
 function providerFromChoice(env = {}) {
@@ -45,7 +55,7 @@ function providerFromChoice(env = {}) {
   if (choice === 'xai') return xai
   if (choice === 'openai') return openai
   if (choice === 'anthropic') return anthropic
-  if (choice === 'auto' || choice === '') return gemini || xai || openai || anthropic || null
+  if (choice === 'auto' || choice === '') return anthropic || gemini || xai || openai || null
   return null
 }
 
@@ -61,7 +71,8 @@ export function resolveProviderChain(env = {}, path) {
   const primary = resolveProvider(env, path)
   if (!primary) return []
   const chain = [primary]
-  for (const id of String(env.AI_FALLBACKS || '').split(',')) {
+  // Unset falls back to Gemini. An explicit empty string (the bakeoff) adds nobody.
+  for (const id of String(env.AI_FALLBACKS ?? 'gemini').split(',')) {
     const name = id.trim().toLowerCase()
     if (!name || chain.some((item) => item.id === name)) continue
     const next = providerFromChoice({ ...env, AI_PROVIDER: name })
@@ -112,8 +123,11 @@ export function geminiRequest(provider, messages, options = {}) {
   if (/^gemini-3/.test(provider.model) && provider.thinkingLevel && !['off', 'default', ''].includes(provider.thinkingLevel)) {
     generationConfig.thinkingConfig = { thinkingLevel: provider.thinkingLevel }
   }
+  const url = options.stream
+    ? `${trimBase(provider.base)}/models/${provider.model}:streamGenerateContent?alt=sse`
+    : `${trimBase(provider.base)}/models/${provider.model}:generateContent`
   return {
-    url: `${trimBase(provider.base)}/models/${provider.model}:generateContent`,
+    url,
     headers: {
       'content-type': 'application/json',
       'x-goog-api-key': provider.apiKey
@@ -134,6 +148,7 @@ export function openAiRequest(provider, messages, options = {}) {
     response_format: { type: 'json_object' }
   }
   if (options.maxOutputTokens) body.max_tokens = options.maxOutputTokens
+  if (options.stream) body.stream = true
   return {
     url: `${trimBase(provider.base)}/chat/completions`,
     headers: {
@@ -168,8 +183,95 @@ export function responsesText(payload) {
 export function anthropicText(payload) {
   const blocks = Array.isArray(payload?.content) ? payload.content : []
   const tool = blocks.find((part) => part?.type === 'tool_use' && part.name === 'emit_result')
+  if (typeof tool?.input === 'string' && tool.input) return tool.input
   if (tool?.input && typeof tool.input === 'object') return JSON.stringify(tool.input)
   return blocks.filter((part) => part?.type === 'text').map((part) => part.text || '').join('')
+}
+
+export function stitchModelText(head, tail) {
+  const next = String(tail || '')
+  const prev = String(head || '')
+  if (!next) return prev
+  if (prev.endsWith(next)) return prev
+  return prev + next
+}
+
+function takeUsage(usage, into) {
+  if (!usage || typeof usage !== 'object') return
+  const input = usage.input_tokens || usage.promptTokenCount || usage.prompt_tokens || 0
+  const output = usage.output_tokens || usage.candidatesTokenCount || usage.completion_tokens || 0
+  if (input) into.inputTokens = input
+  if (output) into.outputTokens = output
+}
+
+export function completionMeta(provider, payload, text) {
+  const meta = { truncated: false, inputTokens: 0, outputTokens: 0 }
+  const id = provider?.id
+  if (id === 'gemini') {
+    meta.truncated = payload?.candidates?.[0]?.finishReason === 'MAX_TOKENS'
+    takeUsage(payload?.usageMetadata, meta)
+  } else if (id === 'anthropic') {
+    meta.truncated = payload?.stop_reason === 'max_tokens'
+    takeUsage(payload?.usage, meta)
+  } else if (id === 'openai') {
+    const reason = payload?.incomplete_details?.reason
+    meta.truncated = reason === 'max_output_tokens' || payload?.status === 'incomplete'
+    takeUsage(payload?.usage, meta)
+  } else {
+    meta.truncated = payload?.choices?.[0]?.finish_reason === 'length'
+    takeUsage(payload?.usage, meta)
+  }
+  if (!meta.outputTokens && text) meta.outputTokens = Math.ceil(String(text).length / 4)
+  return meta
+}
+
+// Incremental SSE from Gemini, Anthropic, OpenAI Responses, and chat completions (xAI).
+export function foldProviderStream(providerId, raw) {
+  const textParts = []
+  let toolJson = ''
+  const meta = { truncated: false, inputTokens: 0, outputTokens: 0 }
+  for (const line of String(raw || '').split(/\r?\n/)) {
+    if (!line.startsWith('data:')) continue
+    const data = line.slice(5).trim()
+    if (!data || data === '[DONE]') continue
+    let event
+    try {
+      event = JSON.parse(data)
+    } catch {
+      continue
+    }
+    if (providerId === 'anthropic') {
+      if (event.type === 'content_block_delta') {
+        const delta = event.delta || {}
+        if (delta.type === 'input_json_delta' && delta.partial_json) toolJson += delta.partial_json
+        if (delta.type === 'text_delta' && delta.text) textParts.push(delta.text)
+      }
+      if (event.type === 'message_start') takeUsage(event.message?.usage, meta)
+      if (event.type === 'message_delta') {
+        if (event.delta?.stop_reason === 'max_tokens') meta.truncated = true
+        takeUsage(event.usage, meta)
+      }
+      continue
+    }
+    if (providerId === 'gemini') {
+      const parts = event.candidates?.[0]?.content?.parts || []
+      for (const part of parts) if (part?.text) textParts.push(part.text)
+      if (event.candidates?.[0]?.finishReason === 'MAX_TOKENS') meta.truncated = true
+      takeUsage(event.usageMetadata, meta)
+      continue
+    }
+    if (event.type === 'response.output_text.delta' && event.delta) textParts.push(event.delta)
+    const incomplete = event.response?.incomplete_details?.reason || event.incomplete_details?.reason
+    if (incomplete === 'max_output_tokens' || event.type === 'response.incomplete') meta.truncated = true
+    const choice = event.choices?.[0]
+    if (choice?.delta?.content) textParts.push(choice.delta.content)
+    if (choice?.finish_reason === 'length') meta.truncated = true
+    takeUsage(event.usage, meta)
+    takeUsage(event.response?.usage, meta)
+  }
+  const text = toolJson || textParts.join('')
+  if (!meta.outputTokens && text) meta.outputTokens = Math.ceil(text.length / 4)
+  return { text, ...meta }
 }
 
 export function schemaIsStrict(schema) {
@@ -185,11 +287,26 @@ export function schemaIsStrict(schema) {
 }
 
 export function anthropicRequest(provider, messages, options = {}) {
-  const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n')
+  const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n') +
+    '\nAlways answer by calling the emit_result tool exactly once with the full result.'
   const input = messages.filter((message) => message.role !== 'system').map((message) => ({
     role: message.role === 'assistant' ? 'assistant' : 'user',
     content: message.content
   }))
+  const body = {
+    model: provider.model,
+    max_tokens: options.maxOutputTokens || 2048,
+    system,
+    messages: input,
+    tools: [{
+      name: 'emit_result',
+      description: 'Return the JSON result for this step.',
+      input_schema: options.schema || { type: 'object', additionalProperties: true }
+    }],
+    // Newer Claude models reject a forced tool_choice ("tool"/"any"), so ask with auto.
+    tool_choice: { type: 'auto' }
+  }
+  if (options.stream) body.stream = true
   return {
     url: `${trimBase(provider.base)}/v1/messages`,
     headers: {
@@ -197,18 +314,7 @@ export function anthropicRequest(provider, messages, options = {}) {
       'x-api-key': provider.apiKey,
       'anthropic-version': '2023-06-01'
     },
-    body: {
-      model: provider.model,
-      max_tokens: options.maxOutputTokens || 2048,
-      system,
-      messages: input,
-      tools: [{
-        name: 'emit_result',
-        description: 'Return the JSON result for this step.',
-        input_schema: options.schema || { type: 'object', additionalProperties: true }
-      }],
-      tool_choice: { type: 'tool', name: 'emit_result' }
-    }
+    body
   }
 }
 
@@ -239,6 +345,7 @@ export function openAiResponsesRequest(provider, messages, options = {}) {
     }
   }
   if (options.maxOutputTokens) body.max_output_tokens = options.maxOutputTokens
+  if (options.stream) body.stream = true
   return {
     url: `${trimBase(provider.base)}/responses`,
     headers: {
