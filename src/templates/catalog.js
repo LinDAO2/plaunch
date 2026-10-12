@@ -1,3 +1,5 @@
+import { ARENA_TEMPLATES } from '../arena/templates.js'
+
 export const TRADEMARK = /wordle|tetris|pac[-\s]?man|flappy(?:\s*bird)?|super\s*mario|\bmario\b|space\s*invaders/i
 
 const palette = (accent, extra = {}) => ({
@@ -219,7 +221,8 @@ export const TEMPLATES = [
       sprites: ['gem', 'hero'],
       rules: ['scoreGroup']
     })
-  }
+  },
+  ...ARENA_TEMPLATES
 ]
 
 export function templateById(id) {

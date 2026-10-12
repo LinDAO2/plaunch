@@ -512,5 +512,185 @@
         "scoreGroup": "function"
       }
     }
+  },
+  {
+    "id": "arena",
+    "name": "Arena",
+    "tags": [
+      "action",
+      "arcade"
+    ],
+    "keywords": [
+      "arena",
+      "blaster",
+      "multiplayer"
+    ],
+    "description": "Sci-fi arena. Pointer look, a blaster, bots, and a round timer. No neighborhood and no real-world weapons.",
+    "editable": {
+      "CONFIG": {
+        "speed": {
+          "min": 4,
+          "max": 18
+        },
+        "bots": {
+          "min": 0,
+          "max": 8
+        },
+        "seconds": {
+          "min": 30,
+          "max": 180
+        },
+        "range": {
+          "min": 8,
+          "max": 40
+        },
+        "damage": {
+          "min": 10,
+          "max": 80
+        },
+        "quality": {
+          "min": 0,
+          "max": 2
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "palette.floor": "color",
+        "palette.wall": "color",
+        "palette.sky": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "mode": "text",
+        "weapon": "text",
+        "sky": "text"
+      },
+      "RULES": {
+        "scoreKill": "function"
+      }
+    }
+  },
+  {
+    "id": "circuit-dash",
+    "name": "Circuit Dash",
+    "tags": [
+      "action",
+      "arcade"
+    ],
+    "keywords": [
+      "kart",
+      "race",
+      "circuit"
+    ],
+    "description": "A low-poly kart loop. Drive through the gates and finish the laps. Bots take the other lanes.",
+    "editable": {
+      "CONFIG": {
+        "speed": {
+          "min": 4,
+          "max": 18
+        },
+        "bots": {
+          "min": 0,
+          "max": 8
+        },
+        "seconds": {
+          "min": 30,
+          "max": 180
+        },
+        "range": {
+          "min": 8,
+          "max": 40
+        },
+        "damage": {
+          "min": 10,
+          "max": 80
+        },
+        "quality": {
+          "min": 0,
+          "max": 2
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "palette.floor": "color",
+        "palette.wall": "color",
+        "palette.sky": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "mode": "text",
+        "weapon": "text",
+        "sky": "text"
+      },
+      "RULES": {
+        "scoreKill": "function"
+      }
+    }
+  },
+  {
+    "id": "beacon-isle",
+    "name": "Beacon Isle",
+    "tags": [
+      "arcade",
+      "casual"
+    ],
+    "keywords": [
+      "explore",
+      "island",
+      "beacon"
+    ],
+    "description": "Walk a low-poly island, light the beacons, and pop the buoys. Nothing on the island is a zombie.",
+    "editable": {
+      "CONFIG": {
+        "speed": {
+          "min": 4,
+          "max": 18
+        },
+        "bots": {
+          "min": 0,
+          "max": 8
+        },
+        "seconds": {
+          "min": 30,
+          "max": 180
+        },
+        "range": {
+          "min": 8,
+          "max": 40
+        },
+        "damage": {
+          "min": 10,
+          "max": 80
+        },
+        "quality": {
+          "min": 0,
+          "max": 2
+        }
+      },
+      "THEME": {
+        "palette.bg": "color",
+        "palette.ink": "color",
+        "palette.accent": "color",
+        "palette.mute": "color",
+        "palette.floor": "color",
+        "palette.wall": "color",
+        "palette.sky": "color",
+        "names.title": "text",
+        "names.hint": "text",
+        "names.over": "text",
+        "mode": "text",
+        "weapon": "text",
+        "sky": "text"
+      },
+      "RULES": {
+        "scoreKill": "function"
+      }
+    }
   }
 ]

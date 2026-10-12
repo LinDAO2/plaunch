@@ -520,7 +520,7 @@ test('file-backed PGlite data survives a restart', async () => {
     const first = await openDatabase(`pglite://${dir}`)
     await migrate(first)
     const seeded = await seedIfEmpty(first)
-    assert.equal(seeded, 30)
+    assert.equal(seeded, 33)
     const names = await first.query(`select name, credit->>'author' as author from games`)
     const blob = names.rows.map((row) => `${row.name}|${row.author || ''}`).join('\n')
     assert.equal(/Ada Run|Zip Run|Dot Run|Submitter|Ada Lovelace/.test(blob), false)

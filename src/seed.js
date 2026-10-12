@@ -30,12 +30,13 @@ export function templateGames() {
     name: spec.name,
     description: spec.description,
     type: 'arcade',
-    duration: 60,
+    duration: spec.duration || 60,
     accent: String(spec.theme.palette.accent || '#e6ff3a').toLowerCase(),
     createdAt: new Date(Date.UTC(2026, 9, 10, 18, 0, index)).toISOString(),
-    tags: (TEMPLATE_TAGS[spec.id] || ['arcade']).filter((tag) => TAGS.includes(tag)),
+    tags: (spec.tags || TEMPLATE_TAGS[spec.id] || ['arcade']).filter((tag) => TAGS.includes(tag)),
     freeformHtml: renderTemplate(spec),
-    credit: {}
+    credit: spec.credit || {},
+    featured: spec.featured === true
   }))
 }
 
@@ -102,10 +103,10 @@ export async function seed(db) {
       assertCatalogGame(game)
       const result = await tx.query(
         `insert into games (id, name, description, mechanic, duration, accent, token_interest, status, plays, generation, spec, created_at, updated_at, published_at, tags, featured, tier, freeform_html, credit)
-         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', null, $7, $7, $7, $8::jsonb, false, 'freeform', $9, $10::jsonb)
+         values ($1, $2, $3, $4, $5, $6, false, 'published', 0, 'seed', null, $7, $7, $7, $8::jsonb, $11, 'freeform', $9, $10::jsonb)
          on conflict (id) do nothing
          returning id`,
-        [game.id, game.name, game.description, game.type, game.duration, game.accent, game.createdAt, JSON.stringify(game.tags), game.freeformHtml, JSON.stringify(game.credit)]
+        [game.id, game.name, game.description, game.type, game.duration, game.accent, game.createdAt, JSON.stringify(game.tags), game.freeformHtml, JSON.stringify(game.credit), game.featured === true]
       )
       if (!result.rows.length) continue
       inserted += 1

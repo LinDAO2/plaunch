@@ -1,3 +1,4 @@
+import { attachArenaBridge } from '/arena-bridge.js'
 import { api, ensureCsrf } from '/client-api.js'
 import { mountWorld } from '/blocks-view.js'
 import { createRuntime, renderHint, typeNames } from '/mechanics.js'
@@ -9,6 +10,7 @@ const embed = new URLSearchParams(location.search).get('embed') === '1'
 let current = null
 let roundToken = null
 let freeformFrame = null
+let arenaBridge = null
 let freeformPoints = null
 let freeformBest = 0
 let board = { scores: [], unverified: [] }
@@ -143,6 +145,7 @@ function mountFreeform(src) {
   frame.title = current?.name || 'Game'
   frame.dataset.src = src
   freeformFrame = frame
+  arenaBridge = attachArenaBridge({ frame: () => freeformFrame, slug })
   field.append(frame)
   $('game').classList.add('freeform-on')
   $('display').hidden = true
@@ -177,6 +180,7 @@ window.addEventListener('message', (event) => {
     fitSandboxFrame(freeformFrame, size)
     return
   }
+  if (arenaBridge && freeformFrame && event.source === freeformFrame.contentWindow && event.origin === 'null' && arenaBridge.onMessage(event.data)) return
   const points = readSandboxScore(event, freeformFrame)
   if (points === null) return
   freeformBest = Math.max(freeformBest, points)

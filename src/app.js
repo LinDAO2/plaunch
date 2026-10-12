@@ -91,6 +91,7 @@ const FILES = new Map([
   ['/juice.js', 'juice.js'],
   ['/icons.js', 'icons.js'],
   ['/blocks-view.js', 'blocks-view.js'],
+  ['/arena-bridge.js', 'arena-bridge.js'],
   ['/fonts/bricolage-grotesque-latin-700.woff2', 'fonts/bricolage-grotesque-latin-700.woff2'],
   ['/fonts/source-sans-3-latin-400.woff2', 'fonts/source-sans-3-latin-400.woff2'],
   ['/fonts/source-sans-3-latin-600.woff2', 'fonts/source-sans-3-latin-600.woff2'],

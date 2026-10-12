@@ -23,12 +23,14 @@ const MARK = /wordle|tetris|pac-man|pacman|flappy bird|space invaders|\bmario\b/
 
 test('the template catalog and word list are complete', () => {
   const catalog = templateCatalog()
-  assert.equal(catalog.length, 12)
+  assert.equal(catalog.length, 15)
   const ids = catalog.map((item) => item.id)
   assert.deepEqual(ids, [
     'word-guess', 'block-drop', 'snake', 'merge-tiles', 'flap', 'breakout',
-    'platformer', 'endless-runner', 'space-shooter', 'maze-chomper', 'jump-up', 'match-3'
+    'platformer', 'endless-runner', 'space-shooter', 'maze-chomper', 'jump-up', 'match-3',
+    'arena', 'circuit-dash', 'beacon-isle'
   ])
+  const three = new Set(['arena', 'circuit-dash', 'beacon-isle'])
   for (const item of catalog) {
     assert.ok(item.name)
     assert.ok(item.tags.length)
@@ -40,8 +42,14 @@ test('the template catalog and word list are complete', () => {
     const html = templateHtml(item.id)
     assert.equal(inspectFreeform(html).join('; '), '')
     assert.match(html, new RegExp(`playground-template: ${item.id}`))
-    assert.match(html, /src="\/kaplay.js"/)
-    assert.match(html, /src="\/zzfx.js"/)
+    if (three.has(item.id)) {
+      assert.match(html, /src="\/three.js"/)
+      assert.match(html, /playground-engine: three/)
+      assert.doesNotMatch(html, /src="\/kaplay.js"/)
+    } else {
+      assert.match(html, /src="\/kaplay.js"/)
+      assert.match(html, /src="\/zzfx.js"/)
+    }
     assert.match(html, /PLAYGROUND CONFIG/)
     assert.match(html, /PLAYGROUND THEME/)
     assert.match(html, /PLAYGROUND RULES/)

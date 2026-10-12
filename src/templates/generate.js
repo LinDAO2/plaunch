@@ -96,8 +96,11 @@ function pickerMessages(prompt) {
 function editMessages(spec, prompt, changes) {
   const html = HTML[spec.id]
   const blocks = ['CONFIG', 'THEME', 'RULES'].map((name) => blockText(html, name)).join('\n')
+  const system = spec.engine === 'three'
+    ? 'You edit a three.js arena template. Return JSON only. Keys are optional: CONFIG, THEME, RULES. Include only fields you change. CONFIG values are integers inside the allowed ranges. THEME mode is one of deathmatch, tag, ctf, race, explore. THEME weapon is blaster, laser, or none. THEME sky is day, dusk, night, or neon. Palette values are #rrggbb. Names are short and original, never trademarked. RULES.scoreKill is a full function scoreKill(mode, kind) returning an integer. Do not return HTML.'
+    : `You edit one Kaplay template. Return JSON only. Keys are optional: CONFIG, THEME, RULES. Include only fields you change. CONFIG values are integers inside the allowed ranges. THEME palette values are #rrggbb colors. THEME names are short original titles, never trademarked game names. RULES values are full function source starting with "function <name>". Do not return HTML. ${KAPLAY_CHEATSHEET}`
   return [
-    { role: 'system', content: `You edit one Kaplay template. Return JSON only. Keys are optional: CONFIG, THEME, RULES. Include only fields you change. CONFIG values are integers inside the allowed ranges. THEME palette values are #rrggbb colors. THEME names are short original titles, never trademarked game names. RULES values are full function source starting with "function <name>". Do not return HTML. ${KAPLAY_CHEATSHEET}` },
+    { role: 'system', content: system },
     { role: 'user', content: `Template: ${spec.name} (${spec.id})\n${spec.description}\nIdea: ${prompt}\nChanges: ${changes.join('; ') || 'match the idea with colors, names, and a few numbers'}\nEditable fields: ${JSON.stringify(spec.fields)}\n${blocks}` }
   ]
 }

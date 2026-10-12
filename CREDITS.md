@@ -4,6 +4,8 @@ Template games are original Kaplay scripts. They follow the rules of the games b
 
 ## Engine and sound
 
+- **three.js r170 (0.170.0)** by the three.js authors. The browser build is `vendor/three/three.min.js`, served as `/three.js`. License text is `vendor/three/LICENSE` (MIT). Arena, Circuit Dash, and Beacon Isle draw with procedural boxes, cylinders, and spheres. No Kenney or Quaternius meshes are shipped. No neighborhood scene and no real-weapon model is included.
+
 - **Kaplay 3001.0.19** by the KAPLAY team. Pinned at `vendor/kaplay/kaplay-3001.0.19.js`. The file served as `/kaplay.js` is that build. License text is `vendor/kaplay/LICENSE.md`: MIT, plus extra restrictions that forbid using the software to train machine-learning models. npm lists the package license as MIT. Those extra clauses are in the vendored license and apply to this copy.
 - **ZzFXMicro 1.4.0** by Frank Force. `vendor/zzfx/zzfx.js` is the micro build, served as `/zzfx.js`. MIT, `vendor/zzfx/LICENSE`. The full ZzFX module is not shipped. It is an ES module and its header contains a URL the sandbox checker would reject.
 

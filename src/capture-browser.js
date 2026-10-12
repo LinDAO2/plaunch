@@ -1,7 +1,14 @@
 import http from 'node:http'
 import { once } from 'node:events'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 const LAUNCH_ARGS = ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
+const VENDOR_FILES = {
+  '/three.js': fileURLToPath(new URL('../vendor/three/three.min.js', import.meta.url)),
+  '/kaplay.js': fileURLToPath(new URL('../vendor/kaplay/kaplay-3001.0.19.js', import.meta.url)),
+  '/zzfx.js': fileURLToPath(new URL('../vendor/zzfx/zzfx.js', import.meta.url))
+}
 
 export async function launchCaptureBrowser() {
   let chromium
@@ -96,6 +103,10 @@ async function wake(page, id) {
     await start.click({ timeout: 3000 }).catch(() => {})
   }
   const phase = await page.evaluate(() => (window.__state && window.__state.phase) || '').catch(() => '')
+  if (await page.evaluate(() => window.__state && window.__state.engine === 'three').catch(() => false)) {
+    await page.waitForTimeout(900)
+    return
+  }
   if (phase === 'start') {
     await page.keyboard.press('Enter')
     await page.waitForFunction(() => window.__state.phase === 'play' || window.__state.phase === 'over', null, { timeout: 8000 })
@@ -157,9 +168,15 @@ export async function captureGame(browser, url, id) {
 }
 
 export async function captureHtml(browser, html) {
+  const files = new Map([['/game.html', html]])
+  for (const [name, file] of Object.entries(VENDOR_FILES)) {
+    if (html.includes(`src="${name}"`)) files.set(name, readFileSync(file))
+  }
+  const server = serveCapture(files)
+  const port = await server.listen()
   const page = await browser.newPage({ viewport: { width: 720, height: 720 }, deviceScaleFactor: 1 })
   try {
-    await page.setContent(html, { waitUntil: 'load', timeout: 15000 })
+    await page.goto(`http://127.0.0.1:${port}/game.html`, { waitUntil: 'load', timeout: 15000 })
     await wake(page, 'import')
     const png = await frameFromPage(page)
     if (!png || png.length < 800 || png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') return null
@@ -168,5 +185,6 @@ export async function captureHtml(browser, html) {
     return null
   } finally {
     await page.close()
+    await server.close()
   }
 }

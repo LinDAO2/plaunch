@@ -3,6 +3,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { aiStatus } from './src/ai/generate.js'
 import { createApp } from './src/app.js'
+import { createArenaHub } from './src/arena/hub.js'
 import { createWorldHub } from './src/blocks/hub.js'
 import { loadConfig } from './src/config.js'
 import { databaseKind, openDatabase } from './src/db.js'
@@ -37,10 +38,12 @@ export async function start() {
     servers.push(usercontent)
   } else {
     const hub = createWorldHub({ db, config })
+    const arena = createArenaHub({ db, config })
     const app = createApp({ db, config, hub })
     const server = http.createServer(app)
     hub.attach(server)
-    hubs.push(hub)
+    arena.attach(server)
+    hubs.push(hub, arena)
     await listen(server, config.port)
     servers.push(server)
     config.mainOrigins = unique([

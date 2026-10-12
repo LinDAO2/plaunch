@@ -1,6 +1,6 @@
 export const FREEFORM_MAX_BYTES = 150 * 1024
 
-const VENDOR_SCRIPTS = new Set(['/kaplay.js', '/zzfx.js'])
+const VENDOR_SCRIPTS = new Set(['/kaplay.js', '/zzfx.js', '/three.js'])
 
 const RULES = [
   [/<(?:script|link|iframe|object|embed)\b[^>]*\b(?:src|href)\s*=\s*['"]?\s*(?:https?:|\/\/)/i, 'External scripts and stylesheets are not allowed'],

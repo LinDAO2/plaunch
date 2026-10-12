@@ -11,6 +11,10 @@ const VENDOR = {
   '/zzfx.js': {
     body: readFileSync(fileURLToPath(new URL('../vendor/zzfx/zzfx.js', import.meta.url))),
     version: '1.4.0'
+  },
+  '/three.js': {
+    body: readFileSync(fileURLToPath(new URL('../vendor/three/three.min.js', import.meta.url))),
+    version: '0.170.0'
   }
 }
 

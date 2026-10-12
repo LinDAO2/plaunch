@@ -327,7 +327,8 @@ export function createWorldHub({ db, config }) {
         let url
         try { url = new URL(req.url || '/', 'http://localhost') } catch { socket.destroy(); return }
         const match = url.pathname.match(/^\/api\/worlds\/([a-z0-9-]+)$/)
-        if (!match) { socket.destroy(); return }
+        // Arena rooms listen on this same upgrade. Leave their sockets alone.
+        if (!match) return
         const origin = req.headers.origin
         if (origin && config.mainOrigins?.length && !config.mainOrigins.includes(origin)) {
           socket.destroy()

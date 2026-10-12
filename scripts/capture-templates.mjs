@@ -12,6 +12,7 @@ const files = new Map()
 for (const spec of TEMPLATES) files.set(`/${spec.id}`, renderTemplate(spec))
 files.set('/kaplay.js', await readFile(path.join(root, 'vendor/kaplay/kaplay-3001.0.19.js')))
 files.set('/zzfx.js', await readFile(path.join(root, 'vendor/zzfx/zzfx.js')))
+files.set('/three.js', await readFile(path.join(root, 'vendor/three/three.min.js')))
 
 const browser = await launchCaptureBrowser()
 if (!browser) {

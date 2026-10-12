@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { createApp } from '../src/app.js'
+import { createArenaHub } from '../src/arena/hub.js'
 import { createWorldHub } from '../src/blocks/hub.js'
 import { loadConfig } from '../src/config.js'
 import { openDatabase } from '../src/db.js'
@@ -38,9 +39,11 @@ export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
   await migrate(db)
   if (seed) await seedIfEmpty(db)
   const hub = createWorldHub({ db, config })
+  const arena = createArenaHub({ db, config })
   const app = createApp({ db, config, fetchImpl, hub })
   const server = http.createServer(app)
   hub.attach(server)
+  arena.attach(server)
   const usercontent = http.createServer(createUsercontentApp({ db, config }))
   const serverListening = once(server, 'listening')
   const userListening = once(usercontent, 'listening')
@@ -61,6 +64,7 @@ export async function startServer({ env = {}, fetchImpl, seed = true } = {}) {
     usercontentBase: config.usercontentOrigin,
     async close() {
       await hub.close()
+      await arena.close()
       await new Promise((resolve, reject) => usercontent.close((err) => err ? reject(err) : resolve()))
       await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()))
       await db.close()

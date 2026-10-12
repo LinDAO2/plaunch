@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { renderArena } from '../arena/render.js'
 import { TEMPLATES } from './catalog.js'
 import { PLAY, RULES } from './plays.js'
 import { SHELL } from './shell.js'
@@ -18,6 +19,7 @@ export function wordCount() {
 }
 
 export function renderTemplate(spec) {
+  if (spec.engine === 'three') return renderArena(spec)
   const rules = RULES[spec.id]
   const play = PLAY[spec.id]
   if (!rules || !play) throw new Error(`Missing template source for ${spec.id}`)
