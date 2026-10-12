@@ -3,7 +3,7 @@ import { cleanText } from '../validate.js'
 import { generateWorldIdea, wantsWorld } from '../blocks/spec.js'
 import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
 import { log } from '../log.js'
-import { DEFAULT_AI_TIMEOUT_MS, aiStatus, describeUpstreamError, geminiRequest, geminiText, openAiRequest, openAiText, resolveProvider } from './providers.js'
+import { DEFAULT_AI_TIMEOUT_MS, aiStatus, anthropicRequest, anthropicText, describeUpstreamError, geminiRequest, geminiText, openAiRequest, openAiResponsesRequest, openAiText, resolveProvider, resolveProviderChain, responsesText } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
 import { SAMPLE_SPECS } from './samples.js'
 import { STYLE_GUIDE } from '../style-kit.js'
@@ -68,8 +68,28 @@ function retryDelay() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+function requestFor(provider, messages, options) {
+  if (provider.id === 'gemini') return geminiRequest(provider, messages, options)
+  if (provider.id === 'anthropic') return anthropicRequest(provider, messages, options)
+  if (provider.id === 'openai') return openAiResponsesRequest(provider, messages, options)
+  return openAiRequest(provider, messages, options)
+}
+
+function textFor(provider, payload) {
+  if (provider.id === 'gemini') return geminiText(payload)
+  if (provider.id === 'anthropic') return anthropicText(payload)
+  if (provider.id === 'openai') return responsesText(payload)
+  return openAiText(payload)
+}
+
+function canFallback(err) {
+  if (!err) return false
+  if (err.code === 'ai_provider_auth' || err.code === 'ai_request_rejected' || err.code === 'ai_model_not_found') return false
+  return err.retry === true || err.code === 'ai_quota_exceeded'
+}
+
 async function callProvider(provider, messages, fetchImpl, options = {}) {
-  const request = provider.id === 'gemini' ? geminiRequest(provider, messages, options) : openAiRequest(provider, messages, options)
+  const request = requestFor(provider, messages, options)
   let response
   try {
     response = await fetchImpl(request.url, {
@@ -107,7 +127,7 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     error.retry = true
     throw error
   }
-  const content = provider.id === 'gemini' ? geminiText(payload) : openAiText(payload)
+  const content = textFor(provider, payload)
   if (!content) {
     const error = new HttpError(502, 'AI provider returned an empty response', 'ai_provider_error')
     error.retry = true
@@ -124,12 +144,20 @@ function withUpstream(error, source) {
 // One delayed retry for transient upstream failures (503, 500, 504, transport). Never for 4xx.
 export async function requestModelText(provider, messages, fetchImpl, options = {}) {
   const opts = { maxResponseChars: 262144, ...options }
+  options.onUse?.(provider)
+  const once = () => callProvider(provider, messages, fetchImpl, opts)
   try {
-    return await callProvider(provider, messages, fetchImpl, opts)
+    try {
+      return await once()
+    } catch (err) {
+      if (!err.retry || options.noRetry) throw err
+      if (err.retryDelayMs) await sleep(err.retryDelayMs)
+      return await once()
+    }
   } catch (err) {
-    if (!err.retry || options.noRetry) throw err
-    if (err.retryDelayMs) await sleep(err.retryDelayMs)
-    return callProvider(provider, messages, fetchImpl, opts)
+    const next = (options.fallbacks || [])[0]
+    if (!next || !canFallback(err)) throw err
+    return requestModelText(next, messages, fetchImpl, { ...options, fallbacks: options.fallbacks.slice(1) })
   }
 }
 
@@ -152,7 +180,7 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
   }
   const status = aiStatus(env)
   if (status.mode !== 'ai') return templateResult(prompt)
-  const provider = resolveProvider(env)
+  let provider = resolveProvider(env, 'spec')
   const idea = cleanText(prompt, 600)
   if (idea.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
   const messages = [
@@ -162,6 +190,7 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
   let lastError = 'AI provider failed'
   let code = 'ai_invalid_output'
   let providerFailures = 0
+  let fallbacks = resolveProviderChain(env, 'spec').slice(1)
   for (let attempt = 1; attempt <= 3; attempt++) {
     let raw
     try {
@@ -171,7 +200,15 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch }
       code = err.code || 'ai_provider_error'
       providerFailures += 1
       // Transport and 5xx failures get one retry; three 503s in a row burned free-tier quota live.
-      if (err.retry === false || attempt === 3 || providerFailures >= 2) throw withUpstream(new HttpError(502, lastError, code), err)
+      if (err.retry === false || attempt === 3 || providerFailures >= 2) {
+        if (canFallback(err) && fallbacks.length) {
+          provider = fallbacks.shift()
+          providerFailures = 0
+          attempt = 0
+          continue
+        }
+        throw withUpstream(new HttpError(502, lastError, code), err)
+      }
       if (err.retryDelayMs) await sleep(err.retryDelayMs)
       continue
     }

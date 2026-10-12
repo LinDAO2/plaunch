@@ -1,4 +1,4 @@
-# Playground — game launchpad v1.3.2
+# Playground — game launchpad v1.3.3
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 
@@ -70,6 +70,8 @@ npm test
 AI generation is capped per UTC day. Accounts use `AI_DAILY_LIMIT_PER_USER` (default 20). Guests use `AI_DAILY_LIMIT_PER_GUEST` (default 10) for that guest and again for the IP. Everyone shares `AI_DAILY_LIMIT_GLOBAL` (default 200). Over the cap, the route returns 429 with `ai_daily_limit`.
 
 `POST /api/generate` remains the template matcher even when a key is set.
+
+Providers are Gemini, xAI chat completions, OpenAI Responses (`gpt-6-astra` by default, no temperature), and Anthropic Messages (`claude-sonnet-5-5` by default, tool use, no temperature). `AI_PROVIDER_SPEC`, `AI_PROVIDER_FREEFORM`, and `AI_PROVIDER_SAFETY` override the path. `AI_FALLBACKS` is used only after a 429 or a 5xx. `npm run bakeoff -- --providers gemini,openai,anthropic --prompts test/bakeoff-prompts.txt` runs the fixture bakeoff and writes `artifacts/bakeoff/bakeoff.md`. Add `--smoke` for a headless pass. Token counts are recorded. USD is left blank when a model price is not confirmed.
 
 ### Template library
 

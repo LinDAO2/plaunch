@@ -505,7 +505,7 @@ async function refreshAccount() {
 
 async function refreshMode() {
   const status = await api('/ai/status')
-  const names = { gemini: 'Gemini', openai: 'OpenAI', xai: 'xAI' }
+  const names = { gemini: 'Gemini', openai: 'OpenAI', xai: 'xAI', anthropic: 'Anthropic' }
   $('gen-mode').textContent = names[status.provider] || 'Template'
   const off = $('ai-off')
   if (off) off.hidden = status.mode === 'ai'

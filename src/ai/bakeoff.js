@@ -1,0 +1,139 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { generateIdea } from './idea.js'
+import { templateFreeform, titleFromPrompt } from './freeform.js'
+import { inspectFreeform } from './freeform-check.js'
+import { validateGameSpec } from './gamespec.js'
+
+export function fixtureObject(prompt, body) {
+  const blob = JSON.stringify(body || {})
+  const idea = String(prompt || '')
+  if (blob.includes('general-audience')) return { flag: false, reason: '' }
+  if (blob.includes('"tier"') && blob.includes('freeform')) {
+    return { tier: /tower|rhythm|gravity|typing|pong/i.test(idea) ? 'freeform' : 'spec' }
+  }
+  if (blob.includes('templateId')) return { templateId: 'flap', confidence: 0.55, changes: ['candy colors'] }
+  if (blob.includes('"html"')) return { html: templateFreeform(idea) }
+  return { THEME: { names: { title: titleFromPrompt(idea).slice(0, 24) } } }
+}
+
+export function fixtureResponse(url, body, prompt) {
+  const value = fixtureObject(prompt, body)
+  const text = JSON.stringify(value)
+  if (String(url).includes('anthropic.com')) {
+    return {
+      content: [{ type: 'tool_use', name: 'emit_result', input: value }],
+      usage: { input_tokens: 120, output_tokens: 80 }
+    }
+  }
+  if (String(url).includes('/responses')) {
+    return { output_text: text, usage: { input_tokens: 120, output_tokens: 80 } }
+  }
+  if (String(url).includes('/chat/completions')) {
+    return { choices: [{ message: { content: text } }], usage: { prompt_tokens: 120, completion_tokens: 80 } }
+  }
+  return {
+    candidates: [{ content: { parts: [{ text }] } }],
+    usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 80 }
+  }
+}
+
+function tokensFrom(payload) {
+  const usage = payload?.usage || payload?.usageMetadata || {}
+  return {
+    input: usage.input_tokens || usage.promptTokenCount || usage.prompt_tokens || 0,
+    output: usage.output_tokens || usage.candidatesTokenCount || usage.completion_tokens || 0
+  }
+}
+
+export function fixtureFetch(prompt) {
+  const totals = { input: 0, output: 0 }
+  const fetchImpl = async (url, init = {}) => {
+    const body = init.body ? JSON.parse(init.body) : {}
+    const payload = fixtureResponse(url, body, prompt)
+    const used = tokensFrom(payload)
+    totals.input += used.input
+    totals.output += used.output
+    return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  return { fetchImpl, totals }
+}
+
+function providerEnv(id) {
+  return {
+    AI_PROVIDER: id,
+    GEMINI_API_KEY: id === 'gemini' ? 'fixture' : '',
+    OPENAI_API_KEY: id === 'openai' ? 'fixture' : '',
+    ANTHROPIC_API_KEY: id === 'anthropic' ? 'fixture' : '',
+    XAI_API_KEY: id === 'xai' ? 'fixture' : ''
+  }
+}
+
+export async function runBakeoff({ prompts, providers, outDir, smoke = false }) {
+  const results = []
+  await mkdir(outDir, { recursive: true })
+  const gamesDir = path.join(outDir, 'games')
+  await mkdir(gamesDir, { recursive: true })
+  for (const prompt of prompts) {
+    for (const id of providers) {
+      const started = Date.now()
+      const { fetchImpl, totals } = fixtureFetch(prompt)
+      try {
+        const idea = await generateIdea({ prompt, tier: 'auto', env: providerEnv(id), fetchImpl })
+        const html = idea.html || idea.game?.freeformHtml || ''
+        const problems = []
+        if (html) problems.push(...inspectFreeform(html))
+        else if (idea.spec) {
+          try { validateGameSpec(idea.spec) } catch (err) { problems.push(err.message) }
+        } else problems.push('No game document')
+        const file = `${id}-${prompt.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 40)}.json`
+        await writeFile(path.join(gamesDir, file), JSON.stringify({
+          prompt,
+          provider: id,
+          mode: idea.mode,
+          name: idea.game?.name || '',
+          html: html || null,
+          spec: idea.spec || null
+        }, null, 2))
+        results.push({
+          prompt,
+          provider: id,
+          ok: problems.length === 0,
+          mode: idea.mode,
+          model: idea.model,
+          ms: Date.now() - started,
+          tokens: { ...totals },
+          usd: null,
+          errors: problems,
+          smoke: smoke ? 'skipped-in-fixture' : 'off',
+          file
+        })
+      } catch (err) {
+        results.push({
+          prompt,
+          provider: id,
+          ok: false,
+          mode: 'error',
+          ms: Date.now() - started,
+          tokens: { ...totals },
+          usd: null,
+          errors: [err.message],
+          smoke: 'off',
+          file: ''
+        })
+      }
+    }
+  }
+  const markdown = [
+    '# Bakeoff',
+    '',
+    'Token counts are from the fixture or the provider usage field. USD is omitted when the model has no confirmed price.',
+    '',
+    '| Prompt | Provider | OK | Mode | ms | in | out |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
+    ...results.map((row) => `| ${row.prompt} | ${row.provider} | ${row.ok} | ${row.mode} | ${row.ms} | ${row.tokens.input} | ${row.tokens.output} |`)
+  ].join('\n')
+  await writeFile(path.join(outDir, 'bakeoff.json'), JSON.stringify({ results }, null, 2))
+  await writeFile(path.join(outDir, 'bakeoff.md'), markdown)
+  return results
+}

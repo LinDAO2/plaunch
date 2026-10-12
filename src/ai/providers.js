@@ -10,7 +10,7 @@ function timeoutEnv(value) {
   return Number.isInteger(n) && n >= 1000 && n <= 120_000 ? n : DEFAULT_AI_TIMEOUT_MS
 }
 
-export function resolveProvider(env = {}) {
+function providerFromChoice(env = {}) {
   const choice = String(env.AI_PROVIDER || 'auto').toLowerCase()
   const gemini = env.GEMINI_API_KEY ? {
     id: 'gemini',
@@ -29,17 +29,48 @@ export function resolveProvider(env = {}) {
   } : null
   const openai = env.OPENAI_API_KEY ? {
     id: 'openai',
-    model: env.OPENAI_MODEL || 'gpt-4o-mini',
+    model: env.OPENAI_MODEL || 'gpt-6-astra',
     apiKey: env.OPENAI_API_KEY,
     base: env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    timeoutMs: timeoutEnv(env.AI_TIMEOUT_MS)
+  } : null
+  const anthropic = env.ANTHROPIC_API_KEY ? {
+    id: 'anthropic',
+    model: env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
+    apiKey: env.ANTHROPIC_API_KEY,
+    base: env.ANTHROPIC_API_BASE || 'https://api.anthropic.com',
     timeoutMs: timeoutEnv(env.AI_TIMEOUT_MS)
   } : null
   if (choice === 'gemini') return gemini
   if (choice === 'xai') return xai
   if (choice === 'openai') return openai
-  if (choice === 'auto' || choice === '') return gemini || xai || openai || null
+  if (choice === 'anthropic') return anthropic
+  if (choice === 'auto' || choice === '') return gemini || xai || openai || anthropic || null
   return null
 }
+
+const PATHS = { spec: 'AI_PROVIDER_SPEC', freeform: 'AI_PROVIDER_FREEFORM', safety: 'AI_PROVIDER_SAFETY' }
+
+export function resolveProvider(env = {}, path) {
+  const routed = PATHS[path] ? env[PATHS[path]] : ''
+  if (routed) return providerFromChoice({ ...env, AI_PROVIDER: routed })
+  return providerFromChoice(env)
+}
+
+export function resolveProviderChain(env = {}, path) {
+  const primary = resolveProvider(env, path)
+  if (!primary) return []
+  const chain = [primary]
+  for (const id of String(env.AI_FALLBACKS || '').split(',')) {
+    const name = id.trim().toLowerCase()
+    if (!name || chain.some((item) => item.id === name)) continue
+    const next = providerFromChoice({ ...env, AI_PROVIDER: name })
+    if (next?.id === name) chain.push(next)
+  }
+  return chain
+}
+
+const PROVIDER_LABELS = { gemini: 'Gemini', xai: 'xAI', openai: 'OpenAI', anthropic: 'Anthropic' }
 
 export function aiStatus(env = {}) {
   const provider = resolveProvider(env)
@@ -51,7 +82,7 @@ export function aiStatus(env = {}) {
       notice: 'Template mode. No AI provider key is configured, so ideas use the built-in matcher instead of a model.'
     }
   }
-  const label = provider.id === 'gemini' ? 'Gemini' : provider.id === 'xai' ? 'xAI' : 'OpenAI'
+  const label = PROVIDER_LABELS[provider.id] || provider.id
   return {
     mode: 'ai',
     provider: provider.id,
@@ -123,7 +154,100 @@ export function openAiText(payload) {
   return typeof content === 'string' ? content : ''
 }
 
-const PROVIDER_LABELS = { gemini: 'Gemini', xai: 'xAI', openai: 'OpenAI' }
+export function responsesText(payload) {
+  if (typeof payload?.output_text === 'string' && payload.output_text) return payload.output_text
+  const chunks = []
+  for (const item of payload?.output || []) {
+    for (const part of item?.content || []) {
+      if (part?.type === 'output_text' && part.text) chunks.push(part.text)
+    }
+  }
+  return chunks.join('')
+}
+
+export function anthropicText(payload) {
+  const blocks = Array.isArray(payload?.content) ? payload.content : []
+  const tool = blocks.find((part) => part?.type === 'tool_use' && part.name === 'emit_result')
+  if (tool?.input && typeof tool.input === 'object') return JSON.stringify(tool.input)
+  return blocks.filter((part) => part?.type === 'text').map((part) => part.text || '').join('')
+}
+
+export function schemaIsStrict(schema) {
+  if (!schema || typeof schema !== 'object') return false
+  if (schema.type === 'array') return schemaIsStrict(schema.items || {})
+  if (schema.type !== 'object') return true
+  if (schema.additionalProperties !== false) return false
+  const props = schema.properties || {}
+  const keys = Object.keys(props)
+  const required = new Set(Array.isArray(schema.required) ? schema.required : [])
+  if (keys.some((key) => !required.has(key)) || required.size !== keys.length) return false
+  return keys.every((key) => schemaIsStrict(props[key]))
+}
+
+export function anthropicRequest(provider, messages, options = {}) {
+  const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n')
+  const input = messages.filter((message) => message.role !== 'system').map((message) => ({
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    content: message.content
+  }))
+  return {
+    url: `${trimBase(provider.base)}/v1/messages`,
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': provider.apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: {
+      model: provider.model,
+      max_tokens: options.maxOutputTokens || 2048,
+      system,
+      messages: input,
+      tools: [{
+        name: 'emit_result',
+        description: 'Return the JSON result for this step.',
+        input_schema: options.schema || { type: 'object', additionalProperties: true }
+      }],
+      tool_choice: { type: 'tool', name: 'emit_result' }
+    }
+  }
+}
+
+export function openAiResponsesRequest(provider, messages, options = {}) {
+  const instructions = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n')
+  const input = messages.filter((message) => message.role !== 'system').map((message) => ({
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    content: message.content
+  }))
+  const schema = options.schema || {
+    type: 'object',
+    additionalProperties: false,
+    properties: { result: { type: 'string' } },
+    required: ['result']
+  }
+  const body = {
+    model: provider.model,
+    store: false,
+    instructions,
+    input,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: options.schemaName || 'result',
+        strict: schemaIsStrict(schema),
+        schema
+      }
+    }
+  }
+  if (options.maxOutputTokens) body.max_output_tokens = options.maxOutputTokens
+  return {
+    url: `${trimBase(provider.base)}/responses`,
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${provider.apiKey}`
+    },
+    body
+  }
+}
 
 function redactSecrets(text, provider) {
   let out = String(text || '')
@@ -153,7 +277,7 @@ export function describeUpstreamError(provider, status, bodyText) {
   const tag = `${label} HTTP ${status}${upstreamCode ? ` ${upstreamCode}` : ''}`
   const code = String(upstreamCode).toUpperCase()
   let category
-  if (status === 503 || code === 'UNAVAILABLE') category = 'busy'
+  if (status === 503 || status === 529 || code === 'UNAVAILABLE' || code === 'OVERLOADED_ERROR') category = 'busy'
   else if (status === 429 || code === 'RESOURCE_EXHAUSTED') category = 'quota'
   else if (status === 401 || status === 403 || code === 'PERMISSION_DENIED' || code === 'UNAUTHENTICATED') category = 'auth'
   else if (status === 404 || code === 'NOT_FOUND') category = 'model_not_found'

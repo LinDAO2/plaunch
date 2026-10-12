@@ -1,0 +1,12 @@
+wordle
+flappy
+3D kart race
+neon arena
+match-3
+tower defense
+rhythm tap
+zombie-free survival island
+platformer with double jump
+typing game
+pong 2-player
+puzzle with gravity

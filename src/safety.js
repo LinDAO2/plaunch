@@ -1,5 +1,5 @@
 import { requestModelText } from './ai/generate.js'
-import { resolveProvider } from './ai/providers.js'
+import { resolveProviderChain } from './ai/providers.js'
 import { safetyModelOnPublish } from './config.js'
 
 const RULES = [
@@ -43,21 +43,21 @@ export async function classifySafety({ text, env = {}, fetchImpl, model }) {
   if (local) return { flagged: true, reason: local, source: 'blocklist' }
   const enabled = model === undefined ? safetyModelOnPublish(env) : Boolean(model)
   if (!enabled) return { flagged: false, reason: '', source: 'skipped' }
-  if (!env.GEMINI_API_KEY) return { flagged: false, reason: '', source: 'none' }
+  const chain = resolveProviderChain(env, 'safety')
+  let provider = chain[0]
+  if (!provider) return { flagged: false, reason: '', source: 'none' }
   try {
-    const provider = resolveProvider({ ...env, AI_PROVIDER: 'gemini' })
-    if (!provider) return { flagged: false, reason: '', source: 'none' }
     const raw = await requestModelText(provider, [
       { role: 'system', content: SAFETY_PROMPT },
       { role: 'user', content: String(text || '').slice(0, 4000) }
-    ], fetchImpl, { schema: SAFETY_SCHEMA, maxOutputTokens: 128 })
+    ], fetchImpl, { schema: SAFETY_SCHEMA, schemaName: 'safety_review', maxOutputTokens: 128, fallbacks: chain.slice(1), onUse: (item) => { provider = item } })
     let parsed = {}
     try { parsed = JSON.parse(String(raw).trim()) } catch { parsed = {} }
     if (parsed.flag === true) {
-      return { flagged: true, reason: cleanReason(parsed.reason, 'policy'), source: 'gemini' }
+      return { flagged: true, reason: cleanReason(parsed.reason, 'policy'), source: provider.id }
     }
-    return { flagged: false, reason: '', source: 'gemini' }
+    return { flagged: false, reason: '', source: provider.id }
   } catch {
-    return { flagged: false, reason: '', source: 'gemini-unavailable' }
+    return { flagged: false, reason: '', source: `${provider.id}-unavailable` }
   }
 }

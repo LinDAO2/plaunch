@@ -3,7 +3,7 @@ import { STYLE_GUIDE } from '../style-kit.js'
 import { cleanText } from '../validate.js'
 import { aiStatus, requestModelText } from './generate.js'
 import { assertFreeform, inspectFreeform } from './freeform-check.js'
-import { resolveProvider } from './providers.js'
+import { resolveProviderChain } from './providers.js'
 
 export const FREEFORM_SCHEMA = {
   type: 'object',
@@ -192,7 +192,8 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
       tierReason: 'Auto picked the freeform sandbox. The idea does not fit the arcade spec.'
     }
   }
-  const provider = resolveProvider(env)
+  const chain = resolveProviderChain(env, 'freeform')
+  let provider = chain[0]
   const messages = [
     { role: 'system', content: FREEFORM_PROMPT },
     { role: 'user', content: `Player idea:\n${idea}` }
@@ -201,7 +202,10 @@ export async function generateFreeform({ prompt, env, fetchImpl = globalThis.fet
   for (let attempt = 0; attempt < 2; attempt++) {
     const raw = await requestModelText(provider, messages, fetchImpl, {
       schema: FREEFORM_SCHEMA,
-      maxOutputTokens: 16384
+      schemaName: 'freeform_html',
+      maxOutputTokens: 16384,
+      fallbacks: chain.slice(1),
+      onUse: (item) => { provider = item }
     })
     const html = extractHtml(raw)
     errors = inspectFreeform(html)

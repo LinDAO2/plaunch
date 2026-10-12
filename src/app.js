@@ -108,7 +108,7 @@ const MIME = {
   '.png': 'image/png',
   '.woff2': 'font/woff2'
 }
-const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'seed', 'import'])
+const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'ai:anthropic', 'seed', 'import'])
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const SLUG = /^[a-z0-9-]{1,48}$/
 

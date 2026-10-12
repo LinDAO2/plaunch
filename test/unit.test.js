@@ -200,7 +200,11 @@ test('provider selection prefers Gemini, then xAI, then OpenAI', () => {
   assert.equal(gemini.id, 'gemini')
   assert.equal(gemini.model, 'gemini-3.5-flash')
   assert.equal(resolveProvider({ AI_PROVIDER: 'xai', GEMINI_API_KEY: 'g', XAI_API_KEY: 'x' }).id, 'xai')
-  assert.equal(resolveProvider({ AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).model, 'gpt-4o-mini')
+  assert.equal(resolveProvider({ AI_PROVIDER: 'openai', OPENAI_API_KEY: 'o' }).model, 'gpt-6-astra')
+  assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).id, 'anthropic')
+  assert.equal(resolveProvider({ ANTHROPIC_API_KEY: 'a' }).model, 'claude-sonnet-5-5')
+  assert.equal(resolveProvider({ GEMINI_API_KEY: 'g', XAI_API_KEY: 'x', OPENAI_API_KEY: 'o', ANTHROPIC_API_KEY: 'a' }).id, 'gemini')
+  assert.equal(resolveProvider({ AI_PROVIDER_SPEC: 'anthropic', AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a' }, 'spec').id, 'anthropic')
   assert.equal(resolveProvider({ GEMINI_MODEL: 'custom-gemini', GEMINI_API_KEY: 'g' }).model, 'custom-gemini')
 })
 

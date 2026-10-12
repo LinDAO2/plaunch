@@ -1,7 +1,7 @@
 import { HttpError } from '../errors.js'
 import { cleanText } from '../validate.js'
 import { aiStatus, requestModelText } from '../ai/generate.js'
-import { resolveProvider } from '../ai/providers.js'
+import { resolveProvider, resolveProviderChain } from '../ai/providers.js'
 import { TEMPLATES, templateById } from './catalog.js'
 import { EDIT_SCHEMA, KAPLAY_CHEATSHEET, PICK_SCHEMA } from './cheatsheet.js'
 import { hashText, pickTemplate } from './pick.js'
@@ -113,11 +113,12 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
   let spec = picked.template
   let changes = []
   if (status.mode !== 'ai') return pack(spec, themed(spec, idea, 0), env, null, idea, false)
-  const provider = resolveProvider(env)
+  const chain = resolveProviderChain(env, 'spec')
+  let provider = chain[0]
   if (!provider) return pack(spec, themed(spec, idea, 0), env, null, idea, false)
   if (picked.confidence < 0.84) {
     try {
-      const raw = await requestModelText(provider, pickerMessages(idea), fetchImpl, { schema: PICK_SCHEMA, maxOutputTokens: 300, noRetry: true })
+      const raw = await requestModelText(provider, pickerMessages(idea), fetchImpl, { schema: PICK_SCHEMA, schemaName: 'template_pick', maxOutputTokens: 300, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item } })
       const choice = parseModelJson(raw)
       const chosen = templateById(choice.templateId)
       if (chosen && Number(choice.confidence) >= 0.5) {
@@ -129,7 +130,7 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
     }
   }
   try {
-    const raw = await requestModelText(provider, editMessages(spec, idea, changes), fetchImpl, { schema: EDIT_SCHEMA, maxOutputTokens: 2048, noRetry: true })
+    const raw = await requestModelText(provider, editMessages(spec, idea, changes), fetchImpl, { schema: EDIT_SCHEMA, schemaName: 'template_edit', maxOutputTokens: 2048, noRetry: true, fallbacks: chain.slice(1), onUse: (item) => { provider = item } })
     const edits = parseModelJson(raw)
     const allowed = {}
     if (edits && typeof edits === 'object') {
@@ -152,7 +153,8 @@ export async function restyleTemplate({ templateId, html, prompt, turn = 1, env,
   const base = html && html.includes(`playground-template: ${spec.id}`) ? html : HTML[spec.id]
   const status = aiStatus(env)
   if (status.mode === 'ai') {
-    const provider = resolveProvider(env)
+    const chain = resolveProviderChain(env, 'spec')
+    let provider = chain[0]
     if (provider) {
       try {
         const raw = await requestModelText(provider, [
