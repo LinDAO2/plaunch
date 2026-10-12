@@ -58,13 +58,17 @@
   }
 
   body {
-    background: black;
+    background: #4FB3FF;
     display: flex;
     align-items: center;
     justify-content: center;
   }
   canvas {
-    border: 1px solid white;
+    display: block;
+    margin: 24px;
+    border: 6px solid #1B1B2F;
+    border-radius: 16px;
+    background: #7BC86C;
   }
   </style>
 
@@ -113,12 +117,12 @@ var context = canvas.getContext('2d');
 
 
 
-var grid = 16;
+var grid = 28;
 var count = 0;
 
 var snake = {
-  x: 160,
-  y: 160,
+  x: 168,
+  y: 168,
 
   
   dx: grid,
@@ -128,11 +132,11 @@ var snake = {
   cells: [],
 
   
-  maxCells: 4
+  maxCells: 8
 };
 var apple = {
-  x: 320,
-  y: 320
+  x: 224,
+  y: 168
 };
 
 
@@ -151,7 +155,12 @@ function loop() {
   }
 
   count = 0;
-  context.clearRect(0,0,canvas.width,canvas.height);
+  context.fillStyle = '#7BC86C';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#6aaf5c';
+  for (var stripe = 0; stripe < canvas.height; stripe += grid * 2) {
+    context.fillRect(0, stripe, canvas.width, grid);
+  }
 
   
   snake.x += snake.dx;
@@ -182,15 +191,17 @@ function loop() {
   }
 
   
-  context.fillStyle = 'red';
-  context.fillRect(apple.x, apple.y, grid-1, grid-1);
+  context.fillStyle = '#1B1B2F';
+  context.fillRect(apple.x - 1, apple.y - 1, grid + 2, grid + 2);
+  context.fillStyle = '#FF2E63';
+  context.fillRect(apple.x, apple.y, grid, grid);
 
   
-  context.fillStyle = 'green';
   snake.cells.forEach(function(cell, index) {
-
-    
-    context.fillRect(cell.x, cell.y, grid-1, grid-1);
+    context.fillStyle = '#1B1B2F';
+    context.fillRect(cell.x - 1, cell.y - 1, grid + 2, grid + 2);
+    context.fillStyle = index === 0 ? '#FFD23F' : '#14532d';
+    context.fillRect(cell.x, cell.y, grid, grid);
 
     
     if (cell.x === apple.x && cell.y === apple.y) {
@@ -200,8 +211,8 @@ function loop() {
       if (window.Playground) Playground.submitScore(snake.score);
 
       
-      apple.x = getRandomInt(0, 25) * grid;
-      apple.y = getRandomInt(0, 25) * grid;
+      apple.x = getRandomInt(0, Math.floor(canvas.width / grid)) * grid;
+      apple.y = getRandomInt(0, Math.floor(canvas.height / grid)) * grid;
     }
 
     
@@ -209,10 +220,10 @@ function loop() {
 
       
       if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
-        snake.x = 160;
-        snake.y = 160;
+        snake.x = 168;
+        snake.y = 168;
         snake.cells = [];
-        snake.maxCells = 4;
+        snake.maxCells = 8;
         snake.score = 0;
         snake.dx = grid;
         snake.dy = 0;

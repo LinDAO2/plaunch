@@ -178,24 +178,36 @@ async function wake(page, id) {
     return
   }
   if (id === 'stack-blocks') {
-    for (let i = 0; i < 8; i++) {
-      await page.keyboard.press('Space')
-      await page.waitForTimeout(220)
+    await page.keyboard.press('Space')
+    await page.waitForTimeout(250)
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press('ArrowDown')
+      await page.waitForTimeout(40)
     }
-    await page.evaluate(() => {
-      const canvas = document.querySelector('canvas')
-      if (!canvas) return
-      canvas.style.width = '420px'
-      canvas.style.height = 'auto'
-      canvas.style.imageRendering = 'pixelated'
-    })
+    await page.keyboard.press('ArrowLeft')
+    await page.waitForTimeout(700)
+    return
+  }
+  if (id === 'brick-bounce') {
+    await page.keyboard.press('Space')
+    await page.keyboard.down('ArrowRight')
+    await page.waitForTimeout(700)
+    await page.keyboard.up('ArrowRight')
+    return
+  }
+  if (id === 'grid-snake') {
+    await page.waitForTimeout(280)
+    await page.keyboard.press('ArrowDown')
+    await page.waitForTimeout(360)
+    await page.keyboard.press('ArrowLeft')
+    await page.waitForTimeout(360)
     return
   }
   if (id === 'tower-bounce') {
     await page.keyboard.down('ArrowLeft')
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(500)
     await page.keyboard.up('ArrowLeft')
-    await page.waitForTimeout(900)
+    await page.waitForTimeout(700)
     return
   }
   await page.keyboard.press('ArrowRight')
@@ -211,9 +223,20 @@ export async function captureGame(browser, url, id) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 })
     await page.waitForTimeout(250)
     await wake(page, id)
+    const pageFrame = id === 'stack-blocks' || id === 'brick-bounce' || id === 'tower-bounce' || id === 'grid-snake'
+    if (pageFrame) {
+      await page.evaluate(() => {
+        const pad = document.getElementById('pg-pad')
+        const start = document.getElementById('pg-start')
+        if (pad) pad.style.display = 'none'
+        if (start) start.hidden = true
+      })
+    }
     const png = id === 'tile-2048'
       ? await page.locator('.game-container').screenshot({ type: 'png' })
-      : await frameFromPage(page)
+      : pageFrame
+        ? await page.screenshot({ type: 'png' })
+        : await frameFromPage(page)
     if (!png || png.length < 800 || png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
       throw new Error(`empty poster for ${id}`)
     }

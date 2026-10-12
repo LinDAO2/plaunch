@@ -7,7 +7,7 @@ import { ARENA_TEMPLATES } from '../src/arena/templates.js'
 import { renderArena } from '../src/arena/render.js'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const artDir = '/opt/cursor/artifacts/posters/v135'
+const artDir = '/opt/cursor/artifacts/posters/v136'
 const ids = ['arena', 'circuit-dash', 'beacon-isle']
 
 const files = new Map()
@@ -32,9 +32,9 @@ for (const id of ids) {
 
 const three = files.get('/three.js')
 const packs = {
-  arena: ['blaster.glb', 'bolt.glb', 'astronaut.glb', 'alien.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb'],
+  arena: ['blaster.glb', 'bolt.glb', 'knight.glb', 'rogue.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb'],
   'circuit-dash': ['car.glb', 'barrier.glb', 'road.glb', 'tree.glb', 'pebble.glb'],
-  'beacon-isle': ['blaster.glb', 'bolt.glb', 'astronaut.glb', 'alien.glb', 'palm.glb', 'tree.glb', 'bush.glb', 'flower.glb', 'pebble.glb', 'grass.glb', 'beacon.glb']
+  'beacon-isle': ['blaster.glb', 'bolt.glb', 'knight.glb', 'rogue.glb', 'palm.glb', 'tree.glb', 'bush.glb', 'flower.glb', 'pebble.glb', 'grass.glb', 'beacon.glb']
 }
 const fonts = ['lilita-one-latin.woff2', 'rubik-latin-700.woff2', 'chakra-petch-latin-600.woff2']
   .reduce((n, name) => n + files.get(`/fonts/${name}`).length, 0)
@@ -122,6 +122,18 @@ try {
       await page.close()
     }
   }
+  const fps = await browser.newPage({ viewport: { width: 480, height: 480 }, deviceScaleFactor: 1 })
+  await fps.goto(`http://127.0.0.1:${port}/arena#sky=day`, { waitUntil: 'domcontentloaded', timeout: 20000 })
+  await fps.waitForFunction(() => window.__arena && window.__arena.ready, null, { timeout: 25000 })
+  await fps.evaluate(() => {
+    window.__arena.begin()
+    window.__arena.push({ mz: 0, mx: 0, fire: 0 })
+  })
+  await fps.waitForTimeout(600)
+  const fpsPng = await fps.screenshot({ type: 'png' })
+  await writeFile(path.join(artDir, 'fps-arena-day.png'), fpsPng)
+  console.log(JSON.stringify({ id: 'arena-fps', bytes: fpsPng.length, size: pngSize(fpsPng) }))
+  await fps.close()
 } finally {
   await browser.close()
   await server.close()

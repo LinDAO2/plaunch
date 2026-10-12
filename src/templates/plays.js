@@ -528,14 +528,18 @@ function mount() {
       }
     })
     onDraw(function () {
-      brick(px - 42, 392, 84, 26, rgb(255, 210, 63))
-      brick(px - 10, 372, 22, 22, rgb(244, 247, 251))
-      brick(px - 50, 404, 18, 20, rgb(255, 90, 60))
-      brick(px + 32, 404, 18, 20, rgb(255, 90, 60))
-      for (const bullet of bullets) brick(bullet.x - 3, bullet.y, 8, 18, rgb(255, 248, 230))
+      brick(px - 64, 348, 128, 44, rgb(255, 210, 63))
+      brick(px - 22, 316, 44, 36, rgb(125, 215, 255))
+      brick(px - 18, 324, 36, 18, rgb(255, 248, 230))
+      brick(px - 78, 372, 32, 36, rgb(255, 46, 99))
+      brick(px + 46, 372, 32, 36, rgb(255, 46, 99))
+      for (const bullet of bullets) brick(bullet.x - 5, bullet.y, 12, 32, rgb(255, 248, 230))
       for (const enemy of enemies) if (enemy.alive) {
-        brick(enemy.x - 30, enemy.y + 10, 60, 28, rgb(255, 90, 60))
-        if (!cast(4, enemy.x - 30, enemy.y - 16, 60)) stamp(THEME.sprites.hero, enemy.x - 28, enemy.y, 22)
+        brick(enemy.x - 58, enemy.y + 6, 116, 48, rgb(255, 46, 99))
+        brick(enemy.x - 24, enemy.y + 18, 48, 20, rgb(255, 210, 63))
+        brick(enemy.x - 70, enemy.y + 16, 22, 22, rgb(125, 215, 255))
+        brick(enemy.x + 48, enemy.y + 16, 22, 22, rgb(125, 215, 255))
+        if (!cast(4, enemy.x - 48, enemy.y - 52, 96)) stamp(THEME.sprites.hero, enemy.x - 36, enemy.y, 28)
       }
     })
   })
@@ -599,13 +603,17 @@ function mount() {
       }
     })
     onDraw(function () {
-      const cell = CONFIG.cell
+      const cw = 44
+      const ch = 68
+      const ox = Math.round((480 - cols * cw) / 2)
+      const oy = Math.round((480 - rows * ch) / 2)
+      brick(ox - 10, oy - 10, cols * cw + 20, rows * ch + 20, rgb(10, 18, 56))
       for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-        if (layout[y][x] === '#') brick(16 + x * cell, 46 + y * cell, cell - 4, cell - 4, rgb(47, 92, 210))
-        else if (dots[x + ',' + y]) drawCircle({ pos: vec2(16 + x * cell + cell / 2, 46 + y * cell + cell / 2), radius: 5, color: rgb(255, 210, 63) })
+        if (layout[y][x] === '#') brick(ox + x * cw + 3, oy + y * ch + 3, cw - 6, ch - 6, rgb(79, 179, 255))
+        else if (dots[x + ',' + y]) drawCircle({ pos: vec2(ox + x * cw + cw / 2, oy + y * ch + ch / 2), radius: 9, color: rgb(255, 210, 63) })
       }
-      if (!cast(6, 16 + px * cell, 46 + py * cell, cell - 2)) stamp(THEME.sprites.hero, 16 + px * cell, 46 + py * cell, Math.max(12, cell / 2))
-      if (!cast(8, 16 + gx * cell, 46 + gy * cell, cell - 2)) stamp(THEME.sprites.chaser, 16 + gx * cell, 46 + gy * cell, Math.max(12, cell / 2))
+      if (!cast(6, ox + px * cw - 8, oy + py * ch + 4, 60)) stamp(THEME.sprites.hero, ox + px * cw, oy + py * ch, 28)
+      if (!cast(8, ox + gx * cw - 8, oy + gy * ch + 4, 60)) stamp(THEME.sprites.chaser, ox + gx * cw, oy + gy * ch, 28)
     })
   })
 }

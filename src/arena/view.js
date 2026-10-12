@@ -190,11 +190,11 @@ function qualityLabel() {
 
 function packFiles() {
   if (theme.mode === 'race') return ['car.glb', 'barrier.glb', 'road.glb', 'tree.glb', 'pebble.glb']
-  if (theme.mode === 'explore') return ['blaster.glb', 'bolt.glb', 'astronaut.glb', 'alien.glb', 'palm.glb', 'tree.glb', 'bush.glb', 'flower.glb', 'pebble.glb', 'grass.glb', 'beacon.glb']
-  return ['blaster.glb', 'bolt.glb', 'astronaut.glb', 'alien.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb']
+  if (theme.mode === 'explore') return ['blaster.glb', 'bolt.glb', 'knight.glb', 'rogue.glb', 'palm.glb', 'tree.glb', 'bush.glb', 'flower.glb', 'pebble.glb', 'grass.glb', 'beacon.glb']
+  return ['blaster.glb', 'bolt.glb', 'knight.glb', 'rogue.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb']
 }
 
-const TOON = new Set(['astronaut', 'alien', 'blaster', 'bolt', 'car'])
+const TOON = new Set(['knight', 'rogue', 'blaster', 'bolt', 'car'])
 
 function toonMap() {
   if (toonMap.tex) return toonMap.tex
@@ -276,7 +276,7 @@ function prepare(gltf, name) {
   if (role === 'toon') {
     const thick = name === 'blaster' || name === 'bolt' ? 0.015 : 0.025
     root.traverse((obj) => {
-      if (!obj.isMesh || obj.userData.hull || obj.userData.rim) return
+      if (!obj.isMesh || obj.isSkinnedMesh || obj.userData.hull || obj.userData.rim) return
       addShell(obj, thick, '#3a4254', { hull: true, depthWrite: true })
       addShell(obj, thick + 0.02, '#ffffff', { rim: true, transparent: true, opacity: 0.34, depthWrite: false })
     })
@@ -289,14 +289,32 @@ function prepare(gltf, name) {
   const wrap = new THREE.Group()
   wrap.add(root)
   wrap.userData.size = { x: size.x, y: size.y, z: size.z }
+  wrap.userData.clips = gltf.animations || []
   return wrap
+}
+
+function cloneRig(src) {
+  const clone = src.clone(true)
+  const srcNodes = []
+  const dstNodes = []
+  src.traverse((obj) => srcNodes.push(obj))
+  clone.traverse((obj) => dstNodes.push(obj))
+  const map = new Map()
+  for (let i = 0; i < srcNodes.length; i++) map.set(srcNodes[i], dstNodes[i])
+  clone.traverse((obj) => {
+    if (!obj.isSkinnedMesh || !obj.skeleton) return
+    const bones = obj.skeleton.bones.map((bone) => map.get(bone) || bone)
+    obj.bind(new THREE.Skeleton(bones, obj.skeleton.boneInverses), obj.bindMatrix)
+  })
+  return clone
 }
 
 function take(name) {
   const src = models[name]
   if (!src) return null
-  const clone = src.clone(true)
+  const clone = src.userData.clips && src.userData.clips.length ? cloneRig(src) : src.clone(true)
   clone.userData.size = src.userData.size
+  clone.userData.clips = src.userData.clips || null
   const parts = Object.create(null)
   clone.traverse((obj) => {
     if (obj.name) parts[obj.name] = obj
@@ -738,8 +756,9 @@ function buildLevel() {
 function buildGun() {
   if (theme.weapon === 'none' || theme.mode === 'race') return
   gun = take('blaster') || new THREE.Group()
-  gun.scale.setScalar(1.35)
-  gun.position.set(0.42, -0.32, -0.52)
+  gun.scale.setScalar(1)
+  // About 27% of a 72° view, fully inside the bottom-right corner.
+  gun.position.set(0.62, -0.88, -1.48)
   gun.rotation.y = Math.PI - 0.14
   gun.userData.base = { x: gun.position.x, y: gun.position.y, z: gun.position.z, rx: gun.rotation.x }
   const tip = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), lit(grade.pickup, grade.pickup, qualityName === 'low' ? 0.8 : 3))
@@ -825,8 +844,9 @@ function actorMesh(actor) {
     rig.add(tag)
     rig.userData.tag = tag
   } else {
-    const useAlien = actor.bot && (String(actor.id).charCodeAt(String(actor.id).length - 1) % 2 === 0)
-    const body = take(useAlien && models.alien ? 'alien' : 'astronaut') || new THREE.Group()
+    const useRogue = actor.bot && (String(actor.id).charCodeAt(String(actor.id).length - 1) % 2 === 0)
+    const bodyName = useRogue && models.rogue ? 'rogue' : (models.knight ? 'knight' : '')
+    const body = (bodyName && take(bodyName)) || new THREE.Group()
     const height = body.userData.size ? 1.7 / body.userData.size.y : 1
     body.scale.setScalar(height)
     tilt.add(body)
@@ -837,6 +857,25 @@ function actorMesh(actor) {
     tintRig(body, tint)
     rig.userData.parts = body.userData.parts || {}
     rig.userData.base = body.userData.base || {}
+    const clips = body.userData.clips || []
+    if (clips.length && THREE.AnimationMixer) {
+      const mixer = new THREE.AnimationMixer(body)
+      const named = (clipName) => clips.find((clip) => clip.name === clipName) || clips[0]
+      const actions = {
+        idle: mixer.clipAction(named('Idle')),
+        run: mixer.clipAction(named('Running_A')),
+        shoot: mixer.clipAction(named('1H_Ranged_Shoot')),
+        death: mixer.clipAction(named('Death_A'))
+      }
+      actions.shoot.setLoop(THREE.LoopOnce, 1)
+      actions.shoot.clampWhenFinished = true
+      actions.death.setLoop(THREE.LoopOnce, 1)
+      actions.death.clampWhenFinished = true
+      actions.idle.play()
+      rig.userData.mixer = mixer
+      rig.userData.actions = actions
+      rig.userData.clip = 'idle'
+    }
     const tag = makeTag(actor.name, tint)
     tag.position.y = 2.05
     rig.add(tag)
@@ -856,6 +895,26 @@ function poseActor(rig, actor, moving, shooting, dt) {
   const tilt = rig.userData.tilt
   const parts = rig.userData.parts
   const base = rig.userData.base || {}
+  if (rig.userData.mixer) {
+    const want = !actor.alive ? 'death' : shooting ? 'shoot' : moving ? 'run' : 'idle'
+    if (rig.userData.clip !== want) {
+      const prev = rig.userData.actions[rig.userData.clip]
+      const next = rig.userData.actions[want]
+      if (prev) prev.fadeOut(0.12)
+      next.reset().fadeIn(0.12).play()
+      rig.userData.clip = want
+    }
+    rig.userData.mixer.update(dt)
+    if (!actor.alive) rig.userData.death += dt
+    else {
+      rig.userData.death = 0
+      if (tilt) {
+        tilt.rotation.x = 0
+        tilt.position.y = 0
+      }
+    }
+    return
+  }
   if (!actor.alive) {
     rig.userData.death += dt
     if (tilt) tilt.rotation.x = Math.min(1.15, rig.userData.death * 2.2)
@@ -1391,11 +1450,7 @@ function paint(actors, you, left, feed, over, beacons, flags, dt, input) {
       gun.position.y = base.y + Math.abs(Math.cos(animT * 7.5)) * 0.014 * bob + recoil * 0.02
       gun.position.z = base.z + recoil * 0.05
       gun.rotation.x = base.rx - recoil * (2 * Math.PI / 180)
-      if (posterMode && theme.mode !== 'race') {
-        gun.position.z = base.z - 0.38
-        gun.position.x = base.x - 0.06
-        gun.scale.setScalar(1.6)
-      }
+      gun.scale.setScalar(posterMode && theme.mode !== 'race' ? 0.72 : 1)
     }
     const aliveIds = new Set()
     for (const actor of drawn) {

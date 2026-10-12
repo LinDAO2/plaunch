@@ -70,7 +70,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
+      note: 'KayKit Adventurers CC0 characters and Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
     }
   },
   {
@@ -102,7 +102,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
+      note: 'KayKit Adventurers CC0 characters and Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
     }
   },
   {
@@ -134,7 +134,7 @@ export const ARENA_TEMPLATES = [
       source: 'https://github.com/mrdoob/three.js/tree/r170',
       sha: 'r170',
       origin: 'template',
-      note: 'Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
+      note: 'KayKit Adventurers CC0 characters and Kenney CC0 meshes in vendor/arena-assets. three.js r170 is MIT. Day, dusk, night, and neon lighting follow the v1.3.1 art-direction table.'
     }
   }
 ]

@@ -64,7 +64,11 @@
   }
 
   canvas {
-    border: 1px solid black;
+    display: block;
+    margin: 16px;
+    border: 6px solid #1B1B2F;
+    border-radius: 16px;
+    background: #4FB3FF;
   }
   </style>
 
@@ -182,7 +186,10 @@ let prevDoodleY = doodle.y;
 
 function loop() {
   requestAnimationFrame(loop);
-  context.clearRect(0,0,canvas.width,canvas.height);
+  context.fillStyle = '#4FB3FF';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#CDEBFF';
+  context.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
 
   
   doodle.dy += gravity;
@@ -245,9 +252,13 @@ function loop() {
   }
 
   
-  context.fillStyle = 'green';
   platforms.forEach(function(platform) {
+    context.fillStyle = '#1B1B2F';
+    context.fillRect(platform.x - 2, platform.y - 2, platformWidth + 4, platformHeight + 6);
+    context.fillStyle = '#7BC86C';
     context.fillRect(platform.x, platform.y, platformWidth, platformHeight);
+    context.fillStyle = '#FFD23F';
+    context.fillRect(platform.x, platform.y, platformWidth, 6);
 
     
     if (
@@ -274,8 +285,12 @@ function loop() {
   });
 
   
-  context.fillStyle = 'yellow';
+  context.fillStyle = '#1B1B2F';
+  context.fillRect(doodle.x - 3, doodle.y - 3, doodle.width + 6, doodle.height + 6);
+  context.fillStyle = '#FFD23F';
   context.fillRect(doodle.x, doodle.y, doodle.width, doodle.height);
+  context.fillStyle = '#FF2E63';
+  context.fillRect(doodle.x + 8, doodle.y + 14, doodle.width - 16, 16);
 
   prevDoodleY = doodle.y;
 

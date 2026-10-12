@@ -58,10 +58,17 @@
   }
 
   body {
-    background: black;
+    background: #4FB3FF;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  #game {
+    display: block;
+    margin: 20px;
+    border: 6px solid #1B1B2F;
+    border-radius: 16px;
+    background: #16325a;
   }
   </style>
 
@@ -129,16 +136,16 @@ const level1 = [
 
 
 const colorMap = {
-  'R': 'red',
-  'O': 'orange',
-  'G': 'green',
-  'Y': 'yellow'
+  'R': '#FF2E63',
+  'O': '#FF9A1F',
+  'G': '#7BC86C',
+  'Y': '#FFD23F'
 };
 
 
 const brickGap = 2;
 const brickWidth = 25;
-const brickHeight = 12;
+const brickHeight = 18;
 
 
 
@@ -164,9 +171,9 @@ for (let row = 0; row < level1.length; row++) {
 
 const paddle = {
   
-  x: canvas.width / 2 - brickWidth / 2,
+  x: canvas.width / 2 - (brickWidth * 3) / 2,
   y: 440,
-  width: brickWidth,
+  width: brickWidth * 3,
   height: brickHeight,
 
   
@@ -174,10 +181,10 @@ const paddle = {
 };
 
 const ball = {
-  x: 130,
-  y: 260,
-  width: 5,
-  height: 5,
+  x: 180,
+  y: 360,
+  width: 12,
+  height: 12,
 
   
   speed: 2,
@@ -208,8 +215,8 @@ function loop() {
   if (paddle.x < wallSize) {
     paddle.x = wallSize
   }
-  else if (paddle.x + brickWidth > canvas.width - wallSize) {
-    paddle.x = canvas.width - wallSize - brickWidth;
+  else if (paddle.x + paddle.width > canvas.width - wallSize) {
+    paddle.x = canvas.width - wallSize - paddle.width;
   }
 
   
@@ -278,24 +285,31 @@ function loop() {
   }
 
   
-  context.fillStyle = 'lightgrey';
+  context.fillStyle = '#16325a';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#1B1B2F';
   context.fillRect(0, 0, canvas.width, wallSize);
   context.fillRect(0, 0, wallSize, canvas.height);
   context.fillRect(canvas.width - wallSize, 0, wallSize, canvas.height);
 
   
   if (ball.dx || ball.dy) {
+    context.fillStyle = '#F4F7FB';
     context.fillRect(ball.x, ball.y, ball.width, ball.height);
   }
 
   
   bricks.forEach(function(brick) {
+    context.fillStyle = '#1B1B2F';
+    context.fillRect(brick.x - 1, brick.y - 1, brick.width + 2, brick.height + 2);
     context.fillStyle = brick.color;
     context.fillRect(brick.x, brick.y, brick.width, brick.height);
   });
 
   
-  context.fillStyle = 'cyan';
+  context.fillStyle = '#B8860B';
+  context.fillRect(paddle.x, paddle.y + 4, paddle.width, paddle.height);
+  context.fillStyle = '#FFD23F';
   context.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
 }
 

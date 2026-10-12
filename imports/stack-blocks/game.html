@@ -51,24 +51,16 @@
 
   <title>Stack</title>
   <style>
-    body      { font-family: Helvetica, sans-serif; }
-    #stack   { margin: 1em auto; padding: 1em; border: 4px solid black; border-radius: 10px; background-color: #F8F8F8; }
-    #stats    { display: inline-block; vertical-align: top; }
-    #canvas   { display: inline-block; vertical-align: top; background: url(texture.jpg); box-shadow: 10px 10px 10px #999; border: 2px solid #333; }
-    #menu     { display: inline-block; vertical-align: top; position: relative; }
-    #menu p   { margin: 0.5em 0; text-align: center; }
-    #menu p a { text-decoration: none; color: black; }
-    #upcoming { display: block; margin: 0 auto; background-color: #E0E0E0; }
-    #score    { color: red; font-weight: bold; vertical-align: middle; }
-    #rows     { color: blue; font-weight: bold; vertical-align: middle; }
-    #stats    { position: absolute; bottom: 0em; right: 1em; }
-    @media screen and (min-width:   0px) and (min-height:   0px)  { #stack { font-size: 0.75em; width: 250px; } #menu { width: 100px; height: 200px; } #upcoming { width:  50px; height:  50px; } #canvas { width: 100px; height: 200px; } }  
-    @media screen and (min-width: 400px) and (min-height: 400px)  { #stack { font-size: 1.00em; width: 350px; } #menu { width: 150px; height: 300px; } #upcoming { width:  75px; height:  75px; } #canvas { width: 150px; height: 300px; } }  
-    @media screen and (min-width: 500px) and (min-height: 500px)  { #stack { font-size: 1.25em; width: 450px; } #menu { width: 200px; height: 400px; } #upcoming { width: 100px; height: 100px; } #canvas { width: 200px; height: 400px; } }  
-    @media screen and (min-width: 600px) and (min-height: 600px)  { #stack { font-size: 1.50em; width: 550px; } #menu { width: 250px; height: 500px; } #upcoming { width: 125px; height: 125px; } #canvas { width: 250px; height: 500px; } }  
-    @media screen and (min-width: 700px) and (min-height: 700px)  { #stack { font-size: 1.75em; width: 650px; } #menu { width: 300px; height: 600px; } #upcoming { width: 150px; height: 150px; } #canvas { width: 300px; height: 600px; } }  
-    @media screen and (min-width: 800px) and (min-height: 800px)  { #stack { font-size: 2.00em; width: 750px; } #menu { width: 350px; height: 700px; } #upcoming { width: 175px; height: 175px; } #canvas { width: 350px; height: 700px; } }  
-    @media screen and (min-width: 900px) and (min-height: 900px)  { #stack { font-size: 2.25em; width: 850px; } #menu { width: 400px; height: 800px; } #upcoming { width: 200px; height: 200px; } #canvas { width: 400px; height: 800px; } }  
+    body      { font-family: Rubik, Helvetica, sans-serif; }
+    #stack    { margin: 16px; padding: 12px 14px 14px; border: 6px solid #1B1B2F; border-radius: 18px; background: #16325a; width: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #menu     { display: flex; align-items: center; gap: 14px; width: auto; height: auto; position: static; color: #F4F7FB; }
+    #menu p   { margin: 0; text-align: center; color: #F4F7FB; }
+    #menu p a { text-decoration: none; color: #FFD23F; }
+    #start    { display: none; }
+    #upcoming { display: block; margin: 0; background: #24184e; border: 3px solid #1B1B2F; border-radius: 8px; width: 64px; height: 64px; }
+    #score, #rows { color: #FFD23F; font-weight: 700; }
+    #stats    { position: static; display: none; }
+    #canvas   { display: block; background: #12082a; box-shadow: none; border: 4px solid #FFD23F; border-radius: 8px; width: 220px; height: 440px; }
   </style>
 
 <style>@font-face{font-family:"Lilita One";src:url("/fonts/lilita-one-latin.woff2") format("woff2");font-weight:400;font-display:swap}
@@ -196,13 +188,13 @@ html,body{margin:0!important;padding:0!important;height:100%;background:#4FB3FF;
     
     
 
-    var i = { size: 4, blocks: [0x0F00, 0x2222, 0x00F0, 0x4444], color: 'cyan'   };
-    var j = { size: 3, blocks: [0x44C0, 0x8E00, 0x6440, 0x0E20], color: 'blue'   };
-    var l = { size: 3, blocks: [0x4460, 0x0E80, 0xC440, 0x2E00], color: 'orange' };
-    var o = { size: 2, blocks: [0xCC00, 0xCC00, 0xCC00, 0xCC00], color: 'yellow' };
-    var s = { size: 3, blocks: [0x06C0, 0x8C40, 0x6C00, 0x4620], color: 'green'  };
-    var t = { size: 3, blocks: [0x0E40, 0x4C40, 0x4E00, 0x4640], color: 'purple' };
-    var z = { size: 3, blocks: [0x0C60, 0x4C80, 0xC600, 0x2640], color: 'red'    };
+    var i = { size: 4, blocks: [0x0F00, 0x2222, 0x00F0, 0x4444], color: '#7ad7ff' };
+    var j = { size: 3, blocks: [0x44C0, 0x8E00, 0x6440, 0x0E20], color: '#2F7BFF' };
+    var l = { size: 3, blocks: [0x4460, 0x0E80, 0xC440, 0x2E00], color: '#FF9A1F' };
+    var o = { size: 2, blocks: [0xCC00, 0xCC00, 0xCC00, 0xCC00], color: '#FFD23F' };
+    var s = { size: 3, blocks: [0x06C0, 0x8C40, 0x6C00, 0x4620], color: '#7BC86C' };
+    var t = { size: 3, blocks: [0x0E40, 0x4C40, 0x4E00, 0x4640], color: '#C04BFF' };
+    var z = { size: 3, blocks: [0x0C60, 0x4C80, 0xC600, 0x2640], color: '#FF2E63' };
 
     
     
@@ -456,6 +448,7 @@ html,body{margin:0!important;padding:0!important;height:100%;background:#4FB3FF;
     function draw() {
       ctx.save();
       ctx.lineWidth = 1;
+      ctx.strokeStyle = '#FFD23F';
       ctx.translate(0.5, 0.5); 
       drawCourt();
       drawNext();
@@ -467,6 +460,8 @@ html,body{margin:0!important;padding:0!important;height:100%;background:#4FB3FF;
     function drawCourt() {
       if (invalid.court) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#12082a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         if (playing)
           drawPiece(ctx, current.type, current.x, current.y, current.dir);
         var x, y, block;
@@ -518,7 +513,9 @@ html,body{margin:0!important;padding:0!important;height:100%;background:#4FB3FF;
     function drawBlock(ctx, x, y, color) {
       ctx.fillStyle = color;
       ctx.fillRect(x*dx, y*dy, dx, dy);
-      ctx.strokeRect(x*dx, y*dy, dx, dy)
+      ctx.strokeStyle = '#1B1B2F';
+      ctx.lineWidth = Math.max(2, Math.round(Math.min(dx, dy) * 0.12));
+      ctx.strokeRect(x*dx + 1, y*dy + 1, dx - 2, dy - 2);
     }
 
     

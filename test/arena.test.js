@@ -209,7 +209,7 @@ test('three.js is served from the sandbox origin and arena is on the guest play 
     const bytes = Buffer.byteLength(Buffer.from(await script.arrayBuffer()))
     assert.ok(bytes < 5 * 1024 * 1024, `three.js is ${bytes} bytes`)
     assert.ok(bytes > 100000)
-    const assetNames = ['astronaut.glb', 'alien.glb', 'blaster.glb', 'bolt.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb']
+    const assetNames = ['knight.glb', 'rogue.glb', 'blaster.glb', 'bolt.glb', 'wall.glb', 'barrel.glb', 'crate.glb', 'rock.glb', 'dish.glb']
     let assetBytes = 0
     for (const name of assetNames) {
       const asset = await fetch(`${server.usercontentBase}/assets/${name}`)
