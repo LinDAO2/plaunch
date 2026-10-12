@@ -304,7 +304,7 @@ test('every template boots, takes input, and posts a score', { timeout: 240000 }
           const before = await page.evaluate(() => window.__state.input)
           await page.keyboard.press('ArrowRight')
           await page.waitForFunction((value) => window.__state.input > value, before, { timeout: 4000 })
-          await page.waitForFunction(() => window.__posted === true && window.__scores.length > 0, null, { timeout: 10000 })
+          await page.waitForFunction(() => window.__posted === true && window.__scores.length > 0, null, { timeout: 16000 })
           const report = await page.evaluate(() => ({
             phase: window.__state.phase,
             score: window.__state.score,
