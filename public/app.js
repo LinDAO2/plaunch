@@ -619,7 +619,7 @@ for (const sky of document.querySelectorAll('.sky')) {
     prompt.focus()
   })
 }
-const promptExamples = ['a candy island with a pyramid', 'snow caves at dusk', 'a desert treasure hunt', 'a moon base at night']
+const promptExamples = ['a forest lake with a cabin to build', 'snowy mountain peaks', 'a desert canyon', 'a beach cove', 'a shared watchtower', 'a clear lake']
 let promptExample = 0
 setInterval(() => {
   const prompt = $('prompt')

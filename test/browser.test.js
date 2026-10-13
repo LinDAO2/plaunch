@@ -188,7 +188,7 @@ test('redesign pages fit a desktop', { timeout: 180000 }, async () => {
     await shot(desktop, '01-home-desktop.png')
     await desktop.locator('.idea').first().click()
     await desktop.click('#generate')
-    await desktop.waitForFunction(() => document.querySelector('#editor')?.hidden === false && /Candy/.test(document.querySelector('#name')?.value || ''))
+    await desktop.waitForFunction(() => document.querySelector('#editor')?.hidden === false && /Lake/.test(document.querySelector('#name')?.value || ''))
     await shot(desktop, '01-editor-desktop.png')
     await desktop.goto(server.base + '/discover', { waitUntil: 'domcontentloaded' })
     await desktop.waitForFunction(() => document.body.innerText.includes('Click Frenzy') && document.querySelector('.card-share'))
