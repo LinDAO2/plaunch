@@ -618,9 +618,11 @@ ${shader.fragmentShader}`
           quality.tier === 'high' &&
           ground === DUNE &&
           (world.biome === 'desert' || world.landform === 'canyon') &&
-          hash2(x, z, (world.seed || 1) + 67) > 0.955
+          x % 8 === 3 &&
+          z % 8 === 5 &&
+          hash2(x, z, (world.seed || 1) + 67) > 0.2
         ) {
-          pushCactus(take('cactus'), x, z, h + 1, 0.85 + hash2(x, z, (world.seed || 1) + 68) * 0.35)
+          pushCactus(take('cactus'), x, z, h + 1, 0.9 + hash2(x, z, (world.seed || 1) + 68) * 0.35)
         }
       }
     }
