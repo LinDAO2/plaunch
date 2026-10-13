@@ -5,9 +5,49 @@ import {
   CANOPY, CANDY, CLAY, DUNE, FROST, GLOW, PETAL, POOL, ROCK, SOIL, TIMBER, TURF
 } from '/blocks/blocks.js'
 
-const THREE = globalThis.THREE
+let THREE = globalThis.THREE
 
 const TIME = { value: 0 }
+
+function hash3(x, y, z, seed) {
+  let n = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 1274126177) ^ Math.imul(seed | 0, 1442695041)
+  n = Math.imul(n ^ (n >>> 13), 1274126177)
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296
+}
+
+function fade3(t) {
+  return t * t * (3 - 2 * t)
+}
+
+function noise3(x, y, z, seed) {
+  const x0 = Math.floor(x)
+  const y0 = Math.floor(y)
+  const z0 = Math.floor(z)
+  const fx = fade3(x - x0)
+  const fy = fade3(y - y0)
+  const fz = fade3(z - z0)
+  let acc = 0
+  for (let dz = 0; dz <= 1; dz++) {
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dx = 0; dx <= 1; dx++) {
+        const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz)
+        acc += w * hash3(x0 + dx, y0 + dy, z0 + dz, seed)
+      }
+    }
+  }
+  return acc
+}
+
+let boulderSrc = null
+function boulderSource() {
+  if (boulderSrc) return boulderSrc
+  const geo = new THREE.IcosahedronGeometry(1, 2)
+  const pos = new Float32Array(geo.attributes.position.array)
+  const index = geo.index ? new Uint32Array(geo.index.array) : null
+  boulderSrc = { pos, index, count: geo.attributes.position.count }
+  geo.dispose()
+  return boulderSrc
+}
 
 export function detectQuality() {
   const embed = document.body.classList.contains('embed') || new URLSearchParams(location.search).get('embed') === '1'
@@ -80,6 +120,45 @@ function pbrMaterial(loader, name, extra = {}) {
   material.customProgramCacheKey = () => (sway ? `sway:${name}` : `pbr:${name}`)
   material.onBeforeCompile = (shader) => {
     patchVertex(shader, sway ? LEAF_SWAY : '')
+  }
+  return material
+}
+
+function boulderMaterial(loader) {
+  const material = pbrMaterial(loader, 'stone')
+  material.customProgramCacheKey = () => 'boulder-triplanar'
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uRockScale = { value: 0.62 }
+    shader.vertexShader = `varying vec3 vWorldPos;\nvarying vec3 vWorldNormal;\n${shader.vertexShader}`
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      vWorldNormal = normalize(mat3(modelMatrix) * objectNormal);`
+    )
+    shader.fragmentShader = `varying vec3 vWorldPos;\nvarying vec3 vWorldNormal;\nuniform float uRockScale;\n${shader.fragmentShader}`
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `vec3 rockBlend = abs(normalize(vWorldNormal));
+      rockBlend = pow(rockBlend, vec3(4.0));
+      rockBlend /= (rockBlend.x + rockBlend.y + rockBlend.z);
+      #ifdef USE_MAP
+        vec3 rockX = texture2D(map, vWorldPos.zy * uRockScale).rgb;
+        vec3 rockY = texture2D(map, vWorldPos.xz * uRockScale).rgb;
+        vec3 rockZ = texture2D(map, vWorldPos.xy * uRockScale).rgb;
+        diffuseColor *= vec4(rockX * rockBlend.x + rockY * rockBlend.y + rockZ * rockBlend.z, 1.0);
+      #endif`
+    )
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <roughnessmap_fragment>',
+      `float roughnessFactor = roughness;
+      #ifdef USE_ROUGHNESSMAP
+        float roughX = texture2D(roughnessMap, vWorldPos.zy * uRockScale).g;
+        float roughY = texture2D(roughnessMap, vWorldPos.xz * uRockScale).g;
+        float roughZ = texture2D(roughnessMap, vWorldPos.xy * uRockScale).g;
+        roughnessFactor *= roughX * rockBlend.x + roughY * rockBlend.y + roughZ * rockBlend.z;
+      #endif`
+    )
   }
   return material
 }
@@ -221,6 +300,7 @@ function ensureDepth(target) {
 }
 
 export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
+  THREE = globalThis.THREE || THREE
   if (!THREE) return { ok: false, quality: detectQuality(), remeshAll() {}, remeshAt() {}, render() {}, project() { return null }, dispose() {} }
   const quality = detectQuality()
   let renderer
@@ -313,11 +393,12 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     glow: flatMaterial(0xd6e25a, { roughness: 0.4, emissive: 0xc6d84a, emissiveIntensity: 0.6 }),
     cactus: new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.74,
+      roughness: 0.86,
       metalness: 0,
       vertexColors: true,
       side: THREE.DoubleSide
-    })
+    }),
+    boulder: boulderMaterial(loader)
   }
   if (quality.tier === 'high') materials.water.roughness = 0.09
   for (const material of Object.values(materials)) {
@@ -524,49 +605,240 @@ ${shader.fragmentShader}`
     return [color[0] * scale, color[1] * scale, color[2] * scale]
   }
 
-  function pushRock(bag, x, z, y, height, spread, color) {
+  function pushBoulder(bag, x, z, y) {
+    const src = boulderSource()
+    const seed = ((world.seed || 1) + x * 19 + z * 37) | 0
+    const a = hash2(x, z, seed + 11)
+    const b = hash2(x, z, seed + 17)
+    const c = hash2(x, z, seed + 23)
+    const d = hash2(x, z, seed + 29)
+    const e = hash2(x, z, seed + 31)
+    const radius = 0.58 + a * 0.95
+    const squash = 0.42 + b * 0.28
+    const stretchX = 0.72 + c * 0.5
+    const stretchZ = 0.7 + d * 0.55
+    const yaw = a * Math.PI * 2
+    const pitch = (b - 0.5) * 0.9
+    const roll = (c - 0.5) * 0.7
+    const cy = Math.cos(yaw)
+    const sy = Math.sin(yaw)
+    const cp = Math.cos(pitch)
+    const sp = Math.sin(pitch)
+    const cr = Math.cos(roll)
+    const sr = Math.sin(roll)
+    const count = src.count
+    const pts = new Float32Array(count * 3)
+    const shade = new Float32Array(count)
+    for (let i = 0; i < count; i++) {
+      let vx = src.pos[i * 3]
+      let vy = src.pos[i * 3 + 1]
+      let vz = src.pos[i * 3 + 2]
+      const len = Math.hypot(vx, vy, vz) || 1
+      const n = noise3(vx * 1.7, vy * 1.7, vz * 1.7, seed)
+      const n2 = noise3(vx * 3.3 + 2.1, vy * 3.3, vz * 3.3 - 1.4, seed + 9)
+      const disp = (n - 0.5) * 0.46 + (n2 - 0.5) * 0.2
+      vx = (vx / len) * (1 + disp)
+      vy = (vy / len) * (1 + disp * 0.75)
+      vz = (vz / len) * (1 + disp)
+      vx *= radius * stretchX
+      vy *= radius * squash
+      vz *= radius * stretchZ
+      const x1 = vx * cy + vz * sy
+      const z1 = -vx * sy + vz * cy
+      const y2 = vy * cp - z1 * sp
+      const z2 = vy * sp + z1 * cp
+      const x3 = x1 * cr - y2 * sr
+      const y3 = x1 * sr + y2 * cr
+      pts[i * 3] = x3
+      pts[i * 3 + 1] = y3
+      pts[i * 3 + 2] = z2
+      shade[i] = Math.min(1, Math.max(0.86, 0.94 + (n - 0.5) * 0.1))
+    }
+    let minY = Infinity
+    let maxY = -Infinity
+    for (let i = 0; i < count; i++) {
+      const py = pts[i * 3 + 1]
+      if (py < minY) minY = py
+      if (py > maxY) maxY = py
+    }
+    const span = Math.max(0.2, maxY - minY)
+    const sunk = 0.3 + e * 0.18
+    const lift = y - (minY + span * sunk)
+    const norms = new Float32Array(count * 3)
+    const triangles = src.index ? src.index.length / 3 : count / 3
+    const tri = (t, k) => (src.index ? src.index[t * 3 + k] : t * 3 + k)
+    for (let t = 0; t < triangles; t++) {
+      const i0 = tri(t, 0)
+      const i1 = tri(t, 1)
+      const i2 = tri(t, 2)
+      const ax = pts[i1 * 3] - pts[i0 * 3]
+      const ay = pts[i1 * 3 + 1] - pts[i0 * 3 + 1]
+      const az = pts[i1 * 3 + 2] - pts[i0 * 3 + 2]
+      const bx = pts[i2 * 3] - pts[i0 * 3]
+      const by = pts[i2 * 3 + 1] - pts[i0 * 3 + 1]
+      const bz = pts[i2 * 3 + 2] - pts[i0 * 3 + 2]
+      let nx = ay * bz - az * by
+      let ny = az * bx - ax * bz
+      let nz = ax * by - ay * bx
+      const nl = Math.hypot(nx, ny, nz) || 1
+      nx /= nl
+      ny /= nl
+      nz /= nl
+      norms[i0 * 3] += nx
+      norms[i0 * 3 + 1] += ny
+      norms[i0 * 3 + 2] += nz
+      norms[i1 * 3] += nx
+      norms[i1 * 3 + 1] += ny
+      norms[i1 * 3 + 2] += nz
+      norms[i2 * 3] += nx
+      norms[i2 * 3 + 1] += ny
+      norms[i2 * 3 + 2] += nz
+    }
     const cx = x + 0.5
     const cz = z + 0.5
-    const s = spread
-    const p0 = [cx - s, y, cz - s * 0.35]
-    const p1 = [cx + s * 0.15, y, cz - s]
-    const p2 = [cx + s * 0.9, y, cz + s * 0.2]
-    const p3 = [cx - s * 0.2, y, cz + s * 0.85]
-    const crest = [cx + s * 0.05, y + height, cz - s * 0.08]
-    const hip = [cx - s * 0.22, y + height * 0.58, cz + s * 0.18]
-    pushQuad(bag, [p0, p1, crest, hip], color)
-    pushQuad(bag, [p1, p2, crest, hip], tint(color, 0.82))
-    pushQuad(bag, [p2, p3, hip, crest], tint(color, 0.68))
-    pushQuad(bag, [p3, p0, hip, crest], tint(color, 0.9))
-    pushQuad(bag, [p0, p3, p2, p1], tint(color, 0.48))
+    for (let t = 0; t < triangles; t++) {
+      for (let k = 0; k < 3; k++) {
+        const i = tri(t, k)
+        const nl = Math.hypot(norms[i * 3], norms[i * 3 + 1], norms[i * 3 + 2]) || 1
+        const nx = norms[i * 3] / nl
+        const ny = norms[i * 3 + 1] / nl
+        const nz = norms[i * 3 + 2] / nl
+        const px = cx + pts[i * 3]
+        const py = lift + pts[i * 3 + 1]
+        const pz = cz + pts[i * 3 + 2]
+        const ax = Math.abs(nx)
+        const ay = Math.abs(ny)
+        const az = Math.abs(nz)
+        const u = ay >= ax && ay >= az ? px : ax >= az ? pz : px
+        const v = ay >= ax && ay >= az ? pz : ax >= az ? py : py
+        bag.positions.push(px, py, pz)
+        bag.normals.push(nx, ny, nz)
+        bag.uvs.push(u * 0.62, v * 0.62)
+        const tone = shade[i]
+        bag.colors.push(tone, tone, tone)
+      }
+    }
   }
 
-  function pushColumn(bag, x, y, z, hw, h, hd, color) {
-    const x0 = x - hw
-    const x1 = x + hw
-    const y1 = y + h
-    const z0 = z - hd
-    const z1 = z + hd
-    pushQuad(bag, [[x0, y, z1], [x1, y, z1], [x1, y1, z1], [x0, y1, z1]], color)
-    pushQuad(bag, [[x1, y, z0], [x0, y, z0], [x0, y1, z0], [x1, y1, z0]], tint(color, 0.78))
-    pushQuad(bag, [[x1, y, z1], [x1, y, z0], [x1, y1, z0], [x1, y1, z1]], tint(color, 0.88))
-    pushQuad(bag, [[x0, y, z0], [x0, y, z1], [x0, y1, z1], [x0, y1, z0]], tint(color, 0.68))
-    pushQuad(bag, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], tint(color, 1.06))
+  function pushRibTube(bag, x0, y0, z0, x1, y1, z1, radius, ribs, color, phase, dome, ribDepth = 0.48) {
+    let dx = x1 - x0
+    let dy = y1 - y0
+    let dz = z1 - z0
+    const len = Math.hypot(dx, dy, dz) || 1
+    dx /= len
+    dy /= len
+    dz /= len
+    let ux = 0
+    let uy = 1
+    let uz = 0
+    if (Math.abs(dy) > 0.92) {
+      ux = 1
+      uy = 0
+    }
+    let rx = dy * uz - dz * uy
+    let ry = dz * ux - dx * uz
+    let rz = dx * uy - dy * ux
+    const rl = Math.hypot(rx, ry, rz) || 1
+    rx /= rl
+    ry /= rl
+    rz /= rl
+    const bx = ry * dz - rz * dy
+    const by = rz * dx - rx * dz
+    const bz = rx * dy - ry * dx
+    const cols = ribs * 4
+    const rows = Math.max(4, Math.round(len / 0.26))
+    const grid = []
+    for (let row = 0; row <= rows; row++) {
+      const t = row / rows
+      const px = x0 + (x1 - x0) * t
+      const py = y0 + (y1 - y0) * t
+      const pz = z0 + (z1 - z0) * t
+      let profile = 0.94 + 0.06 * Math.sin(t * Math.PI)
+      if (dome && t > 0.74) profile *= Math.cos(((t - 0.74) / 0.26) * Math.PI * 0.5)
+      if (t < 0.06) profile *= 0.82 + t / 0.06 * 0.18
+      const ring = []
+      for (let col = 0; col < cols; col++) {
+        const ang = (col / cols) * Math.PI * 2 + phase
+        const rib = Math.cos(ang * ribs)
+        const r = Math.max(0.035, radius * profile * (1 + rib * ribDepth))
+        ring.push([
+          px + (rx * Math.cos(ang) + bx * Math.sin(ang)) * r,
+          py + (ry * Math.cos(ang) + by * Math.sin(ang)) * r,
+          pz + (rz * Math.cos(ang) + bz * Math.sin(ang)) * r,
+          0.38 + (rib + 1) * 0.31
+        ])
+      }
+      grid.push({ ring, c: [px, py, pz] })
+    }
+    const tone = (pts) => {
+      let s = 0
+      for (const p of pts) s += p[3]
+      s /= pts.length
+      return [color[0] * s, color[1] * s, color[2] * s]
+    }
+    for (let row = 0; row < rows; row++) {
+      const here = grid[row]
+      const next = grid[row + 1]
+      for (let col = 0; col < cols; col++) {
+        const col2 = (col + 1) % cols
+        const a = here.ring[col]
+        const b = here.ring[col2]
+        const c = next.ring[col2]
+        const d = next.ring[col]
+        const mid = [(a[0] + c[0]) * 0.5, (a[1] + c[1]) * 0.5, (a[2] + c[2]) * 0.5]
+        const axis = [(here.c[0] + next.c[0]) * 0.5, (here.c[1] + next.c[1]) * 0.5, (here.c[2] + next.c[2]) * 0.5]
+        const abx = b[0] - a[0]
+        const aby = b[1] - a[1]
+        const abz = b[2] - a[2]
+        const acx = c[0] - a[0]
+        const acy = c[1] - a[1]
+        const acz = c[2] - a[2]
+        const nx = aby * acz - abz * acy
+        const ny = abz * acx - abx * acz
+        const nz = abx * acy - aby * acx
+        const outward = nx * (mid[0] - axis[0]) + ny * (mid[1] - axis[1]) + nz * (mid[2] - axis[2])
+        const corners = outward >= 0 ? [a, b, c, d] : [b, a, d, c]
+        pushQuad(bag, corners.map((p) => [p[0], p[1], p[2]]), tone([a, b, c, d]))
+      }
+    }
+    const cap = grid[rows]
+    for (let col = 0; col < cols; col++) {
+      const a = cap.ring[col]
+      const b = cap.ring[(col + 1) % cols]
+      pushQuad(bag, [cap.c, [a[0], a[1], a[2]], [b[0], b[1], b[2]], [b[0], b[1], b[2]]], tone([a, b]))
+    }
   }
 
-  function pushCactus(bag, x, z, y, scale) {
+  function pushCactus(bag, x, z, y) {
+    const seed = (world.seed || 1) + 67
+    const roll = hash2(x, z, seed + 1)
+    const vary = 0.78 + hash2(x, z, seed + 2) * 0.36
+    const warm = (hash2(x, z, seed + 3) - 0.5) * 0.012
+    const body = [(0.032 + warm) * vary, 0.086 * vary, (0.034 - warm * 0.4) * vary]
+    const arm = tint(body, 0.9)
+    const scale = 0.9 + roll * 0.38
+    const trunkH = 2.05 * scale
+    const trunkR = 0.27 * (0.82 + hash2(x, z, seed + 4) * 0.36)
+    const leanX = (hash2(x, z, seed + 5) - 0.5) * 0.22
+    const leanZ = (hash2(x, z, seed + 6) - 0.5) * 0.16
+    const phase = hash2(x, z, seed + 7) * Math.PI
     const cx = x + 0.5
     const cz = z + 0.5
-    const body = [0.46, 0.62, 0.3]
-    const arm = [0.34, 0.5, 0.22]
-    const trunk = 1.15 * scale
-    pushColumn(bag, cx, y, cz, 0.1, trunk, 0.1, body)
-    const low = y + trunk * 0.42
-    pushColumn(bag, cx - 0.24, low, cz, 0.16, 0.075, 0.075, arm)
-    pushColumn(bag, cx - 0.36, low, cz, 0.07, trunk * 0.38, 0.07, body)
-    const high = y + trunk * 0.68
-    pushColumn(bag, cx + 0.22, high, cz + 0.02, 0.14, 0.065, 0.065, arm)
-    pushColumn(bag, cx + 0.32, high, cz + 0.02, 0.065, trunk * 0.32, 0.065, body)
+    const y0 = y - 0.05
+    pushRibTube(bag, cx, y0, cz, cx + leanX, y0 + trunkH, cz + leanZ, trunkR, 6, body, phase, true, 0.5)
+    const side = hash2(x, z, seed + 8) > 0.5 ? 1 : -1
+    const armAt = (t, dir, reach, up, armPhase) => {
+      const ax = cx + leanX * t + dir * trunkR * 0.55
+      const ay = y0 + trunkH * t
+      const az = cz + leanZ * t
+      const ox = ax + dir * reach
+      pushRibTube(bag, ax, ay, az, ox, ay + reach * 0.08, az, trunkR * 0.62, 5, arm, armPhase, false, 0.42)
+      pushRibTube(bag, ox, ay + reach * 0.04, az, ox + dir * 0.05, ay + up, az + leanZ * 0.2, trunkR * 0.54, 5, body, armPhase + 0.6, true, 0.42)
+    }
+    armAt(0.4 + hash2(x, z, seed + 9) * 0.06, side, 0.32 * scale, trunkH * (0.32 + hash2(x, z, seed + 10) * 0.12), phase + 0.4)
+    if (hash2(x, z, seed + 11) > 0.18) {
+      armAt(0.6 + hash2(x, z, seed + 12) * 0.08, -side, 0.26 * scale * (0.75 + hash2(x, z, seed + 13) * 0.4), trunkH * (0.2 + hash2(x, z, seed + 14) * 0.16), phase + 1.3)
+    }
   }
 
   function addDecor(list, x0, z0, x1, z1) {
@@ -580,10 +852,14 @@ ${shader.fragmentShader}`
       }
       return bag
     }
-    for (let z = z0; z < z1; z++) {
-      for (let x = x0; x < x1; x++) {
-        let h = 0
-        let hid = 0
+    const heights = new Map()
+    const heightAt = (x, z) => {
+      const key = `${x},${z}`
+      const hit = heights.get(key)
+      if (hit !== undefined) return hit
+      let h = -1
+      if (x >= 0 && z >= 0 && x < world.size && z < world.size) {
+        h = 0
         for (let y = 1; y < world.height; y++) {
           const id = sample(x, y, z) | 0
           if (!id || id === POOL) {
@@ -591,38 +867,92 @@ ${shader.fragmentShader}`
             break
           }
           h = y
-          hid = id
         }
-        if (h < 1 || hid === TIMBER || hid === CANOPY || hid === POOL) continue
+      }
+      heights.set(key, h)
+      return h
+    }
+    const cliffDrop = (x, z, h) => {
+      let drop = 0
+      for (let dz = -3; dz <= 3; dz++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          if (!dx && !dz) continue
+          if (dx * dx + dz * dz > 10) continue
+          const nh = heightAt(x + dx, z + dz)
+          if (nh < 0) continue
+          drop = Math.max(drop, Math.abs(nh - h))
+        }
+      }
+      return drop
+    }
+    const steep = (x, z, h) => {
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nh = heightAt(x + dx, z + dz)
+        if (nh >= 0 && Math.abs(nh - h) >= 2) return true
+      }
+      return false
+    }
+    const rockPatches = new Map()
+    const patchRocks = (gx, gz) => {
+      const key = `${gx},${gz}`
+      const hit = rockPatches.get(key)
+      if (hit) return hit
+      const spots = []
+      const gate = (world.seed || 1) + 80
+      if (hash2(gx, gz, gate) >= 0.6) {
+        const candidates = []
+        for (let dz = 0; dz < 9; dz++) {
+          for (let dx = 0; dx < 9; dx++) {
+            const px = gx * 9 + dx
+            const pz = gz * 9 + dz
+            const ph = heightAt(px, pz)
+            if (ph < 2) continue
+            if (cliffDrop(px, pz, ph) < 3) continue
+            candidates.push({ x: px, z: pz, r: hash2(px, pz, (world.seed || 1) + 53) })
+          }
+        }
+        candidates.sort((p, q) => q.r - p.r)
+        const want = 3 + Math.floor(hash2(gx, gz, gate + 1) * 3)
+        for (const spot of candidates) {
+          if (spots.length >= want) break
+          if (spots.some((other) => Math.hypot(other.x - spot.x, other.z - spot.z) < 2.4)) continue
+          spots.push(spot)
+        }
+      }
+      rockPatches.set(key, spots)
+      return spots
+    }
+    const boulderHere = (x, z) => patchRocks(Math.floor(x / 9), Math.floor(z / 9)).some((spot) => spot.x === x && spot.z === z)
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
+        const h = heightAt(x, z)
+        if (h < 1) continue
+        const hid = sample(x, h, z) | 0
+        if (hid === TIMBER || hid === CANOPY || hid === POOL) continue
         if ((sample(x, h + 1, z) | 0) !== 0) continue
-        const ground = sample(x, h, z) | 0
+        const ground = hid
         const n = hash2(x, z, (world.seed || 1) + 41)
         if (ground === TURF && n > 0.72) {
           pushCross(take('tuft'), x, z, h + 1, 0.9, 0.16, [0.42 + n * 0.1, 0.62, 0.3])
         }
         if (ground === TURF && hash2(x, z, (world.seed || 1) + 47) > 0.9) {
           const palette = [[0.96, 0.86, 0.42], [0.94, 0.95, 0.9], [0.58, 0.74, 0.9], [0.84, 0.7, 0.36]]
-          const tint = palette[Math.floor(hash2(x, z, (world.seed || 1) + 48) * palette.length) % palette.length]
-          pushCross(take('flower'), x, z, h + 1, 0.7, 0.1, tint)
+          const petal = palette[Math.floor(hash2(x, z, (world.seed || 1) + 48) * palette.length) % palette.length]
+          pushCross(take('flower'), x, z, h + 1, 0.7, 0.1, petal)
         }
-        const rocky = hash2(x, z, (world.seed || 1) + 53) > 0.88
         const stony = ground === TURF || ground === DUNE || ground === ROCK || ground === FROST
-        if (stony && rocky) {
-          if (quality.tier === 'high') {
-            const desert = world.biome === 'desert' || world.landform === 'canyon'
-            pushRock(take('rock'), x, z, h + 1, desert ? 0.5 : 0.4, desert ? 0.34 : 0.26, [0.73, 0.7, 0.64])
-          } else {
-            pushCross(take('rock'), x, z, h + 1, 0.38, 0.28, [0.62, 0.6, 0.56])
-          }
-        } else if (
-          quality.tier === 'high' &&
+        const cactusHere = quality.tier === 'high' &&
           ground === DUNE &&
           (world.biome === 'desert' || world.landform === 'canyon') &&
+          !steep(x, z, h) &&
           x % 8 === 3 &&
           z % 8 === 5 &&
           hash2(x, z, (world.seed || 1) + 67) > 0.2
-        ) {
-          pushCactus(take('cactus'), x, z, h + 1, 0.9 + hash2(x, z, (world.seed || 1) + 68) * 0.35)
+        if (cactusHere) {
+          pushCactus(take('cactus'), x, z, h + 1)
+        } else if (stony && boulderHere(x, z)) {
+          if (quality.tier === 'high') pushBoulder(take('rock'), x, z, h + 1)
+          else pushCross(take('rock'), x, z, h + 1, 0.38, 0.28, [0.62, 0.6, 0.56])
         }
       }
     }
@@ -633,10 +963,11 @@ ${shader.fragmentShader}`
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(bag.normals, 3))
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(bag.uvs, 2))
       geo.setAttribute('color', new THREE.Float32BufferAttribute(bag.colors, 3))
-      const material = key === 'flower' ? materials.flower : key === 'rock' ? materials.stone : key === 'cactus' ? materials.cactus : materials.tuft
+      const material = key === 'flower' ? materials.flower : key === 'rock' ? (quality.tier === 'high' ? materials.boulder : materials.stone) : key === 'cactus' ? materials.cactus : materials.tuft
       const view = new THREE.Mesh(geo, material)
-      view.castShadow = false
-      view.receiveShadow = false
+      const solidDecor = quality.tier === 'high' && (key === 'rock' || key === 'cactus')
+      view.castShadow = solidDecor
+      view.receiveShadow = solidDecor
       scene.add(view)
       list.push(view)
     }

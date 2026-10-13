@@ -17,7 +17,7 @@ const prompts = [
   ['desert-canyon', 'a desert canyon']
 ]
 
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader'] })
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 const errors = []
 page.on('pageerror', (error) => errors.push(String(error)))
