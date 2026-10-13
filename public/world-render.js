@@ -95,7 +95,7 @@ function flatMaterial(color, extra = {}) {
   })
 }
 
-function attachSky(scene) {
+function attachSky(scene, tier) {
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
@@ -104,7 +104,8 @@ function attachSky(scene) {
       uSun: { value: new THREE.Vector3(0.35, 0.82, 0.28) },
       uZenith: { value: new THREE.Color('#3e7ec4') },
       uHorizon: { value: new THREE.Color('#d5e4f2') },
-      uLight: { value: 1 }
+      uLight: { value: 1 },
+      uHalo: { value: tier === 'high' ? 1 : 0 }
     },
     vertexShader: `
       varying vec3 vDir;
@@ -120,6 +121,7 @@ function attachSky(scene) {
       uniform vec3 uZenith;
       uniform vec3 uHorizon;
       uniform float uLight;
+      uniform float uHalo;
       void main() {
         vec3 dir = normalize(vDir);
         float h = clamp(dir.y * 0.55 + 0.5, 0.0, 1.0);
@@ -127,8 +129,10 @@ function attachSky(scene) {
         vec3 sun = normalize(uSun);
         float disc = pow(max(dot(dir, sun), 0.0), mix(1400.0, 500.0, clamp(uLight, 0.0, 1.0)));
         float glow = pow(max(dot(dir, sun), 0.0), 8.0);
+        float halo = pow(max(dot(dir, sun), 0.0), 32.0);
         col += vec3(1.0, 0.93, 0.78) * disc * (0.55 + uLight);
         col += uHorizon * glow * 0.18;
+        col += vec3(1.0, 0.88, 0.64) * halo * 0.08 * uHalo;
         float band = pow(1.0 - max(dir.y, 0.0), 4.0);
         col = mix(col, uHorizon, band * 0.45);
         gl_FragColor = vec4(col, 1.0);
@@ -243,7 +247,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
   const haze = new THREE.Color(world?.biome === 'desert' ? '#d2b48c' : world?.biome === 'snow' ? '#c5d4e6' : '#7aa0dc')
   scene.fog = new THREE.FogExp2(haze, quality.tier === 'low' ? 0.0058 : 0.0035)
   const camera = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
-  const sky = attachSky(scene)
+  const sky = attachSky(scene, quality.tier)
 
   const hemi = new THREE.HemisphereLight(0xc5daf5, 0x8a623c, 0.34)
   scene.add(hemi)
@@ -306,8 +310,16 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     }),
     petal: flatMaterial(0xd98cab, { roughness: 0.55 }),
     candy: flatMaterial(0xe25b93, { roughness: 0.42 }),
-    glow: flatMaterial(0xd6e25a, { roughness: 0.4, emissive: 0xc6d84a, emissiveIntensity: 0.6 })
+    glow: flatMaterial(0xd6e25a, { roughness: 0.4, emissive: 0xc6d84a, emissiveIntensity: 0.6 }),
+    cactus: new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.74,
+      metalness: 0,
+      vertexColors: true,
+      side: THREE.DoubleSide
+    })
   }
+  if (quality.tier === 'high') materials.water.roughness = 0.09
   for (const material of Object.values(materials)) {
     for (const tex of [material.map, material.normalMap, material.roughnessMap]) {
       if (tex) tex.anisotropy = aniso
@@ -318,7 +330,26 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
   const reflectCam = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
   const reflectOn = { value: 0 }
   const reflectRes = { value: new THREE.Vector2(reflectTarget.width, reflectTarget.height) }
-  materials.water.customProgramCacheKey = () => 'water'
+  const softWater = quality.tier === 'high'
+  materials.water.customProgramCacheKey = () => (softWater ? 'water-soft' : 'water')
+  const waterReflect = softWater
+    ? `#include <opaque_fragment>
+      if (uReflectOn > 0.5) {
+        vec2 suv = gl_FragCoord.xy / uResolution;
+        vec3 mirrored = texture2D(uReflect, suv).rgb;
+        float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
+        float fres = pow(1.0 - ndv, 2.4);
+        float grazing = clamp(1.0 - abs(normalize(vViewPosition).y), 0.0, 1.0);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, mirrored, mix(0.12, 0.38, fres) * mix(0.75, 1.0, grazing));
+      }`
+    : `#include <opaque_fragment>
+      if (uReflectOn > 0.5) {
+        vec2 suv = gl_FragCoord.xy / uResolution;
+        vec3 mirrored = texture2D(uReflect, suv).rgb;
+        float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
+        float fres = pow(1.0 - ndv, 2.4);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, mirrored, mix(0.28, 0.78, fres));
+      }`
   materials.water.onBeforeCompile = (shader) => {
     patchVertex(shader, WATER_SWAY)
     shader.uniforms.uReflect = { value: reflectTarget.texture }
@@ -328,17 +359,7 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
 uniform float uReflectOn;
 uniform vec2 uResolution;
 ${shader.fragmentShader}`
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      `#include <opaque_fragment>
-      if (uReflectOn > 0.5) {
-        vec2 suv = gl_FragCoord.xy / uResolution;
-        vec3 mirrored = texture2D(uReflect, suv).rgb;
-        float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
-        float fres = pow(1.0 - ndv, 2.4);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, mirrored, mix(0.28, 0.78, fres));
-      }`
-    )
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', waterReflect)
   }
   materials.leaves.color = new THREE.Color(0x8faf78)
 
@@ -499,6 +520,55 @@ ${shader.fragmentShader}`
     ], color)
   }
 
+  function tint(color, scale) {
+    return [color[0] * scale, color[1] * scale, color[2] * scale]
+  }
+
+  function pushRock(bag, x, z, y, height, spread, color) {
+    const cx = x + 0.5
+    const cz = z + 0.5
+    const s = spread
+    const p0 = [cx - s, y, cz - s * 0.35]
+    const p1 = [cx + s * 0.15, y, cz - s]
+    const p2 = [cx + s * 0.9, y, cz + s * 0.2]
+    const p3 = [cx - s * 0.2, y, cz + s * 0.85]
+    const crest = [cx + s * 0.05, y + height, cz - s * 0.08]
+    const hip = [cx - s * 0.22, y + height * 0.58, cz + s * 0.18]
+    pushQuad(bag, [p0, p1, crest, hip], color)
+    pushQuad(bag, [p1, p2, crest, hip], tint(color, 0.82))
+    pushQuad(bag, [p2, p3, hip, crest], tint(color, 0.68))
+    pushQuad(bag, [p3, p0, hip, crest], tint(color, 0.9))
+    pushQuad(bag, [p0, p3, p2, p1], tint(color, 0.48))
+  }
+
+  function pushColumn(bag, x, y, z, hw, h, hd, color) {
+    const x0 = x - hw
+    const x1 = x + hw
+    const y1 = y + h
+    const z0 = z - hd
+    const z1 = z + hd
+    pushQuad(bag, [[x0, y, z1], [x1, y, z1], [x1, y1, z1], [x0, y1, z1]], color)
+    pushQuad(bag, [[x1, y, z0], [x0, y, z0], [x0, y1, z0], [x1, y1, z0]], tint(color, 0.78))
+    pushQuad(bag, [[x1, y, z1], [x1, y, z0], [x1, y1, z0], [x1, y1, z1]], tint(color, 0.88))
+    pushQuad(bag, [[x0, y, z0], [x0, y, z1], [x0, y1, z1], [x0, y1, z0]], tint(color, 0.68))
+    pushQuad(bag, [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]], tint(color, 1.06))
+  }
+
+  function pushCactus(bag, x, z, y, scale) {
+    const cx = x + 0.5
+    const cz = z + 0.5
+    const body = [0.46, 0.62, 0.3]
+    const arm = [0.34, 0.5, 0.22]
+    const trunk = 1.15 * scale
+    pushColumn(bag, cx, y, cz, 0.1, trunk, 0.1, body)
+    const low = y + trunk * 0.42
+    pushColumn(bag, cx - 0.24, low, cz, 0.16, 0.075, 0.075, arm)
+    pushColumn(bag, cx - 0.36, low, cz, 0.07, trunk * 0.38, 0.07, body)
+    const high = y + trunk * 0.68
+    pushColumn(bag, cx + 0.22, high, cz + 0.02, 0.14, 0.065, 0.065, arm)
+    pushColumn(bag, cx + 0.32, high, cz + 0.02, 0.065, trunk * 0.32, 0.065, body)
+  }
+
   function addDecor(list, x0, z0, x1, z1) {
     if (world?.biome === 'candy' || world?.biome === 'moon') return
     const bags = new Map()
@@ -535,8 +605,22 @@ ${shader.fragmentShader}`
           const tint = palette[Math.floor(hash2(x, z, (world.seed || 1) + 48) * palette.length) % palette.length]
           pushCross(take('flower'), x, z, h + 1, 0.7, 0.1, tint)
         }
-        if ((ground === TURF || ground === DUNE || ground === ROCK || ground === FROST) && hash2(x, z, (world.seed || 1) + 53) > 0.88) {
-          pushCross(take('rock'), x, z, h + 1, 0.38, 0.28, [0.62, 0.6, 0.56])
+        const rocky = hash2(x, z, (world.seed || 1) + 53) > 0.88
+        const stony = ground === TURF || ground === DUNE || ground === ROCK || ground === FROST
+        if (stony && rocky) {
+          if (quality.tier === 'high') {
+            const desert = world.biome === 'desert' || world.landform === 'canyon'
+            pushRock(take('rock'), x, z, h + 1, desert ? 0.5 : 0.4, desert ? 0.34 : 0.26, [0.73, 0.7, 0.64])
+          } else {
+            pushCross(take('rock'), x, z, h + 1, 0.38, 0.28, [0.62, 0.6, 0.56])
+          }
+        } else if (
+          quality.tier === 'high' &&
+          ground === DUNE &&
+          (world.biome === 'desert' || world.landform === 'canyon') &&
+          hash2(x, z, (world.seed || 1) + 67) > 0.955
+        ) {
+          pushCactus(take('cactus'), x, z, h + 1, 0.85 + hash2(x, z, (world.seed || 1) + 68) * 0.35)
         }
       }
     }
@@ -547,7 +631,7 @@ ${shader.fragmentShader}`
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(bag.normals, 3))
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(bag.uvs, 2))
       geo.setAttribute('color', new THREE.Float32BufferAttribute(bag.colors, 3))
-      const material = key === 'flower' ? materials.flower : key === 'rock' ? materials.stone : materials.tuft
+      const material = key === 'flower' ? materials.flower : key === 'rock' ? materials.stone : key === 'cactus' ? materials.cactus : materials.tuft
       const view = new THREE.Mesh(geo, material)
       view.castShadow = false
       view.receiveShadow = false
