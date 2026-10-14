@@ -17,33 +17,112 @@ This is a development build. Leaderboards rank **checked** scores by default. Sc
 ## Requirements
 
 - Node.js 20 or newer (CI runs on Node 22)
-- Optional: Docker, for local Postgres
+- Optional: Docker, for local Postgres or the production stack
 
-## Run locally
+## Run
 
 ```bash
 npm install
-npm start
+PORT=4100 npm start
 ```
 
-Open http://localhost:3000.
+`npm start` runs `node server.js` and listens on port 4100. Open http://localhost:4100.
 
-With no `DATABASE_URL`, development mode uses file-backed [PGlite](https://pglite.dev/) at `./data/pglite`. That data survives restarts and is gitignored. Production refuses to boot on PGlite.
+The process applies migrations on startup. In development, an empty database is seeded unless `SEED_ON_EMPTY=false`. `npm run seed` is safe to repeat; existing ids are left alone.
 
-### Postgres
+Copy `.env.example` to `.env` for local overrides. That example file has placeholders only (empty keys and `replace-with-a-long-random-string`). Put real secrets in `.env`. Do not commit `.env` or `data/pglite`. Both are gitignored (`.env` directly, and `data/pglite` because `data/` is ignored).
+
+When `DATABASE_URL` is unset, development uses file-backed [PGlite](https://pglite.dev/) at `./data/pglite`. That directory survives restarts. Production requires a `postgres://` or `postgresql://` URL.
+
+When you run on port 4100, set `PUBLIC_BASE_URL=http://localhost:4100` in `.env`.
+
+### Environment variables
+
+Every variable below is listed in `.env.example`.
+
+| Variable | Role |
+| --- | --- |
+| `PORT` | App listen port. Use `4100` for this local run. |
+| `NODE_ENV` | `development` or `production`. |
+| `DATABASE_URL` | Postgres URL. Unset in development selects `./data/pglite`. |
+| `SESSION_SECRET` | Long random string. Required in production. |
+| `COOKIE_SECURE` | Set `true` behind HTTPS. |
+| `PUBLIC_BASE_URL` | Absolute app origin, no path. |
+| `USERCONTENT_ORIGIN` | Separate origin for freeform HTML games. |
+| `USERCONTENT_PORT` | Port for that sandbox origin. |
+| `ALLOW_SAME_SITE_USERCONTENT` | Opt in to a same-host or same-site sandbox. |
+| `X_SITE_HANDLE` | `twitter:site` handle. Leave empty to omit the tag. |
+| `SEED_ON_EMPTY` | Seed example games when the games table is empty. |
+| `WORLD_GUEST_CAP` | Anonymous socket cap per IP for a shared block world. |
+| `RATE_LIMIT_MAX` | Requests per IP per minute. |
+| `AUTH_RATE_LIMIT_MAX` | Auth requests per IP per minute. |
+| `AI_RATE_LIMIT_MAX` | AI requests per IP per minute. |
+| `PASSWORD_SCRYPT_N` | scrypt cost (power of two). |
+| `AI_PROVIDER` | `auto`, `anthropic`, `gemini`, `openai`, or `xai`. |
+| `AI_PROVIDER_SPEC` | Provider for the spec path. |
+| `AI_PROVIDER_FREEFORM` | Provider for the freeform path. |
+| `AI_PROVIDER_SAFETY` | Provider for the safety path. |
+| `AI_FALLBACKS` | Comma-separated fallbacks used on 429 and 5xx. |
+| `GEMINI_API_KEY` | Google AI Studio key. |
+| `GEMINI_MODEL` | Gemini model name. |
+| `OPENAI_API_KEY` | OpenAI key. |
+| `OPENAI_MODEL` | OpenAI Responses model. |
+| `ANTHROPIC_API_KEY` | Anthropic key. |
+| `ANTHROPIC_MODEL` | Anthropic model name. |
+| `ANTHROPIC_THINKING` | `off` sends thinking `{type:between_tools}`. |
+| `GEMINI_THINKING_LEVEL` | Gemini thinking level. |
+| `AI_TIMEOUT_MS` | Spec and template HTTP timeout. |
+| `AI_FREEFORM_TIMEOUT_MS` | Freeform sandbox timeout. |
+| `AI_RETRY_DELAY_MS` | Delay before one retry of a 500 or 503. |
+| `SERVER_ROLE` | `all`, `app`, or `usercontent`. |
+| `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit for imports. |
+| `AI_RESEARCH` | `on` researches similar games before generation. |
+| `ADMIN_EMAILS` | Comma-separated moderator emails. |
+| `AI_DAILY_LIMIT_PER_USER` | AI attempts per account per UTC day. |
+| `AI_DAILY_LIMIT_PER_GUEST` | AI attempts per guest browser per UTC day. |
+| `AI_DAILY_LIMIT_GLOBAL` | AI attempts for everyone per UTC day. |
+| `PUBLISH_RATE_LIMIT_MAX` | Published games per IP per minute. |
+| `SAFETY_MODEL_ON_PUBLISH` | Gemini safety check on publish. |
+| `X_CLIENT_ID` | Sign in with X. Disabled when empty. |
+| `X_CLIENT_SECRET` | Sign in with X client secret. |
+| `X_REDIRECT_URI` | Sign in with X redirect URI. |
+| `GEMINI_API_BASE` | Gemini API base URL. |
+| `OPENAI_BASE_URL` | OpenAI API base URL. |
+| `XAI_API_KEY` | xAI key. |
+| `XAI_BASE_URL` | xAI API base URL. |
+| `XAI_MODEL` | xAI model name. |
+
+### Docker
+
+Local Postgres only (the app still runs with `npm start` on port 4100):
 
 ```bash
 docker compose up -d
 cp .env.example .env
-# edit SESSION_SECRET, then:
 export DATABASE_URL=postgres://playground:playground@localhost:5432/playground
 export SESSION_SECRET="$(openssl rand -hex 32)"
+export PORT=4100
+export PUBLIC_BASE_URL=http://localhost:4100
 npm run migrate
 npm run seed
 npm start
 ```
 
-The server applies migrations on startup. `npm run seed` is safe to repeat; existing ids are left alone. In development, an empty database is seeded automatically unless `SEED_ON_EMPTY=false`.
+Image build for the app container:
+
+```bash
+docker build -t playground .
+```
+
+The image listens on 3000 and 43921 inside the container (`EXPOSE` in the `Dockerfile`). Publish the app port when you run it, and pass the same variables as `.env.example`.
+
+Production stack (Postgres, the app, and Caddy) is `docker-compose.prod.yml`. Set `POSTGRES_PASSWORD`, `SESSION_SECRET`, `APP_DOMAIN`, and `USERCONTENT_DOMAIN` in `.env`, then:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Caddy publishes ports 80 and 443. The app container still listens on 3000 and 43921. Host names, DNS, and the remaining production values are in [DEPLOY.md](DEPLOY.md).
 
 ## Test
 
