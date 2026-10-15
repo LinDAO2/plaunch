@@ -1,5 +1,9 @@
 # Credits
 
+## Launchpad chrome
+
+v1.5.0 restyles the create page and game cards with original CSS in `public/style.css`. No new fonts, textures, models, or audio were added for that pass.
+
 Template games are original Kaplay scripts. They follow the rules of the games below. They are not line copies, and example art from those projects was not copied. Pixel grids in `THEME` are original. Titles stay generic: Word Guess, Block Drop, Flap, Maze Chomper, Jump Up, and the rest. Trademarked names are not used as titles or trade dress.
 
 ## Terrain textures

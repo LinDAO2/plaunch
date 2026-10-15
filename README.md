@@ -1,4 +1,6 @@
-# Playground — game launchpad v1.4.1
+# Playground — game launchpad v1.5.0
+
+v1.5.0 restyles the launchpad: a cinematic create panel, an acid-yellow accent, and raised game cards. Create still makes a shared block world. The v1.4.1 renderer stays in place: PBR terrain, sun, water, and sky on desktop, with SSAO and bloom off and a smaller shadow map on phones and the X card. No new third-party assets were added.
 
 Playable mini-games for sharing on the web, with creator accounts, an X player card, and a validated AI spec. The original four mechanics still run as they did: tap, reaction, number guess, and meteor dodge. New games can also use the arcade runtime, which plays a GameSpec v1.1 description on a canvas. Arcade specs can fall, pop up and hide, chase the player, shoot, jump on platforms, or step through a maze.
 

@@ -953,12 +953,25 @@ test('screenshot artifacts use the first directory mkdir accepts', async () => {
   }
 })
 
+test('create stays on shared block worlds', () => {
+  const html = readFileSync(path.join(process.cwd(), 'public/index.html'), 'utf8')
+  const app = readFileSync(path.join(process.cwd(), 'public/app.js'), 'utf8')
+  assert.match(html, /Make a shared block world from one sentence/)
+  assert.equal(/fashion studio|cozy fishing|survival frontier|playable game from one sentence/i.test(html), false)
+  assert.match(app, /kind: 'world'/)
+  assert.equal(html.includes('recipe-card'), false)
+})
+
 test('the site palette is black, off-white, and acid yellow', () => {
-  const css = `${readFileSync(path.join(process.cwd(), 'public/style.css'), 'utf8')}\n${readFileSync(path.join(process.cwd(), 'public/play.css'), 'utf8')}`
-  assert.equal(/radial-gradient|linear-gradient/.test(css), false)
+  const style = readFileSync(path.join(process.cwd(), 'public/style.css'), 'utf8')
+  const play = readFileSync(path.join(process.cwd(), 'public/play.css'), 'utf8')
+  const css = `${style}\n${play}`
+  assert.match(style, /radial-gradient/)
+  assert.equal(/radial-gradient|linear-gradient/.test(play), false)
   assert.equal(/#b397ff/i.test(css), false)
-  assert.match(css, /--brand:\s*#1d9bf0/)
-  assert.match(css, /--surface:\s*#16181c/)
+  assert.match(css, /--brand:\s*#e6ff3a/)
+  assert.match(css, /--surface:\s*#111318/)
+  assert.match(css, /--surface-raised:\s*#191c22/)
   assert.match(css, /--muted:\s*#71767b/)
   assert.match(css, /--bg:\s*#000/)
   assert.match(css, /bricolage-grotesque-latin-700\.woff2/)

@@ -221,8 +221,12 @@ export function gameCard(game, { label, playHref }) {
   title.textContent = game.name
   const desc = document.createElement('p')
   desc.textContent = game.description
+  const play = document.createElement('span')
+  play.className = 'card-play'
+  play.textContent = 'Play now →'
   const bottom = document.createElement('div')
   bottom.className = 'card-bottom'
+  bottom.append(play)
   body.append(kind, title, desc, bottom)
   link.append(frameEl, body)
   const share = document.createElement('button')
