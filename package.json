@@ -16,12 +16,12 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.3.14",
     "pg": "^8.16.3",
     "psl": "^1.15.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.3.14",
     "playwright": "^1.56.1"
   }
 }
