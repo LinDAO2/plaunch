@@ -204,7 +204,7 @@ function loop() {
     context.fillRect(cell.x, cell.y, grid, grid);
 
     
-    if (cell.x === apple.x && cell.y === apple.y) {
+    if (index === 0 && cell.x === apple.x && cell.y === apple.y) {
       snake.maxCells++;
       if (!snake.score) snake.score = 0;
       snake.score += 1;

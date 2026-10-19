@@ -6,7 +6,7 @@ import { heuristicTier } from '../src/ai/classify.js'
 import { validateGameSpec } from '../src/ai/gamespec.js'
 import { aoFactor, meshRegion } from '../src/blocks/mesh.js'
 import { validateEdit } from '../src/blocks/rules.js'
-import { VISTA_PITCH, goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, sparkHit, sparkSpots } from '../src/blocks/goals.js'
+import { CYCLE_MS, VISTA_PITCH, goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '../src/blocks/goals.js'
 import { hotbarFor, isSolid, CANDY, PETAL } from '../src/blocks/blocks.js'
 import { featuredWorlds, wantsWorld } from '../src/blocks/spec.js'
 import { blockAt, spawnPoint, worldFromSpec } from '../src/blocks/terrain.js'
@@ -190,6 +190,10 @@ test('landmark height and sparks score a shared goal', () => {
   assert.ok(night.light < day.light)
   assert.notEqual(skyCycle('candy', 0).hex, skyCycle('candy', 0.5).hex)
   assert.equal(skyCycle('grassland', 1).hex, day.hex)
+  assert.equal(CYCLE_MS, 600000)
+  assert.equal(skyPhase(0), 0)
+  assert.equal(skyPhase(CYCLE_MS), 0)
+  assert.equal(skyPhase(CYCLE_MS / 2), 0.5)
 })
 
 test('edit rules reject bad coordinates, blocks, reach, and bursts', () => {

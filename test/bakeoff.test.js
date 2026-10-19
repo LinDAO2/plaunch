@@ -46,7 +46,9 @@ test('Anthropic uses tool-use and OpenAI uses the Responses API', () => {
   assert.equal(schemaIsStrict(EDIT_SCHEMA), false)
 })
 
-test('a 429 falls through to the next provider and a 401 does not', async () => {
+test('quota and auth failures fall through to the next provider', async () => {
+  const { clearProviderCooldowns } = await import('../src/ai/providers.js')
+  clearProviderCooldowns()
   const urls = []
   const quota = async (url) => {
     urls.push(url)
@@ -60,13 +62,20 @@ test('a 429 falls through to the next provider and a 401 does not', async () => 
   })
   assert.equal(switched.provider, 'openai')
   assert.equal(urls.length, 2)
+  clearProviderCooldowns()
   let denied = 0
-  await assert.rejects(() => generateGame({
+  const authed = await generateGame({
     prompt: 'dodge falling meteors',
     env: { AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g', OPENAI_API_KEY: 'o', AI_FALLBACKS: 'openai' },
-    fetchImpl: async () => { denied += 1; return new Response('nope', { status: 401 }) }
-  }), (err) => err.code === 'ai_provider_auth')
-  assert.equal(denied, 1)
+    fetchImpl: async (url) => {
+      denied += 1
+      if (String(url).includes('generativelanguage')) return new Response('{"error":{"message":"bad key"}}', { status: 401 })
+      return new Response(JSON.stringify({ output_text: JSON.stringify(validSpec) }), { status: 200 })
+    }
+  })
+  assert.equal(authed.provider, 'openai')
+  assert.equal(denied, 2)
+  clearProviderCooldowns()
 })
 
 test('bakeoff uses a live key when one is set and fixtures otherwise', () => {

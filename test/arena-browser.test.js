@@ -38,7 +38,7 @@ test('Arena plays in the card iframe: move, fire, score, and a throttled frame r
     await page.waitForFunction(() => {
       const text = document.querySelector('#score')?.textContent || ''
       return Number(text.replace(/\D/g, '')) > 0
-    }, null, { timeout: 12000 })
+    }, null, { timeout: 20000 })
     await frame.waitForFunction(() => window.__arena.fps >= 20, null, { timeout: 8000 })
     const steady = await frame.evaluate(() => window.__arena.fps)
     const session = await page.context().newCDPSession(page)

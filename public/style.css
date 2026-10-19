@@ -145,6 +145,10 @@ p { margin: 0; }
 .gen-progress-label { margin: 0; color: var(--muted); font-size: 13px; }
 .ideas, .skies { display: flex; flex-wrap: wrap; gap: 8px; }
 .sky { min-width: 72px; color: #fff; border: 1px solid var(--line); border-bottom-width: 8px; }
+.sky.sky-day { background: #4FB3FF; border-bottom-color: #CDEBFF; }
+.sky.sky-dusk { background: #2B2A6B; border-bottom-color: #FF9E6B; }
+.sky.sky-night { background: #0B1640; border-bottom-color: #24407A; }
+.sky.sky-neon { background: #1A0633; border-bottom-color: #4B0F6B; }
 .idea {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -267,6 +271,7 @@ input[type="color"] { padding: 4px; height: 40px; }
   background: #000;
   overflow: hidden;
 }
+.goal-banner[hidden] { display: none !important; }
 .goal-banner {
   position: absolute;
   top: 0;

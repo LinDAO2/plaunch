@@ -12,7 +12,7 @@ export const SKY = {
   desert: '#f2c48a',
   snow: '#d5e4ef',
   candy: '#f2a0cc',
-  moon: '#141820'
+  moon: '#243c78'
 }
 
 const LEAF = { grassland: CANOPY, desert: CANOPY, snow: FROST, candy: CANDY, moon: CANOPY }
@@ -72,14 +72,28 @@ function clampHeight(h, cap) {
   return h
 }
 
-function islandFalloff(h, x, z, world) {
-  if (!world.islands) return h
+function islandProfile(x, z, world) {
   const cx = (world.size - 1) / 2
   const cz = (world.size - 1) / 2
-  const dx = (x - cx) / (world.size * 0.46)
-  const dz = (z - cz) / (world.size * 0.46)
-  const dist = Math.sqrt(dx * dx + dz * dz)
-  return dist > 0.78 ? 2 : Math.max(4, Math.round(h * (1 - dist * 0.45)))
+  const blobs = [
+    [cx, cz, world.size * 0.2],
+    [cx - world.size * 0.2, cz + world.size * 0.14, world.size * 0.11],
+    [cx + world.size * 0.16, cz - world.size * 0.16, world.size * 0.1]
+  ]
+  let best = 0
+  for (const [bx, bz, radius] of blobs) {
+    const dist = Math.hypot(x - bx, z - bz) / radius
+    if (dist < 1) best = Math.max(best, 1 - dist * dist)
+  }
+  if (best < 0.12) return { top: 2, bottom: 1, air: false }
+  const top = Math.round(14 + best * 8)
+  const thick = Math.max(3, Math.round(2 + best * 4))
+  return { top, bottom: Math.max(8, top - thick), air: true }
+}
+
+function islandFalloff(h, x, z, world) {
+  if (!world.islands) return h
+  return islandProfile(x, z, world).top
 }
 
 function rollingHeight(x, z, world) {
@@ -89,8 +103,9 @@ function rollingHeight(x, z, world) {
   if (biome === 'moon') n = noise(x / 7, z / 7, seed) * 0.55 + (noise(x / 2.4, z / 2.4, seed + 4) > 0.72 ? -0.22 : 0.05)
   if (biome === 'candy') n = noise(x / 7, z / 7, seed + 2)
   if (biome === 'snow') n = noise(x / 10, z / 10, seed + 8) * 0.8 + 0.08
-  const amp = biome === 'moon' ? 5 : 6
-  let h = Math.round(8 + (n - 0.42) * amp)
+  const amp = biome === 'moon' ? 5 : biome === 'grassland' ? 3 : 6
+  const base = biome === 'grassland' ? 12 : 8
+  let h = Math.round(base + (n - 0.42) * amp)
   h = clampHeight(h, ROLLING_CAP)
   return islandFalloff(h, x, z, world)
 }
@@ -144,7 +159,11 @@ export function surfaceY(x, z, world) {
   const cached = world._height.get(`${x},${z}`)
   if (cached !== undefined) return cached
   const form = world.landform || 'rolling'
-  const h = form === 'rolling' ? rollingHeight(x, z, world) : landformHeight(x, z, world)
+  let h = form === 'rolling' ? rollingHeight(x, z, world) : landformHeight(x, z, world)
+  if (world.structure === 'village') {
+    const origin = structureOrigin(world)
+    if (Math.abs(x - origin.x) <= 10 && Math.abs(z - origin.z) <= 10) h = world.biome === 'snow' ? 14 : 12
+  }
   world._height.set(`${x},${z}`, h)
   return h
 }
@@ -161,7 +180,11 @@ function distFromCenter(x, z, world) {
 function nearStructure(x, z, world) {
   if (world.structure === 'none') return false
   const origin = structureOrigin(world)
-  const reach = world.structure === 'dock' ? 11 : world.structure === 'ruins' ? 5 : 4
+  const reach = world.structure === 'village' ? 12
+    : world.structure === 'waterfall' || world.structure === 'oasis' ? 8
+      : world.structure === 'dock' ? 11
+        : world.structure === 'ruins' ? 5
+          : 4
   return Math.abs(x - origin.x) <= reach && Math.abs(z - origin.z) <= reach
 }
 
@@ -236,12 +259,12 @@ function classicTreeBlock(x, y, z, world) {
       const tz = z + dz
       if (!hasTree(tx, tz, world)) continue
       const h = surfaceY(tx, tz, world)
-      if (dx === 0 && dz === 0 && y > h && y <= h + 3) return wood
-      const reach = y === h + 4 ? 1 : 2
-      if (y >= h + 2 && y <= h + 4 && Math.abs(dx) + Math.abs(dz) <= reach) {
-        if (dx === 0 && dz === 0 && y <= h + 3) continue
-        return leaf
-      }
+      const dy = y - h
+      if (dx === 0 && dz === 0 && dy >= 1 && dy <= 3) return wood
+      const reach = dy === 3 ? 2 : dy === 2 || dy === 4 ? 1 : 0
+      if (!reach || Math.abs(dx) + Math.abs(dz) > reach) continue
+      if (dx === 0 && dz === 0) continue
+      return leaf
     }
   }
   return 0
@@ -279,14 +302,14 @@ function shapedTreeBlock(x, y, z, world) {
       const dy = y - (h + trunk)
       const stacks = world.landform === 'forest'
         ? [
-            [2, 2, 3, 2, 2, 1],
-            [2, 3, 2, 2, 1, 1],
-            [1, 2, 2, 2, 1, 1]
+            [1, 2, 2, 2, 1],
+            [1, 2, 2, 1, 1],
+            [1, 2, 2, 1]
           ]
         : [
-            [2, 3, 3, 2, 1],
-            [3, 3, 2, 2, 1, 1],
-            [2, 2, 3, 2, 1, 1]
+            [1, 2, 2, 1],
+            [1, 2, 2, 1, 1],
+            [1, 2, 2, 1]
           ]
       const radii = stacks[Math.floor(roll * stacks.length) % stacks.length]
       if (dy >= 0 && dy < radii.length) {
@@ -335,6 +358,30 @@ export function structureOrigin(world) {
   }
   world._origin = origin
   return origin
+}
+
+function houseShell(x, y, z, ox, oz, h, world) {
+  const dx = x - ox
+  const dz = z - oz
+  const ax = Math.abs(dx)
+  const az = Math.abs(dz)
+  if (ax <= 2 && az <= 2 && y >= h && y <= h + 4) {
+    const wall = ax === 2 || az === 2
+    if (y === h + 4) return world.biome === 'snow' ? FROST : ROCK
+    if (y === h) return TIMBER
+    if (wall && !(z === oz + 2 && x === ox && (y === h + 1 || y === h + 2))) return TIMBER
+    return AIR
+  }
+  return null
+}
+
+function villageSites(world) {
+  const origin = structureOrigin(world)
+  const spots = [[-3, 4], [0, 2], [3, 4], [-4, -3], [4, -2]]
+  return spots.map(([dx, dz]) => ({
+    x: Math.max(4, Math.min(world.size - 5, origin.x + dx)),
+    z: Math.max(4, Math.min(world.size - 5, origin.z + dz))
+  }))
 }
 
 function structureAt(x, y, z, world) {
@@ -398,12 +445,37 @@ function structureAt(x, y, z, world) {
     return null
   }
   if (world.structure === 'house') {
-    if (ax <= 2 && az <= 2 && y >= h && y <= h + 3) {
-      const wall = ax === 2 || az === 2
-      if (y === h + 3) return world.biome === 'snow' ? FROST : TURF
-      if (y === h) return TIMBER
-      if (wall && !(z === oz + 2 && x === ox && (y === h + 1 || y === h + 2))) return TIMBER
-      return AIR
+    return houseShell(x, y, z, ox, oz, h, world)
+  }
+  if (world.structure === 'village') {
+    for (const site of villageSites(world)) {
+      const ground = surfaceY(site.x, site.z, world)
+      const placed = houseShell(x, y, z, site.x, site.z, ground, world)
+      if (placed !== null) return placed
+    }
+    return null
+  }
+  if (world.structure === 'waterfall') {
+    const lip = h + 8
+    if (x === ox + 1 && z === oz && y > h && y <= lip) return POOL
+    if (Math.abs(x - (ox + 1)) <= 2 && Math.abs(z - oz) <= 2 && y === h) return POOL
+    if (Math.abs(x - (ox + 1)) <= 2 && Math.abs(z - oz) <= 2 && y === h - 1) return ROCK
+    if (ax <= 2 && az <= 1 && y >= h && y <= lip) return ROCK
+    return null
+  }
+  if (world.structure === 'oasis') {
+    if (ax <= 3 && az <= 2 && y === h) return POOL
+    const palms = [[4, 0], [-4, 1], [1, 4], [3, -3]]
+    for (const [px, pz] of palms) {
+      const tx = ox + px
+      const tz = oz + pz
+      if (x === tx && z === tz && y > h && y <= h + 5) return TIMBER
+      const ldx = x - tx
+      const ldz = z - tz
+      if (Math.abs(ldx) + Math.abs(ldz) <= 1 && y >= h + 5 && y <= h + 6) {
+        if (ldx === 0 && ldz === 0 && y === h + 5) continue
+        return CANOPY
+      }
     }
     return null
   }
@@ -440,9 +512,19 @@ function surfaceBlock(world, x, z, h) {
     if (n > 0.33) return PETAL
     return GLOW
   }
-  if (h <= WATER + 1) return DUNE
+  if (h <= WATER + 1 && shoreSand(world, x, z)) return DUNE
   if (hash2(x, z, seed + 7) > 0.93) return CLAY
   return TURF
+}
+
+function shoreSand(world, x, z) {
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nx = x + dx
+    const nz = z + dz
+    if (nx < 0 || nz < 0 || nx >= world.size || nz >= world.size) continue
+    if (surfaceY(nx, nz, world) < WATER) return true
+  }
+  return false
 }
 
 function fillBlock(world, depth) {
@@ -477,12 +559,29 @@ export function naturalAt(x, y, z, world) {
   if (built) return built
   const tree = treeBlock(x, y, z, world)
   if (tree) return tree
+  if (world.islands) return islandColumn(x, y, z, world)
   const h = surfaceY(x, z, world)
   if (world.caves && y > 1 && y < h - 2 && hash2(x + y * 13, z + y * 7, world.seed + 91) > 0.58) return AIR
   if (y > h && y <= WATER && h < WATER) return POOL
   if (y > h) return AIR
   if (y === h) return surfaceBlock(world, x, z, h)
   return fillBlock(world, h - y)
+}
+
+function islandColumn(x, y, z, world) {
+  const profile = islandProfile(x, z, world)
+  const h = profile.top
+  if (world.caves && profile.air && y > profile.bottom && y < h - 2 && hash2(x + y * 13, z + y * 7, world.seed + 91) > 0.58) return AIR
+  if (!profile.air) {
+    if (y > h && y <= WATER) return POOL
+    if (y > h) return AIR
+    if (y === h) return DUNE
+    return fillBlock(world, h - y)
+  }
+  if (y > h) return AIR
+  if (y === h) return surfaceBlock(world, x, z, h)
+  if (y >= profile.bottom) return fillBlock(world, h - y)
+  return AIR
 }
 
 export function blockAt(x, y, z, world, edits) {
@@ -603,7 +702,23 @@ function southOverlook(world, edits) {
   return best
 }
 
+function villageOverlook(world, edits) {
+  const origin = structureOrigin(world)
+  const z = Math.max(3, Math.min(world.size - 4, origin.z + 11))
+  for (const dx of [0, 1, -1, 2, -2]) {
+    const x = Math.max(3, Math.min(world.size - 4, origin.x + dx))
+    const gy = groundY(world, x, z, edits)
+    if (gy < WATER || !columnClear(world, edits, x, z, gy)) continue
+    return { x: x + 0.5, y: gy + 1, z: z + 0.5 }
+  }
+  return null
+}
+
 export function spawnPoint(world, edits) {
+  if (world.structure === 'village') {
+    const pad = villageOverlook(world, edits)
+    if (pad) return pad
+  }
   if (world.landform === 'lake') {
     const pad = southOverlook(world, edits)
     if (pad) return pad

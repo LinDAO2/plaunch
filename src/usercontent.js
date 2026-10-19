@@ -68,7 +68,7 @@ export function sandboxCsp(config) {
   // connect-src and img-src 'self' load the CC0 glTF packs from /assets on this origin only.
   // No 'unsafe-eval' and no 'wasm-unsafe-eval' (no Draco, meshopt, or KTX2 WASM).
   // allow-pointer-lock lets our play page grant mouse look. Hold-to-drag remains if a parent frame denies it.
-  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; font-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors ${ancestors.join(' ')}`
+  return `default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self' blob:; font-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors ${ancestors.join(' ')}`
 }
 
 // CSP connect-src does not cover WebRTC, and a live probe sent STUN packets from the sandbox.

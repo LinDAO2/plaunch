@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto'
 import { generateWorldIdea, repairWorldSpec, structureForPrompt } from '../blocks/spec.js'
 import { log } from '../log.js'
 import { aiStatus, parseModelJson, requestModelText } from './generate.js'
-import { resolveProviderChain } from './providers.js'
+import { configuredProviders, resolveProviderChain } from './providers.js'
 
 const WORLD_SCHEMA = {
   type: 'object',
@@ -87,7 +87,7 @@ const WORLD_PROMPT = `You design one shared Minecraft-style voxel world for a br
 Rules:
 - version is "1.2" and runtime is "world"
 - biome is grassland, desert, snow, candy, or moon
-- structure is cabin, dock, lighthouse, ruins, watchtower, tower, house, pyramid, or none. The server replaces it: a lake gets a cabin or dock, a beach a lighthouse, a canyon ruins, snow a watchtower, and open land none. Do not use a pyramid unless the idea names one
+- structure is cabin, dock, lighthouse, ruins, watchtower, tower, house, village, waterfall, oasis, pyramid, or none. The server replaces it from the idea: several houses become a village, a waterfall stays a waterfall, palms or an oasis stay an oasis, a lake gets a cabin or dock, a beach a lighthouse, a canyon ruins, snow a watchtower. Do not use a pyramid unless the idea names one
 - worldSize is small, medium, or large
 - terrainSeed is an integer from 1 to 100000. The server replaces it, so do not reuse one favorite number
 - terrain.islands and terrain.caves are booleans. terrain.sky is day, dusk, night, or cycle
@@ -118,9 +118,16 @@ function ideaFrom(spec, extra = {}) {
   idea.model = extra.model || null
   idea.mode = extra.provider ? 'ai' : 'template'
   idea.fallback = Boolean(extra.fallback)
+  if (extra.fallback) {
+    const notice = 'A template was used. The AI provider failed, so this world was built from your idea without a model.'
+    idea.notice = notice
+    idea.game.notice = notice
+  }
   idea.tierReason = extra.provider
     ? 'Block world written by the model and checked against the world schema.'
-    : 'Block world. This idea uses the shared voxel runtime.'
+    : extra.fallback
+      ? 'Block world from the template. The configured model was unavailable.'
+      : 'Block world. This idea uses the shared voxel runtime.'
   return idea
 }
 
@@ -138,14 +145,19 @@ function fallbackReason(err) {
 }
 
 export async function generateWorldFromPrompt({ prompt, env, fetchImpl = globalThis.fetch, onProgress }) {
-  const rule = () => ideaFrom(repairWorldSpec(null, prompt), { fallback: aiStatus(env).mode === 'ai' })
-  if (aiStatus(env).mode !== 'ai') return ideaFrom(repairWorldSpec(null, prompt))
+  const hasProvider = configuredProviders(env).length > 0
+  const rule = () => ideaFrom(repairWorldSpec(null, prompt), { fallback: hasProvider })
+  if (!hasProvider || aiStatus(env).mode !== 'ai') {
+    if (hasProvider) log('warn', 'world generation fell back', { reason: 'providers unavailable' })
+    return hasProvider ? rule() : ideaFrom(repairWorldSpec(null, prompt))
+  }
   const chain = resolveProviderChain(env, 'spec')
   if (!chain.length) {
     log('warn', 'world generation fell back', { reason: 'no provider configured' })
     return rule()
   }
   onProgress?.({ phase: 'writing', outputTokens: 0, label: 'Writing the world…' })
+  let used = chain[0]
   try {
     const text = await requestModelText(chain[0], [
       { role: 'system', content: WORLD_PROMPT },
@@ -154,10 +166,11 @@ export async function generateWorldFromPrompt({ prompt, env, fetchImpl = globalT
       schema: WORLD_SCHEMA,
       maxOutputTokens: 1600,
       fallbacks: chain.slice(1),
+      onUse: (item) => { used = item },
       onProgress
     })
     const spec = diversify(repairWorldSpec(parseModelJson(text), prompt), prompt)
-    return ideaFrom(spec, { provider: chain[0].id, model: chain[0].model })
+    return ideaFrom(spec, { provider: used.id, model: used.model })
   } catch (err) {
     const reason = fallbackReason(err)
     log('warn', 'world generation fell back', { reason, code: err?.code || null })

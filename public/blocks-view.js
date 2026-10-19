@@ -1,4 +1,4 @@
-import { CANOPY, DUNE, FROST, ROCK, SOIL, TIMBER, TURF, blockOf, hotbarFor, isSolid } from '/blocks/blocks.js'
+import { blockOf, hotbarFor, isSolid } from '/blocks/blocks.js'
 import { VISTA_PITCH, goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
 import { createWorldRenderer } from '/world-render.js'
@@ -129,47 +129,11 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   }
   paintGoal()
 
-  function speckThumb(dark, light) {
-    const chip = document.createElement('canvas')
-    chip.width = 48
-    chip.height = 48
-    const ctx = chip.getContext('2d')
-    const a = Number.parseInt(dark.slice(1), 16)
-    const b = Number.parseInt(light.slice(1), 16)
-    const from = [(a >> 16) & 255, (a >> 8) & 255, a & 255]
-    const to = [(b >> 16) & 255, (b >> 8) & 255, b & 255]
-    const img = ctx.createImageData(48, 48)
-    for (let y = 0; y < 48; y++) {
-      for (let x = 0; x < 48; x++) {
-        const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
-        const f = n - Math.floor(n)
-        const grain = Math.sin((x + y * 3) * 0.7) * 0.5 + 0.5
-        const t = Math.min(1, Math.max(0, f * 0.65 + grain * 0.35))
-        const o = (y * 48 + x) * 4
-        img.data[o] = from[0] + (to[0] - from[0]) * t
-        img.data[o + 1] = from[1] + (to[1] - from[1]) * t
-        img.data[o + 2] = from[2] + (to[2] - from[2]) * t
-        img.data[o + 3] = 255
-      }
-    }
-    ctx.putImageData(img, 0, 0)
-    return chip.toDataURL('image/png')
-  }
-
-  const thumbUrl = {
-    [TURF]: '/textures/grass_diff.jpg',
-    [SOIL]: '/textures/dirt_diff.jpg',
-    [ROCK]: '/textures/stone_diff.jpg',
-    [DUNE]: '/textures/sand_diff.jpg',
-    [TIMBER]: '/textures/wood_diff.jpg',
-    [CANOPY]: '/textures/leaves_diff.jpg',
-    [FROST]: '/textures/snow_diff.jpg'
-  }
   const bar = hotbarFor(world.biome)
   const buttons = bar.map((id, index) => {
     const button = document.createElement('button')
     button.type = 'button'
-    button.style.backgroundImage = `url("${thumbUrl[id] || speckThumb('#6d6256', '#c4b8a4')}")`
+    button.dataset.block = blockOf(id).name.toLowerCase()
     button.setAttribute('aria-label', blockOf(id).name)
     button.className = index === 0 ? 'on' : ''
     button.addEventListener('pointerdown', (event) => {
@@ -641,7 +605,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   }
 
   function draw(now) {
-    const forced = spec?.cycle === 'day' ? 0.18 : spec?.cycle === 'night' ? 0.82 : spec?.cycle === 'dusk' ? 0.55 : null
+    const forced = spec?.cycle === 'day' ? 0 : spec?.cycle === 'night' ? 0.5 : spec?.cycle === 'dusk' ? 0.38 : null
     const cycle = skyCycle(world.biome, forced === null ? skyPhase(now) : forced)
     state.sky = cycle.hex
     const dir = lookVector()
@@ -677,9 +641,17 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   let raf = 0
   function frame(now) {
     if (stopped) return
-    const dt = Math.min(0.05, (now - last) / 1000 || 0)
+    let dt = (now - last) / 1000 || 0
+    if (dt < 0) dt = 0
+    if (dt > 0.25) dt = 0.25
     last = now
-    step(dt)
+    const slice = 1 / 60
+    let left = dt
+    while (left > 0.0001) {
+      const stepDt = Math.min(slice, left)
+      step(stepDt)
+      left -= stepDt
+    }
     checkSparks()
     moveAcc += dt
     if (moveAcc > 0.1) {

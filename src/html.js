@@ -147,6 +147,7 @@ export function renderSharePage(game, { origin, site = '', scores = [], unverifi
 <title>${name} — playground</title>
 ${tags}
 <link rel="canonical" href="${pageUrl}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/play.css">
 </head>

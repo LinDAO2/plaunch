@@ -28,6 +28,7 @@ describe('http api', { concurrency: false }, () => {
     assert.equal(res.data.version, VERSION)
     assert.equal(res.data.db, 'up')
     assert.equal(res.data.ai.mode, 'template')
+    assert.equal(Array.isArray(res.data.ai.providers), true)
     assert.equal(JSON.stringify(res.data).includes('test-session-secret'), false)
   })
 
@@ -800,17 +801,29 @@ describe('ai route and rate limit', { concurrency: false }, () => {
     }
   })
 
-  test('rate limits and health exemption', async () => {
+  test('static reads skip the global rate limit and writes stay limited', async () => {
     const server = await startServer({ env: { RATE_LIMIT_MAX: '2', AUTH_RATE_LIMIT_MAX: '100' }, seed: false })
     try {
-      const first = await fetch(server.base + '/api/games')
-      const second = await fetch(server.base + '/api/games')
-      const third = await fetch(server.base + '/api/games')
-      assert.equal(first.status, 200)
-      assert.equal(second.status, 200)
-      assert.equal(third.status, 429)
+      for (let i = 0; i < 6; i++) {
+        const css = await fetch(server.base + '/style.css')
+        assert.equal(css.status, 200)
+        assert.match(css.headers.get('cache-control'), /max-age=86400/)
+        const tex = await fetch(server.base + '/textures/grass_diff.jpg')
+        assert.equal(tex.status, 200)
+        assert.match(tex.headers.get('cache-control'), /max-age=2592000/)
+      }
+      const games = await fetch(server.base + '/api/games')
+      assert.equal(games.status, 200)
       const health = await fetch(server.base + '/api/health')
       assert.equal(health.status, 200)
+      const body = JSON.stringify({})
+      const headers = { 'content-type': 'application/json' }
+      const first = await fetch(server.base + '/api/abuse-reports', { method: 'POST', headers, body })
+      const second = await fetch(server.base + '/api/abuse-reports', { method: 'POST', headers, body })
+      const third = await fetch(server.base + '/api/abuse-reports', { method: 'POST', headers, body })
+      assert.notEqual(first.status, 429)
+      assert.notEqual(second.status, 429)
+      assert.equal(third.status, 429)
     } finally {
       await server.close()
     }

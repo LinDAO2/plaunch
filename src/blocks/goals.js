@@ -16,11 +16,11 @@ const DAY = {
   desert: [242, 196, 138],
   snow: [213, 228, 239],
   candy: [242, 160, 204],
-  moon: [20, 24, 32]
+  moon: [36, 64, 120]
 }
 
 export const SPARK_REACH = 2.6
-const CYCLE_MS = 72000
+export const CYCLE_MS = 600000
 
 export function goalTargets(world) {
   if (world?.structure === 'pyramid') return { label: 'Pyramid', raise: 3, sparks: 8 }
@@ -31,6 +31,9 @@ export function goalTargets(world) {
   if (world?.structure === 'dock') return { label: 'Dock', raise: 3, sparks: 5 }
   if (world?.structure === 'ruins') return { label: 'Ruins', raise: 3, sparks: 5 }
   if (world?.structure === 'house') return { label: 'House', raise: 4, sparks: 5 }
+  if (world?.structure === 'village') return { label: 'Village', raise: 4, sparks: 6 }
+  if (world?.structure === 'waterfall') return { label: 'Waterfall', raise: 3, sparks: 5 }
+  if (world?.structure === 'oasis') return { label: 'Oasis', raise: 3, sparks: 5 }
   if (world?.biome === 'candy') return { label: 'Pyramid', raise: 3, sparks: 8 }
   if (world?.biome === 'grassland') return { label: 'Tower', raise: 4, sparks: 6 }
   return { label: 'Landmark', raise: 4, sparks: 5 }
@@ -135,14 +138,18 @@ export function lookYaw(world, x, z) {
 
 export function skyPhase(nowMs) {
   const t = Number(nowMs) || 0
-  return ((t / CYCLE_MS) + 0.18) % 1
+  return (t / CYCLE_MS) % 1
 }
 
 export function skyCycle(biome, phase) {
   const day = DAY[biome] || DAY.grassland
   const night = NIGHT[biome] || NIGHT.grassland
   const p = ((Number(phase) % 1) + 1) % 1
-  const lift = 0.5 + 0.5 * Math.cos(p * Math.PI * 2)
+  // Night is a short dip around the middle of a ten-minute day. Phase 0 is full day.
+  const dist = Math.min(Math.abs(p - 0.5), 0.5)
+  const nightSpan = 0.05
+  const daySpan = 0.14
+  const lift = dist <= nightSpan ? 0 : dist >= daySpan ? 1 : (dist - nightSpan) / (daySpan - nightSpan)
   const mix = (a, b) => Math.round(a * lift + b * (1 - lift))
   const r = mix(day[0], night[0])
   const g = mix(day[1], night[1])

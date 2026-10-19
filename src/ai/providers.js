@@ -60,6 +60,54 @@ function providerFromChoice(env = {}) {
   return null
 }
 
+const COOLDOWN_FALLBACK_MS = 10 * 60 * 1000
+const providerDown = new Map()
+
+function cooldownMs(env = process.env) {
+  const raw = env.AI_PROVIDER_COOLDOWN_MS
+  if (raw !== undefined && String(raw) !== '') {
+    const n = Number(raw)
+    return Number.isInteger(n) && n >= 0 && n <= 3_600_000 ? n : COOLDOWN_FALLBACK_MS
+  }
+  if (env.NODE_ENV === 'test') return 0
+  return COOLDOWN_FALLBACK_MS
+}
+
+export function noteProviderDown(id, info = {}, now = Date.now(), env = process.env) {
+  if (!id) return
+  const wait = cooldownMs(env)
+  if (wait === 0) return
+  providerDown.set(id, {
+    until: now + wait,
+    reason: info.reason || info.code || 'provider_down',
+    message: typeof info.message === 'string' ? info.message.slice(0, 180) : ''
+  })
+}
+
+export function providerCooldown(id, now = Date.now()) {
+  if (!id) return null
+  const row = providerDown.get(id)
+  if (!row) return null
+  if (row.until <= now) {
+    providerDown.delete(id)
+    return null
+  }
+  return row
+}
+
+export function clearProviderCooldowns() {
+  providerDown.clear()
+}
+
+export function configuredProviders(env = {}) {
+  const ids = []
+  if (env.ANTHROPIC_API_KEY) ids.push('anthropic')
+  if (env.OPENAI_API_KEY) ids.push('openai')
+  if (env.GEMINI_API_KEY) ids.push('gemini')
+  if (env.XAI_API_KEY) ids.push('xai')
+  return ids.map((id) => providerFromChoice({ ...env, AI_PROVIDER: id })).filter(Boolean)
+}
+
 const PATHS = { spec: 'AI_PROVIDER_SPEC', freeform: 'AI_PROVIDER_FREEFORM', safety: 'AI_PROVIDER_SAFETY' }
 
 export function resolveProvider(env = {}, path) {
@@ -68,30 +116,55 @@ export function resolveProvider(env = {}, path) {
   return providerFromChoice(env)
 }
 
-export function resolveProviderChain(env = {}, path) {
+export function resolveProviderChain(env = {}, path, now = Date.now()) {
   const primary = resolveProvider(env, path)
   if (!primary) return []
   const chain = [primary]
-  // Unset falls back to Gemini. An explicit empty string (the bakeoff) adds nobody.
-  for (const id of String(env.AI_FALLBACKS ?? 'gemini').split(',')) {
+  // Unset falls back to OpenAI, then Gemini. An explicit empty string (the bakeoff) adds nobody.
+  for (const id of String(env.AI_FALLBACKS ?? 'openai,gemini').split(',')) {
     const name = id.trim().toLowerCase()
     if (!name || chain.some((item) => item.id === name)) continue
     const next = providerFromChoice({ ...env, AI_PROVIDER: name })
     if (next?.id === name) chain.push(next)
   }
-  return chain
+  return chain.filter((item) => !providerCooldown(item.id, now))
 }
 
 const PROVIDER_LABELS = { gemini: 'Gemini', xai: 'xAI', openai: 'OpenAI', anthropic: 'Anthropic' }
 
-export function aiStatus(env = {}) {
-  const provider = resolveProvider(env)
+export function providerReport(env = {}, now = Date.now()) {
+  return configuredProviders(env).map((item) => {
+    const down = providerCooldown(item.id, now)
+    return {
+      id: item.id,
+      model: item.model,
+      status: down ? 'down' : 'up',
+      reason: down?.reason || null,
+      retryAt: down ? new Date(down.until).toISOString() : null
+    }
+  })
+}
+
+export function aiStatus(env = {}, now = Date.now()) {
+  const configured = configuredProviders(env)
+  const provider = resolveProviderChain(env, undefined, now)[0] || null
+  const providers = providerReport(env, now)
+  if (!configured.length) {
+    return {
+      mode: 'template',
+      provider: null,
+      model: null,
+      providers,
+      notice: 'Template mode. No AI provider key is configured, so ideas use the built-in matcher instead of a model.'
+    }
+  }
   if (!provider) {
     return {
       mode: 'template',
       provider: null,
       model: null,
-      notice: 'Template mode. No AI provider key is configured, so ideas use the built-in matcher instead of a model.'
+      providers,
+      notice: 'Template mode. Every configured AI provider is unavailable right now, so ideas use the built-in matcher until one recovers.'
     }
   }
   const label = PROVIDER_LABELS[provider.id] || provider.id
@@ -99,6 +172,7 @@ export function aiStatus(env = {}) {
     mode: 'ai',
     provider: provider.id,
     model: provider.model,
+    providers,
     notice: `AI mode · ${label} · ${provider.model}. Output is validated GameSpec v1 and is never run as code.`
   }
 }
@@ -387,8 +461,10 @@ export function describeUpstreamError(provider, status, bodyText) {
   const label = PROVIDER_LABELS[provider?.id] || 'AI provider'
   const tag = `${label} HTTP ${status}${upstreamCode ? ` ${upstreamCode}` : ''}`
   const code = String(upstreamCode).toUpperCase()
+  const billing = status === 402 || /credit balance|billing|insufficient credit|out of credit|payment required|insufficient_quota/i.test(`${upstreamMessage} ${code}`)
   let category
-  if (status === 503 || status === 529 || code === 'UNAVAILABLE' || code === 'OVERLOADED_ERROR') category = 'busy'
+  if (billing) category = 'billing'
+  else if (status === 503 || status === 529 || code === 'UNAVAILABLE' || code === 'OVERLOADED_ERROR') category = 'busy'
   else if (status === 429 || code === 'RESOURCE_EXHAUSTED') category = 'quota'
   else if (status === 401 || status === 403 || code === 'PERMISSION_DENIED' || code === 'UNAUTHENTICATED') category = 'auth'
   else if (status === 404 || code === 'NOT_FOUND') category = 'model_not_found'
@@ -398,20 +474,22 @@ export function describeUpstreamError(provider, status, bodyText) {
   else category = 'error'
   const detail = upstreamMessage ? `: ${upstreamMessage}` : ''
   const table = {
-    busy: { code: 'ai_provider_busy', retry: true, delay: true, text: `${label} is overloaded right now (${tag}${detail}). Try again in a minute.` },
-    quota: { code: 'ai_quota_exceeded', retry: false, text: `${label} quota exceeded (${tag}${detail}).` },
-    auth: { code: 'ai_provider_auth', retry: false, text: `${label} rejected the API key or project (${tag}${detail}).` },
-    model_not_found: { code: 'ai_model_not_found', retry: false, text: `${label} model ${provider?.model || ''} was not found (${tag}${detail}).` },
-    timeout: { code: 'ai_provider_timeout', retry: true, delay: true, text: `${label} timed out upstream (${tag}${detail}).` },
-    internal: { code: 'ai_provider_internal', retry: true, delay: true, text: `${label} had an internal error (${tag}${detail}).` },
-    rejected: { code: 'ai_request_rejected', retry: false, text: `${label} rejected the request (${tag}${detail}).` },
-    error: { code: 'ai_provider_error', retry: false, text: `${label} request failed (${tag}${detail}).` }
+    busy: { code: 'ai_provider_busy', retry: true, delay: true, failover: true, text: `${label} is overloaded right now (${tag}${detail}). Try again in a minute.` },
+    billing: { code: 'ai_billing', retry: false, failover: true, text: `${label} cannot bill this request (${tag}${detail}).` },
+    quota: { code: 'ai_quota_exceeded', retry: false, failover: true, text: `${label} quota exceeded (${tag}${detail}).` },
+    auth: { code: 'ai_provider_auth', retry: false, failover: true, text: `${label} rejected the API key or project (${tag}${detail}).` },
+    model_not_found: { code: 'ai_model_not_found', retry: false, failover: false, text: `${label} model ${provider?.model || ''} was not found (${tag}${detail}).` },
+    timeout: { code: 'ai_provider_timeout', retry: true, delay: true, failover: true, text: `${label} timed out upstream (${tag}${detail}).` },
+    internal: { code: 'ai_provider_internal', retry: true, delay: true, failover: true, text: `${label} had an internal error (${tag}${detail}).` },
+    rejected: { code: 'ai_request_rejected', retry: false, failover: false, text: `${label} rejected the request (${tag}${detail}).` },
+    error: { code: 'ai_provider_error', retry: false, failover: true, text: `${label} request failed (${tag}${detail}).` }
   }[category]
   return {
     category,
     code: table.code,
     message: table.text,
     retry: table.retry,
+    failover: Boolean(table.failover),
     delay: Boolean(table.delay),
     upstream: { provider: provider?.id || null, model: provider?.model || null, status, code: upstreamCode || null, message: upstreamMessage || null }
   }

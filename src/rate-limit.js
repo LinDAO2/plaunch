@@ -23,7 +23,10 @@ export function createRateLimiter(config) {
     allow(req, pathname, now = Date.now()) {
       if (req.method === 'GET' && pathname === '/api/health') return { ok: true }
       const ip = req.socket?.remoteAddress || 'unknown'
-      if (!hit(globalHits, ip, config.rateLimitMax, now, config.rateWindowMs)) {
+      // Reads, textures, and other static files are shared by every viewer on an IP.
+      // The global cap stays on writes and on generation, which have their own buckets below.
+      const write = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE'
+      if (write && !hit(globalHits, ip, config.rateLimitMax, now, config.rateWindowMs)) {
         return blocked('rate_limited', 'Too many requests')
       }
       if (req.method === 'POST' && pathname.startsWith('/api/auth/')) {

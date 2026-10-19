@@ -3,7 +3,7 @@ import { cleanText } from '../validate.js'
 import { generateWorldIdea, wantsWorld } from '../blocks/spec.js'
 import { gameFromSpec, specFromGame, validateGameSpec } from './gamespec.js'
 import { log } from '../log.js'
-import { DEFAULT_AI_TIMEOUT_MS, FREEFORM_OUTPUT_BUDGET, aiStatus, anthropicRequest, anthropicText, completionMeta, describeUpstreamError, foldProviderStream, geminiRequest, geminiText, openAiRequest, openAiResponsesRequest, openAiText, resolveProvider, resolveProviderChain, responsesText, stitchModelText } from './providers.js'
+import { DEFAULT_AI_TIMEOUT_MS, FREEFORM_OUTPUT_BUDGET, aiStatus, anthropicRequest, anthropicText, completionMeta, describeUpstreamError, foldProviderStream, geminiRequest, geminiText, noteProviderDown, openAiRequest, openAiResponsesRequest, openAiText, resolveProvider, resolveProviderChain, responsesText, stitchModelText } from './providers.js'
 import { generateTemplate, TEMPLATE_NOTICE } from '../template.js'
 import { SAMPLE_SPECS } from './samples.js'
 import { STYLE_GUIDE } from '../style-kit.js'
@@ -84,8 +84,14 @@ function textFor(provider, payload) {
 
 function canFallback(err) {
   if (!err) return false
-  if (err.code === 'ai_provider_auth' || err.code === 'ai_request_rejected' || err.code === 'ai_model_not_found') return false
-  return err.retry === true || err.code === 'ai_quota_exceeded'
+  if (err.code === 'ai_model_not_found') return false
+  if (err.code === 'ai_request_rejected') return false
+  return err.failover === true || err.retry === true || err.code === 'ai_quota_exceeded' || err.code === 'ai_provider_auth' || err.code === 'ai_billing'
+}
+
+function rememberDown(provider, err) {
+  if (!provider?.id || !canFallback(err)) return
+  noteProviderDown(provider.id, { code: err.code, reason: err.code, message: err.message })
 }
 
 function tooLarge() {
@@ -199,6 +205,7 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     const error = new HttpError(502, err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
     // A freeform stall or overall cap should not start a second full wait.
     error.retry = options.stream ? false : true
+    error.failover = true
     error.cause = err
     throw error
   }
@@ -219,6 +226,7 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     if (err.code === 'ai_provider_error') throw err
     const error = new HttpError(502, err.stall || err.name === 'TimeoutError' || err.name === 'AbortError' ? 'AI provider timed out' : 'AI provider request failed', 'ai_provider_error')
     error.retry = options.stream ? false : true
+    error.failover = true
     throw error
   } finally {
     if (killer) clearTimeout(killer)
@@ -228,8 +236,9 @@ async function callProvider(provider, messages, fetchImpl, options = {}) {
     log('warn', 'ai provider error', info.upstream)
     const error = new HttpError(502, info.message, info.code)
     error.upstream = info.upstream
-    // Retrying a 429 or a rejected request only burns quota. A 503, 500, or 504 gets one delayed retry.
+    // A rejected payload is our request. Billing, auth, quota, and 5xx are the provider: fail over, and retry a 5xx once.
     error.retry = info.retry
+    error.failover = info.failover
     if (info.delay) error.retryDelayMs = retryDelay()
     throw error
   }
@@ -300,6 +309,7 @@ export async function requestModelText(provider, messages, fetchImpl = globalThi
   } catch (err) {
     const next = (options.fallbacks || [])[0]
     if (!next || !canFallback(err)) throw err
+    rememberDown(provider, err)
     return requestModelText(next, messages, fetchImpl, { ...options, fallbacks: options.fallbacks.slice(1) })
   }
   if (options.continueOnTruncation && result.truncated && result.outputTokens < FREEFORM_OUTPUT_BUDGET) {
@@ -349,9 +359,9 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch, 
     const idea = generateWorldIdea(prompt)
     return { mode: idea.mode, provider: null, model: null, game: idea.game, spec: idea.spec, notice: idea.notice }
   }
-  const status = aiStatus(env)
-  if (status.mode !== 'ai') return templateResult(prompt)
-  let provider = resolveProvider(env, 'spec')
+  const chain = resolveProviderChain(env, 'spec')
+  if (!chain.length) return templateResult(prompt)
+  let provider = chain[0]
   const idea = cleanText(prompt, 600)
   if (idea.length < 6) throw new HttpError(400, 'Describe your game in more detail', 'validation_error')
   const messages = [
@@ -361,7 +371,7 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch, 
   let lastError = 'AI provider failed'
   let code = 'ai_invalid_output'
   let providerFailures = 0
-  let fallbacks = resolveProviderChain(env, 'spec').slice(1)
+  let fallbacks = chain.slice(1)
   for (let attempt = 1; attempt <= 3; attempt++) {
     let raw
     try {
@@ -373,11 +383,13 @@ export async function generateGame({ prompt, env, fetchImpl = globalThis.fetch, 
       // Transport and 5xx failures get one retry; three 503s in a row burned free-tier quota live.
       if (err.retry === false || attempt === 3 || providerFailures >= 2) {
         if (canFallback(err) && fallbacks.length) {
+          rememberDown(provider, err)
           provider = fallbacks.shift()
           providerFailures = 0
           attempt = 0
           continue
         }
+        if (canFallback(err)) rememberDown(provider, err)
         throw withUpstream(new HttpError(502, lastError, code), err)
       }
       if (err.retryDelayMs) await sleep(err.retryDelayMs)

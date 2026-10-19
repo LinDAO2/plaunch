@@ -80,6 +80,9 @@ export function structureForPrompt(prompt) {
   if (/ruins?/.test(p)) return 'ruins'
   if (/dock|pier|jetty/.test(p)) return 'dock'
   if (/cabin|cottage/.test(p)) return 'cabin'
+  if (/village|hamlet|\btown\b|several houses|\bhouses\b/.test(p)) return 'village'
+  if (/waterfall/.test(p)) return 'waterfall'
+  if (/oasis|\bpalms?\b/.test(p)) return 'oasis'
   if (/house/.test(p)) return 'house'
   if (/castle|tower/.test(p)) return 'tower'
   const landform = landformFor(p)
@@ -100,7 +103,7 @@ export function chooseWorld(prompt) {
   else if (landform === 'canyon') biome = 'desert'
   else if (landform === 'beach') biome = 'grassland'
   else if (/snow|ice|frost|winter/.test(p) || landform === 'peaks') biome = 'snow'
-  else if (/desert|dune|sand/.test(p)) biome = 'desert'
+  else if (/desert|dune|sand|oasis|\bpalms?\b/.test(p)) biome = 'desert'
   const structure = structureForPrompt(p)
   const islands = /island|isle|atoll|archipelago|sky island/.test(p)
   const caves = /\bcaves?\b|\bcaverns?\b|\bmining\b|underground/.test(p)

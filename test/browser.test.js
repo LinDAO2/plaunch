@@ -33,9 +33,9 @@ test('studio and play smoke', { timeout: 120000 }, async () => {
     await page.waitForFunction(() => document.querySelector('#account')?.textContent.includes('Ada'))
 
     await page.click('#publish')
-    await page.waitForFunction(() => (document.querySelector('#status')?.textContent || '').includes('/g/'))
+    await page.waitForFunction(() => (document.querySelector('#status')?.textContent || '').includes('/r/'))
     const status = await page.locator('#status').innerText()
-    const slug = status.match(/\/g\/([a-z0-9-]+)/)[1]
+    const slug = status.match(/\/r\/([a-z0-9-]+)/)[1]
     assert.match(slug, /candy/)
     await page.waitForFunction(() => {
       const link = document.querySelector('#share-x')

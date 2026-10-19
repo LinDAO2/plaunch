@@ -4,7 +4,7 @@ import { generateIdea } from './idea.js'
 import { clearResearchCache } from './research.js'
 import { templateFreeform } from './freeform.js'
 import { inspectFreeform } from './freeform-check.js'
-import { foldProviderStream } from './providers.js'
+import { clearProviderCooldowns, foldProviderStream } from './providers.js'
 import { validateGameSpec } from './gamespec.js'
 
 export function fixtureObject(prompt, body) {
@@ -135,6 +135,7 @@ export function meteringFetch(inner, totals) {
 
 export async function runBakeoff({ prompts, providers, outDir, smoke = false, env = process.env, fetchImpl, research = true } = {}) {
   clearResearchCache()
+  clearProviderCooldowns()
   const results = []
   await mkdir(outDir, { recursive: true })
   const gamesDir = path.join(outDir, 'games')

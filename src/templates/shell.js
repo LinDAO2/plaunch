@@ -191,9 +191,12 @@ function award(points) {
   if (now - comboAt < 1.2) combo = Math.min(12, combo + 1)
   else combo = 1
   comboAt = now
-  window.__state.score = Math.max(window.__state.score || 0, n)
+  const prev = window.__state.score || 0
+  const next = Math.max(prev, n)
+  const gained = next > prev ? next - prev : n
+  window.__state.score = next
   window.__posted = true
-  pops.push({ text: '+' + n, x: 200 + Math.random() * 80, y: 200, life: 0.5 })
+  pops.push({ text: '+' + gained, x: 200 + Math.random() * 80, y: 200, life: 0.5 })
   burst(240, 200, ink(THEME.palette.accent))
   squash()
   if (n > 0) freezeUntil = nowSec() + 0.04

@@ -1,7 +1,7 @@
 import { HttpError } from '../errors.js'
 import { cleanText } from '../validate.js'
 import { aiStatus, requestModelText } from '../ai/generate.js'
-import { resolveProvider, resolveProviderChain } from '../ai/providers.js'
+import { configuredProviders, resolveProvider, resolveProviderChain } from '../ai/providers.js'
 import { TEMPLATES, templateById } from './catalog.js'
 import { EDIT_SCHEMA, KAPLAY_CHEATSHEET, PICK_SCHEMA } from './cheatsheet.js'
 import { hashText, pickTemplate } from './pick.js'
@@ -113,10 +113,11 @@ export async function generateTemplateGame({ prompt, env, fetchImpl = globalThis
   const status = aiStatus(env)
   let spec = picked.template
   let changes = []
-  if (status.mode !== 'ai') return pack(spec, themed(spec, idea, 0), env, null, idea, false)
+  const providersConfigured = configuredProviders(env).length > 0
+  if (status.mode !== 'ai') return pack(spec, themed(spec, idea, 0), env, null, idea, providersConfigured)
   const chain = resolveProviderChain(env, 'spec')
   let provider = chain[0]
-  if (!provider) return pack(spec, themed(spec, idea, 0), env, null, idea, false)
+  if (!provider) return pack(spec, themed(spec, idea, 0), env, null, idea, providersConfigured)
   if (picked.confidence < 0.84) {
     try {
       onProgress?.({ phase: 'choosing', outputTokens: 0, label: 'Choosing a template…' })

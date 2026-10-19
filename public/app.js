@@ -176,6 +176,10 @@ function showWorldPreview(game) {
   $('play').hidden = true
   $('play').disabled = true
   document.body.classList.add('world-play')
+  if ($('goal-banner')) {
+    $('goal-banner').hidden = true
+    $('goal-banner').textContent = ''
+  }
   if (!worldView || worldKey !== key) {
     worldView?.destroy()
     worldView = null
@@ -751,7 +755,17 @@ $('generate').addEventListener('click', async () => {
       }
       result = data
     }
-    if (result.mode === 'template' && $('ai-off')) $('ai-off').hidden = false
+    if (result.fallback) {
+      const note = result.notice || 'A template was used because the AI provider failed.'
+      if ($('ai-off')) {
+        $('ai-off').hidden = false
+        $('ai-off').textContent = note
+      }
+      setStatus(note)
+    } else if (result.mode === 'template' && $('ai-off')) {
+      $('ai-off').hidden = false
+      $('ai-off').textContent = 'AI is off on this server. Generate still builds a shared block world from the idea.'
+    }
     lastTier = result.tier === 'freeform' ? 'freeform' : 'spec'
     lastHtml = result.html || null
     lastTemplate = result.templateId ? { id: result.templateId, name: result.templateName || result.templateId } : readTemplate(result.html)
@@ -794,7 +808,7 @@ $('publish').addEventListener('click', async () => {
       setStatus('Held for review. It stays off Discover until a moderator approves it.')
       toast('Held for review.')
     } else {
-      setStatus(`Published: ${location.origin}/g/${game.id}`)
+      setStatus(`Published: ${location.origin}/r/${game.id}`)
       toast('Game published. Share the page URL.')
     }
     await loadGames()

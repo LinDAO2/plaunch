@@ -120,6 +120,14 @@ function pbrMaterial(loader, name, extra = {}) {
   material.customProgramCacheKey = () => (sway ? `sway:${name}` : `pbr:${name}`)
   material.onBeforeCompile = (shader) => {
     patchVertex(shader, sway ? LEAF_SWAY : '')
+    if (name !== 'leaves') return
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+      float leafSky = smoothstep(0.42, 0.7, diffuseColor.b) * smoothstep(0.12, 0.4, diffuseColor.b - diffuseColor.r);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.40, 0.15), leafSky);
+      diffuseColor.a = 1.0;`
+    )
   }
   return material
 }
@@ -324,8 +332,14 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#9ebfd4')
-  const haze = new THREE.Color(world?.biome === 'desert' ? '#d2b48c' : world?.biome === 'snow' ? '#c5d4e6' : '#7aa0dc')
-  scene.fog = new THREE.FogExp2(haze, quality.tier === 'low' ? 0.0058 : 0.0035)
+  const hazeHex = world?.biome === 'desert' ? '#d2b48c'
+    : world?.biome === 'snow' ? '#c5d4e6'
+      : world?.biome === 'candy' ? '#f4d0e2'
+        : world?.biome === 'moon' ? '#8aa4c8'
+          : '#7aa0dc'
+  const haze = new THREE.Color(hazeHex)
+  const fogFar = world?.biome === 'candy' || world?.biome === 'moon'
+  scene.fog = new THREE.FogExp2(haze, fogFar ? (quality.tier === 'low' ? 0.0022 : 0.0012) : (quality.tier === 'low' ? 0.0058 : 0.0035))
   const camera = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
   const sky = attachSky(scene, quality.tier)
 
@@ -1079,7 +1093,7 @@ ${shader.fragmentShader}`
     sky.material.uniforms.uZenith.value.copy(zenith)
     sky.material.uniforms.uHorizon.value.copy(horizon)
     sky.material.uniforms.uLight.value = light
-    const elev = -0.08 + light * 1.15
+    const elev = 0.22 + light * 0.85
     sunDir.set(0.55, Math.sin(elev), 0.35 * Math.cos(elev)).normalize()
     sky.material.uniforms.uSun.value.copy(sunDir)
     scene.fog.color.copy(haze).lerp(horizon, light > 0.5 ? 0.08 : 0.28)

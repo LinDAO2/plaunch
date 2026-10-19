@@ -747,7 +747,7 @@ test('tier classification keeps arcade ideas on the spec and sends the rest to f
 
 test('sandbox CSP allows only inline code and frames the parent plus X', () => {
   const csp = sandboxCsp({ mainOrigins: ['http://127.0.0.1:9'], publicBaseUrl: 'https://play.example' })
-  assert.equal(csp.startsWith("default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; "), true)
+  assert.equal(csp.startsWith("default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self' blob:; "), true)
   assert.equal(csp.includes('unsafe-eval'), false)
   assert.equal(csp.includes('wasm-unsafe-eval'), false)
   assert.match(csp, /; sandbox allow-scripts allow-pointer-lock;/)
@@ -1166,4 +1166,29 @@ test('tool-use streams wait out Anthropic pings and count real payload tokens', 
   ].join('\n')
   assert.equal(streamIsThinking(texting), false)
   assert.equal(streamPayloadChars('{"text":"abcd","partial_json":"xy","thinking":"z"}'), 7)
+})
+
+test('billing, auth, and quota failures fail over and a dead provider stays down', async () => {
+  const { clearProviderCooldowns, describeUpstreamError, noteProviderDown, resolveProviderChain } = await import('../src/ai/providers.js')
+  clearProviderCooldowns()
+  const provider = { id: 'anthropic', model: 'claude-sonnet-5-5' }
+  const bill = describeUpstreamError(provider, 400, '{"error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}')
+  assert.equal(bill.code, 'ai_billing')
+  assert.equal(bill.retry, false)
+  assert.equal(bill.failover, true)
+  assert.equal(describeUpstreamError(provider, 401, '{"error":{"type":"authentication_error","message":"invalid x-api-key"}}').failover, true)
+  assert.equal(describeUpstreamError(provider, 429, '{"error":{"type":"rate_limit_error","message":"rate limited"}}').code, 'ai_quota_exceeded')
+  const plain = describeUpstreamError(provider, 400, '{"error":{"type":"invalid_request_error","message":"Invalid JSON payload received."}}')
+  assert.equal(plain.code, 'ai_request_rejected')
+  assert.equal(plain.failover, false)
+  const env = {
+    AI_PROVIDER: 'anthropic',
+    ANTHROPIC_API_KEY: 'a',
+    OPENAI_API_KEY: 'o',
+    GEMINI_API_KEY: 'g'
+  }
+  assert.deepEqual(resolveProviderChain(env).map((item) => item.id), ['anthropic', 'openai', 'gemini'])
+  noteProviderDown('anthropic', { code: 'ai_billing' }, 1000, { AI_PROVIDER_COOLDOWN_MS: 600000 })
+  assert.deepEqual(resolveProviderChain(env, undefined, 2000).map((item) => item.id), ['openai', 'gemini'])
+  clearProviderCooldowns()
 })

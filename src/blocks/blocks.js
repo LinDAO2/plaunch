@@ -32,12 +32,12 @@ export const BLOCKS = [
 export const HOTBAR = [TURF, SOIL, ROCK, DUNE, TIMBER, CANOPY, PETAL, CANDY, FROST]
 
 export function hotbarFor(biome) {
-  if (biome === 'candy') return HOTBAR
+  if (biome === 'candy') return [CANDY, PETAL, GLOW, TURF, SOIL, ROCK, DUNE, TIMBER, CANOPY, FROST]
   return HOTBAR.filter((id) => id !== PETAL && id !== CANDY)
 }
 
 export const BIOMES = ['grassland', 'desert', 'snow', 'candy', 'moon']
-export const STRUCTURES = ['tower', 'house', 'pyramid', 'cabin', 'dock', 'lighthouse', 'ruins', 'watchtower', 'none']
+export const STRUCTURES = ['tower', 'house', 'pyramid', 'cabin', 'dock', 'lighthouse', 'ruins', 'watchtower', 'village', 'waterfall', 'oasis', 'none']
 export const WORLD_SIZES = { small: 32, medium: 48, large: 64 }
 export const WORLD_HEIGHT = 48
 export const CHUNK = 16

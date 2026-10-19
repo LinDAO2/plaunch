@@ -103,7 +103,9 @@ const FILES = new Map([
   ['/fonts/ibm-plex-mono-latin-600.woff2', 'fonts/ibm-plex-mono-latin-600.woff2'],
   ['/fonts/lilita-one-latin.woff2', 'fonts/lilita-one-latin.woff2'],
   ['/fonts/rubik-latin-700.woff2', 'fonts/rubik-latin-700.woff2'],
-  ['/fonts/chakra-petch-latin-600.woff2', 'fonts/chakra-petch-latin-600.woff2']
+  ['/fonts/chakra-petch-latin-600.woff2', 'fonts/chakra-petch-latin-600.woff2'],
+  ['/favicon.svg', 'favicon.svg'],
+  ['/favicon.ico', 'favicon.svg']
 ])
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -111,6 +113,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2'
 }
 const GENERATIONS = new Set(['manual', 'rule-based-template', 'ai:gemini', 'ai:openai', 'ai:xai', 'ai:anthropic', 'seed', 'import'])
@@ -478,7 +481,12 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     try {
       await db.query('select 1 as ok')
       const ai = aiStatus(config.env)
-      return sendJson(res, 200, { ok: true, version: config.version, db: 'up', ai: { mode: ai.mode, provider: ai.provider } }, ctx)
+      return sendJson(res, 200, {
+        ok: true,
+        version: config.version,
+        db: 'up',
+        ai: { mode: ai.mode, provider: ai.provider, model: ai.model, providers: ai.providers || [] }
+      }, ctx)
     } catch (err) {
       log('error', 'database health check failed', { requestId: ctx.requestId, message: err.message })
       return sendJson(res, 503, { ok: false, version: config.version, db: 'down' }, ctx)
@@ -667,7 +675,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
       env: config.env,
       safetyModel: config.safetyModelOnPublish
     })
-    if (game.status === 'published') schedulePosterCapture(db, game, config.nodeEnv)
+    if (game.status === 'published') schedulePosterCapture(db, game, config.nodeEnv, requestOrigin(config, req))
     return sendJson(res, 201, { game: present(config, game, { canEdit: true }), url: `/g/${game.id}`, version }, ctx)
   }
 
@@ -679,6 +687,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     const { game, version } = await createGame(db, fields, spec, user.id)
     if (verdict.flagged) await recordHold(db, { actorId: user.id, gameId: game.id, reason: verdict.reason, source: verdict.source })
     const assets = await listAssets(db, game.id)
+    if (game.status === 'published') schedulePosterCapture(db, game, config.nodeEnv, requestOrigin(config, req))
     return sendJson(res, 201, { game: present(config, game, { canEdit: true, assets }), url: `/g/${game.id}`, version }, ctx)
   }
 
@@ -921,7 +930,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     }
     try {
       const bytes = await readFile(file)
-      return sendJsonRaw(res, 200, bytes, ctx, pathname === '/three.js' ? '.js' : '.jpg')
+      return sendJsonRaw(res, 200, bytes, ctx, pathname === '/three.js' ? '.js' : '.jpg', pathname)
     } catch {
       return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
     }
@@ -932,7 +941,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     if (!BLOCK_FILES.has(name)) return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
     try {
       const bytes = await readFile(path.join(BLOCKS, name))
-      return sendJsonRaw(res, 200, bytes, ctx, '.js')
+      return sendJsonRaw(res, 200, bytes, ctx, '.js', pathname)
     } catch {
       return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
     }
@@ -942,7 +951,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
     const file = FILES.get(pathname)
     try {
       const bytes = await readFile(path.join(PUBLIC, file))
-      return sendJsonRaw(res, 200, bytes, ctx, path.extname(file))
+      return sendJsonRaw(res, 200, bytes, ctx, path.extname(file), pathname)
     } catch {
       return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
     }
@@ -984,10 +993,18 @@ function sendImage(res, bytes, ctx, kind = 'card') {
   return 200
 }
 
-function sendJsonRaw(res, status, bytes, ctx, ext) {
+function cacheFor(pathname, ext) {
+  if (pathname === '/favicon.svg' || pathname === '/favicon.ico' || pathname === '/three.js' || pathname.startsWith('/textures/') || ext === '.woff2' || ext === '.jpg' || ext === '.svg') {
+    return 'public, max-age=2592000, immutable'
+  }
+  if (ext === '.js' || ext === '.css') return 'public, max-age=86400'
+  return 'no-store'
+}
+
+function sendJsonRaw(res, status, bytes, ctx, ext, pathname = '') {
   const headers = {
     'content-type': MIME[ext] || 'application/octet-stream',
-    'cache-control': 'no-store',
+    'cache-control': cacheFor(pathname, ext),
     'x-content-type-options': 'nosniff'
   }
   if (ctx?.cookies?.length) headers['set-cookie'] = ctx.cookies

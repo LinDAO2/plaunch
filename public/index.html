@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#000000">
 <title>playground — make a shared block world</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/play.css">
 </head>
 <body>
 <header class="top">
@@ -36,10 +38,10 @@
 <button class="idea" type="button" data-prompt="a clear lake">Clear lake</button>
 </div>
 <div class="skies" aria-label="Sky" hidden>
-<button class="sky" type="button" data-sky="day" style="background:#4FB3FF;border-bottom:8px solid #CDEBFF">Day</button>
-<button class="sky" type="button" data-sky="dusk" style="background:#2B2A6B;border-bottom:8px solid #FF9E6B">Dusk</button>
-<button class="sky" type="button" data-sky="night" style="background:#0B1640;border-bottom:8px solid #24407A">Night</button>
-<button class="sky" type="button" data-sky="neon" style="background:#1A0633;border-bottom:8px solid #4B0F6B">Neon</button>
+<button class="sky sky-day" type="button" data-sky="day">Day</button>
+<button class="sky sky-dusk" type="button" data-sky="dusk">Dusk</button>
+<button class="sky sky-night" type="button" data-sky="night">Night</button>
+<button class="sky sky-neon" type="button" data-sky="neon">Neon</button>
 </div>
 <button id="generate" class="primary" type="button">Generate</button>
 <div class="hero-meta"><span>Block worlds</span><span>Smooth on phones</span><span>Ready for X</span></div>
@@ -68,7 +70,7 @@
 <p id="remix-row" class="hint" hidden><button id="remix" class="outline" type="button">Remix</button> Copy this world and its spec into your studio.</p>
 <p id="controls-hint" class="hint"></p>
 <div class="game" id="game">
-<p id="goal-banner" class="goal-banner">Tap as fast as you can.</p>
+<p id="goal-banner" class="goal-banner" hidden></p>
 <span class="game-label" id="game-label">Ready</span>
 <strong id="display">0</strong>
 <div id="field" class="field"></div>

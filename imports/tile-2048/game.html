@@ -1831,7 +1831,10 @@ window.requestAnimationFrame(function () {
       if (!el || typeof MutationObserver !== 'function') return;
       var last = null;
       var send = function () {
-        var n = parseInt(String(el.textContent).replace(/[^0-9]/g, ''), 10);
+        var clone = el.cloneNode(true);
+        var extras = clone.querySelectorAll('.score-addition');
+        for (var i = 0; i < extras.length; i++) extras[i].remove();
+        var n = parseInt(String(clone.textContent).replace(/[^0-9]/g, ''), 10);
         if (!isFinite(n) || n === last) return;
         last = n;
         if (window.Playground) window.Playground.submitScore(n);

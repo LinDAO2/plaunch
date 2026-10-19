@@ -1,4 +1,4 @@
-# Playground — game launchpad v1.5.0
+# Playground — game launchpad v1.5.1
 
 v1.5.0 restyles the launchpad: a cinematic create panel, an acid-yellow accent, and raised game cards. Create still makes a shared block world. The v1.4.1 renderer stays in place: PBR terrain, sun, water, and sky on desktop, with SSAO and bloom off and a smaller shadow map on phones and the X card. No new third-party assets were added.
 
@@ -64,7 +64,7 @@ Every variable below is listed in `.env.example`.
 | `AI_PROVIDER_SPEC` | Provider for the spec path. |
 | `AI_PROVIDER_FREEFORM` | Provider for the freeform path. |
 | `AI_PROVIDER_SAFETY` | Provider for the safety path. |
-| `AI_FALLBACKS` | Comma-separated fallbacks used on 429 and 5xx. |
+| `AI_FALLBACKS` | Comma-separated fallbacks used when a provider is down (billing, auth, quota, or 5xx). Default `openai,gemini`. |
 | `GEMINI_API_KEY` | Google AI Studio key. |
 | `GEMINI_MODEL` | Gemini model name. |
 | `OPENAI_API_KEY` | OpenAI key. |
@@ -181,7 +181,7 @@ The play page mounts the game in an iframe whose attribute is `sandbox="allow-sc
 
 The sandbox response CSP is exactly:
 
-`default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self'; font-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors <app origin> https://x.com https://*.x.com https://twitter.com https://*.twitter.com`
+`default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; connect-src 'self' blob:; font-src 'self'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts allow-pointer-lock; frame-ancestors <app origin> https://x.com https://*.x.com https://twitter.com https://*.twitter.com`
 
 There is no `unsafe-eval` and no `wasm-unsafe-eval`. `font-src 'self'` lets a sandboxed page load the OFL woff2 files served on that same origin. `script-src 'self'` exists so the page can load the pinned Kaplay, ZzFX, and three.js files.
 

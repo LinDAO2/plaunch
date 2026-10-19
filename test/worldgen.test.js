@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
 import { generateWorldFromPrompt } from '../src/ai/worldgen.js'
-import { CANOPY, GLOW, FROST, ROCK, TIMBER } from '../src/blocks/blocks.js'
+import { CANOPY, DUNE, GLOW, FROST, POOL, ROCK, TIMBER, TURF } from '../src/blocks/blocks.js'
 import { repairWorldSpec, chooseWorld, structureForPrompt } from '../src/blocks/spec.js'
 import { WATER, blockAt, spawnPoint, structureOrigin, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
 
@@ -177,8 +177,15 @@ test('islands drop the shore and caves open air under the surface', () => {
     terrain: { islands: true, caves: false, sky: 'day' }
   })
   const edge = surfaceY(0, 0, islands)
-  const mid = surfaceY(islands.size >> 1, islands.size >> 1, islands)
+  const midX = islands.size >> 1
+  const midZ = islands.size >> 1
+  const mid = surfaceY(midX, midZ, islands)
   assert.ok(edge < mid, `shore ${edge} should sit under the middle ${mid}`)
+  let airUnder = 0
+  for (let y = 2; y < mid - 2; y++) {
+    if (blockAt(midX, y, midZ, islands) === 0) airUnder += 1
+  }
+  assert.ok(airUnder > 2, `floating island should have air underneath, saw ${airUnder}`)
   const caves = worldFromSpec({
     biome: 'snow',
     terrainSeed: 77,
@@ -337,4 +344,63 @@ test('remix forks a world spec and its placed blocks', async () => {
   } finally {
     await server.close()
   }
+})
+
+test('prompt structures and grassland grass show up in the terrain', () => {
+  assert.equal(structureForPrompt('a village with several houses'), 'village')
+  assert.equal(structureForPrompt('a tall waterfall in the hills'), 'waterfall')
+  assert.equal(structureForPrompt('an oasis with palms'), 'oasis')
+  assert.equal(chooseWorld('an oasis with palms').biome, 'desert')
+  const village = worldFromSpec(chooseWorld('a village with several houses'))
+  let roofs = 0
+  for (let z = 0; z < village.size; z++) {
+    for (let x = 0; x < village.size; x++) {
+      const h = surfaceY(x, z, village)
+      if (blockAt(x, h + 4, z, village) === ROCK && blockAt(x, h + 1, z, village) === 0) roofs += 1
+    }
+  }
+  assert.ok(roofs >= 20, `village roofs ${roofs}`)
+  const fall = worldFromSpec(chooseWorld('a mountain waterfall'))
+  assert.equal(fall.structure, 'waterfall')
+  let falling = 0
+  for (let y = 1; y < fall.height; y++) {
+    for (let z = 0; z < fall.size; z++) {
+      for (let x = 0; x < fall.size; x++) {
+        if (blockAt(x, y, z, fall) === POOL) falling += 1
+      }
+    }
+  }
+  assert.ok(falling > 6, `waterfall water ${falling}`)
+  const oasis = worldFromSpec(chooseWorld('an oasis with palms'))
+  assert.equal(oasis.biome, 'desert')
+  let wood = 0
+  let leaf = 0
+  let water = 0
+  for (let y = 1; y < 24; y++) {
+    for (let z = 0; z < oasis.size; z += 1) {
+      for (let x = 0; x < oasis.size; x += 1) {
+        const id = blockAt(x, y, z, oasis)
+        if (id === TIMBER) wood += 1
+        if (id === CANOPY) leaf += 1
+        if (id === POOL) water += 1
+      }
+    }
+  }
+  assert.ok(wood >= 8, `oasis trunks ${wood}`)
+  assert.ok(leaf >= 4, `oasis fronds ${leaf}`)
+  assert.ok(water >= 4, `oasis water ${water}`)
+  const grass = worldFromSpec({ biome: 'grassland', terrainSeed: 1107, worldSize: 'medium', structure: 'none' })
+  let turf = 0
+  let sand = 0
+  let samples = 0
+  for (let z = 1; z < grass.size; z += 2) {
+    for (let x = 1; x < grass.size; x += 2) {
+      const h = surfaceY(x, z, grass)
+      const id = blockAt(x, h, z, grass)
+      samples += 1
+      if (id === TURF) turf += 1
+      if (id === DUNE) sand += 1
+    }
+  }
+  assert.ok(turf / samples > 0.75, `grass ${turf} sand ${sand} of ${samples}`)
 })
