@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { aiStatus } from './ai/generate.js'
+import { aiStatusFresh } from './ai/providers.js'
 import { assertFreeform } from './ai/freeform-check.js'
 import { inspectImport } from './imports/bundle.js'
 import { importBroughtGame } from './imports/service.js'
@@ -480,7 +481,7 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   if (method === 'GET' && pathname === '/api/health') {
     try {
       await db.query('select 1 as ok')
-      const ai = aiStatus(config.env)
+      const ai = await aiStatusFresh(config.env, fetchImpl)
       return sendJson(res, 200, {
         ok: true,
         version: config.version,

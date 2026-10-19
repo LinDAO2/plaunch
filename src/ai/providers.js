@@ -1,4 +1,5 @@
 import { geminiResponseSchema } from './gamespec.js'
+import { log } from '../log.js'
 
 // Rosebud is intentionally not a provider. It has no generation API and its terms prohibit automated use.
 
@@ -61,7 +62,9 @@ function providerFromChoice(env = {}) {
 }
 
 const COOLDOWN_FALLBACK_MS = 10 * 60 * 1000
+const BILLING_PROBE_MS = 4000
 const providerDown = new Map()
+const probeFreshUntil = new Map()
 
 function cooldownMs(env = process.env) {
   const raw = env.AI_PROVIDER_COOLDOWN_MS
@@ -97,6 +100,7 @@ export function providerCooldown(id, now = Date.now()) {
 
 export function clearProviderCooldowns() {
   providerDown.clear()
+  probeFreshUntil.clear()
 }
 
 export function configuredProviders(env = {}) {
@@ -175,6 +179,89 @@ export function aiStatus(env = {}, now = Date.now()) {
     providers,
     notice: `AI mode · ${label} · ${provider.model}. Output is validated GameSpec v1 and is never run as code.`
   }
+}
+
+// Counts tokens instead of generating. A credit or billing rejection still comes back as HTTP 400.
+export function anthropicCreditProbe(provider) {
+  return {
+    url: `${trimBase(provider.base)}/v1/messages/count_tokens`,
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': provider.apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      messages: [{ role: 'user', content: 'hi' }]
+    })
+  }
+}
+
+function withAnthropicBillingDown(status) {
+  const providers = status.providers.map((item) => item.id === 'anthropic' && item.status !== 'down'
+    ? { ...item, status: 'down', reason: 'ai_billing', retryAt: item.retryAt }
+    : item)
+  if (status.provider !== 'anthropic') return { ...status, providers }
+  const next = providers.find((item) => item.status === 'up')
+  if (!next) {
+    return {
+      mode: 'template',
+      provider: null,
+      model: null,
+      providers,
+      notice: 'Template mode. Every configured AI provider is unavailable right now, so ideas use the built-in matcher until one recovers.'
+    }
+  }
+  const label = PROVIDER_LABELS[next.id] || next.id
+  return {
+    mode: 'ai',
+    provider: next.id,
+    model: next.model,
+    providers,
+    notice: `AI mode · ${label} · ${next.model}. Output is validated GameSpec v1 and is never run as code.`
+  }
+}
+
+// Health can learn about a billing rejection before the next generate call.
+// A cached generate failure is reused. Otherwise one count_tokens request checks Anthropic.
+export async function aiStatusFresh(env = {}, fetchImpl = globalThis.fetch, now = Date.now()) {
+  const anthropic = configuredProviders(env).find((item) => item.id === 'anthropic')
+  if (!anthropic) return aiStatus(env, now)
+  if (providerCooldown('anthropic', now)) return aiStatus(env, now)
+  const freshUntil = probeFreshUntil.get('anthropic') || 0
+  if (freshUntil > now) return aiStatus(env, now)
+  const request = anthropicCreditProbe(anthropic)
+  let response
+  try {
+    response = await fetchImpl(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      signal: AbortSignal.timeout(BILLING_PROBE_MS)
+    })
+  } catch (err) {
+    log('warn', 'anthropic billing probe failed', { message: err.message })
+    const ttl = cooldownMs(env)
+    if (ttl > 0) probeFreshUntil.set('anthropic', now + Math.min(ttl, 60_000))
+    return aiStatus(env, now)
+  }
+  if (response.ok) {
+    const ttl = cooldownMs(env)
+    if (ttl > 0) probeFreshUntil.set('anthropic', now + ttl)
+    return aiStatus(env, now)
+  }
+  let text = ''
+  try { text = await response.text() } catch { text = '' }
+  const info = describeUpstreamError(anthropic, response.status, String(text).slice(0, 2000))
+  if (info.code !== 'ai_billing') {
+    const ttl = cooldownMs(env)
+    if (ttl > 0) probeFreshUntil.set('anthropic', now + ttl)
+    return aiStatus(env, now)
+  }
+  noteProviderDown('anthropic', { code: info.code, reason: info.code, message: info.message }, now, env)
+  log('warn', 'anthropic billing probe rejected', { code: info.code })
+  return withAnthropicBillingDown(aiStatus(env, now))
 }
 
 function trimBase(base) {

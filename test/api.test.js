@@ -1125,4 +1125,45 @@ describe('guest creators', { concurrency: false }, () => {
       await server.close()
     }
   })
+
+  test('GET /api/health marks Anthropic down on a billing rejection before generate', async () => {
+    const { clearProviderCooldowns } = await import('../src/ai/providers.js')
+    clearProviderCooldowns()
+    let calls = 0
+    const server = await startServer({
+      env: {
+        AI_PROVIDER: 'anthropic',
+        ANTHROPIC_API_KEY: 'test-anthropic-key',
+        AI_PROVIDER_COOLDOWN_MS: '600000',
+        AI_FALLBACKS: ''
+      },
+      seed: false,
+      fetchImpl: async (url) => {
+        calls += 1
+        assert.match(String(url), /\/v1\/messages\/count_tokens$/)
+        return new Response(JSON.stringify({
+          type: 'error',
+          error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' }
+        }), { status: 400 })
+      }
+    })
+    try {
+      const client = createClient(server.base)
+      const first = await client.request('GET', '/api/health')
+      assert.equal(first.status, 200)
+      assert.equal(first.data.db, 'up')
+      const row = first.data.ai.providers.find((item) => item.id === 'anthropic')
+      assert.equal(row.status, 'down')
+      assert.equal(row.reason, 'ai_billing')
+      assert.equal(first.data.ai.provider, null)
+      assert.equal(first.data.ai.mode, 'template')
+      const second = await client.request('GET', '/api/health')
+      assert.equal(second.data.ai.providers.find((item) => item.id === 'anthropic').status, 'down')
+      assert.equal(calls, 1)
+      assert.equal(JSON.stringify(first.data).includes('test-anthropic-key'), false)
+    } finally {
+      clearProviderCooldowns()
+      await server.close()
+    }
+  })
 })

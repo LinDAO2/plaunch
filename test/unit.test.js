@@ -1192,3 +1192,52 @@ test('billing, auth, and quota failures fail over and a dead provider stays down
   assert.deepEqual(resolveProviderChain(env, undefined, 2000).map((item) => item.id), ['openai', 'gemini'])
   clearProviderCooldowns()
 })
+
+test('health reports a cached Anthropic billing failure without calling the provider', async () => {
+  const { aiStatusFresh, clearProviderCooldowns, noteProviderDown } = await import('../src/ai/providers.js')
+  clearProviderCooldowns()
+  const env = {
+    AI_PROVIDER: 'anthropic',
+    ANTHROPIC_API_KEY: 'test-key',
+    AI_PROVIDER_COOLDOWN_MS: '600000',
+    NODE_ENV: 'test'
+  }
+  noteProviderDown('anthropic', { code: 'ai_billing', reason: 'ai_billing' }, 1000, env)
+  let calls = 0
+  const status = await aiStatusFresh(env, async () => { calls += 1; throw new Error('should not probe') }, 2000)
+  assert.equal(calls, 0)
+  assert.equal(status.providers.find((item) => item.id === 'anthropic').status, 'down')
+  assert.equal(status.providers.find((item) => item.id === 'anthropic').reason, 'ai_billing')
+  assert.equal(status.mode, 'template')
+  clearProviderCooldowns()
+})
+
+test('a credit rejection is visible on the next health read before any generate call', async () => {
+  const { aiStatusFresh, clearProviderCooldowns } = await import('../src/ai/providers.js')
+  clearProviderCooldowns()
+  const env = {
+    AI_PROVIDER: 'anthropic',
+    ANTHROPIC_API_KEY: 'test-key',
+    OPENAI_API_KEY: 'openai-key',
+    AI_PROVIDER_COOLDOWN_MS: '600000',
+    NODE_ENV: 'test'
+  }
+  let calls = 0
+  const fetchImpl = async (url) => {
+    calls += 1
+    assert.match(url, /\/v1\/messages\/count_tokens$/)
+    return new Response(JSON.stringify({
+      type: 'error',
+      error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' }
+    }), { status: 400 })
+  }
+  const first = await aiStatusFresh(env, fetchImpl, 5000)
+  const anthropic = first.providers.find((item) => item.id === 'anthropic')
+  assert.equal(anthropic.status, 'down')
+  assert.equal(anthropic.reason, 'ai_billing')
+  assert.equal(first.provider, 'openai')
+  const second = await aiStatusFresh(env, fetchImpl, 6000)
+  assert.equal(calls, 1)
+  assert.equal(second.providers.find((item) => item.id === 'anthropic').status, 'down')
+  clearProviderCooldowns()
+})
