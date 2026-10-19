@@ -1,6 +1,6 @@
 import {
-  AIR, BIOMES, CANOPY, CANDY, CHUNK, CLAY, DUNE, FROST, GLOW, PETAL, POOL, ROCK, SOIL,
-  STRUCTURES, TIMBER, TURF, WORLD_HEIGHT, WORLD_SIZES, blockHex, isSolid
+  AIR, BIOMES, CANOPY, CANDY, CHUNK, CLAY, COBBLE, DOOR, DUNE, FROST, GLOW, PETAL, PLANKS, POOL, ROCK, SOIL,
+  STRUCTURES, TIMBER, TURF, WINDOW, WORLD_HEIGHT, WORLD_SIZES, blockHex, isSolid
 } from './blocks.js'
 
 export const WATER = 7
@@ -162,7 +162,11 @@ export function surfaceY(x, z, world) {
   let h = form === 'rolling' ? rollingHeight(x, z, world) : landformHeight(x, z, world)
   if (world.structure === 'village') {
     const origin = structureOrigin(world)
-    if (Math.abs(x - origin.x) <= 10 && Math.abs(z - origin.z) <= 10) h = world.biome === 'snow' ? 14 : 12
+    const dx = Math.abs(x - origin.x)
+    const dz = z - origin.z
+    const pad = dx <= 16 && dz >= -18 && dz <= 6
+    const lane = dx <= 8 && dz >= 0 && dz <= 22
+    if (pad || lane) h = world.biome === 'snow' ? 14 : 12
   }
   world._height.set(`${x},${z}`, h)
   return h
@@ -180,11 +184,17 @@ function distFromCenter(x, z, world) {
 function nearStructure(x, z, world) {
   if (world.structure === 'none') return false
   const origin = structureOrigin(world)
-  const reach = world.structure === 'village' ? 12
-    : world.structure === 'waterfall' || world.structure === 'oasis' ? 8
-      : world.structure === 'dock' ? 11
-        : world.structure === 'ruins' ? 5
-          : 4
+  if (world.structure === 'village') {
+    const dx = Math.abs(x - origin.x)
+    const dz = z - origin.z
+    if (dx <= 16 && dz >= -18 && dz <= 8) return true
+    if (dx <= 8 && dz >= 0 && dz <= 24) return true
+    return false
+  }
+  const reach = world.structure === 'waterfall' || world.structure === 'oasis' ? 8
+    : world.structure === 'dock' ? 11
+      : world.structure === 'ruins' ? 5
+        : 4
   return Math.abs(x - origin.x) <= reach && Math.abs(z - origin.z) <= reach
 }
 
@@ -360,24 +370,30 @@ export function structureOrigin(world) {
   return origin
 }
 
+const VILLAGE_PITCH = -4 * Math.PI / 180
+
 function houseShell(x, y, z, ox, oz, h, world) {
   const dx = x - ox
   const dz = z - oz
   const ax = Math.abs(dx)
   const az = Math.abs(dz)
-  if (ax <= 2 && az <= 2 && y >= h && y <= h + 4) {
-    const wall = ax === 2 || az === 2
-    if (y === h + 4) return world.biome === 'snow' ? FROST : ROCK
-    if (y === h) return TIMBER
-    if (wall && !(z === oz + 2 && x === ox && (y === h + 1 || y === h + 2))) return TIMBER
-    return AIR
+  const roof = world.biome === 'snow' ? FROST : COBBLE
+  if (y === h + 5 && ax <= 4 && az <= 4 && (ax === 4 || az === 4)) return roof
+  if (ax <= 3 && az <= 3 && y >= h && y <= h + 5) {
+    if (y === h + 5) return roof
+    if (y === h) return PLANKS
+    const wall = ax === 3 || az === 3
+    if (!wall) return AIR
+    if (z === oz + 3 && x === ox && (y === h + 1 || y === h + 2)) return DOOR
+    if (y === h + 2 && ((ax === 3 && az <= 1) || (az === 3 && ax <= 1))) return WINDOW
+    return PLANKS
   }
   return null
 }
 
 function villageSites(world) {
   const origin = structureOrigin(world)
-  const spots = [[-3, 4], [0, 2], [3, 4], [-4, -3], [4, -2]]
+  const spots = [[-11, -1], [0, -3], [11, -1], [-7, -13], [7, -13]]
   return spots.map(([dx, dz]) => ({
     x: Math.max(4, Math.min(world.size - 5, origin.x + dx)),
     z: Math.max(4, Math.min(world.size - 5, origin.z + dz))
@@ -704,12 +720,12 @@ function southOverlook(world, edits) {
 
 function villageOverlook(world, edits) {
   const origin = structureOrigin(world)
-  const z = Math.max(3, Math.min(world.size - 4, origin.z + 11))
-  for (const dx of [0, 1, -1, 2, -2]) {
-    const x = Math.max(3, Math.min(world.size - 4, origin.x + dx))
+  const z = Math.max(4, Math.min(world.size - 5, origin.z + 12))
+  for (const dx of [0, 1, -1, 2, -2, 3, -3]) {
+    const x = Math.max(4, Math.min(world.size - 5, origin.x + dx))
     const gy = groundY(world, x, z, edits)
     if (gy < WATER || !columnClear(world, edits, x, z, gy)) continue
-    return { x: x + 0.5, y: gy + 1, z: z + 0.5 }
+    return { x: x + 0.5, y: gy + 1, z: z + 0.5, pitch: VILLAGE_PITCH }
   }
   return null
 }

@@ -1,4 +1,6 @@
-# Playground — game launchpad v1.5.1
+# Playground — game launchpad v1.5.2
+
+v1.5.2 sharpens the shared block worlds: plank walls, cobble roofs, alpha-cut leaves and grass, tiled ground with mipmaps, and a blue sky with haze only in the distance.
 
 v1.5.0 restyles the launchpad: a cinematic create panel, an acid-yellow accent, and raised game cards. Create still makes a shared block world. The v1.4.1 renderer stays in place: PBR terrain, sun, water, and sky on desktop, with SSAO and bloom off and a smaller shadow map on phones and the X card. No new third-party assets were added.
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateIdea } from '../src/ai/idea.js'
 import { generateWorldFromPrompt } from '../src/ai/worldgen.js'
-import { CANOPY, DUNE, GLOW, FROST, POOL, ROCK, TIMBER, TURF } from '../src/blocks/blocks.js'
+import { CANOPY, COBBLE, DOOR, DUNE, GLOW, FROST, PLANKS, POOL, ROCK, TIMBER, TURF, WINDOW } from '../src/blocks/blocks.js'
 import { repairWorldSpec, chooseWorld, structureForPrompt } from '../src/blocks/spec.js'
 import { WATER, blockAt, spawnPoint, structureOrigin, surfaceY, vistaGlance, worldFromSpec } from '../src/blocks/terrain.js'
 
@@ -353,13 +353,31 @@ test('prompt structures and grassland grass show up in the terrain', () => {
   assert.equal(chooseWorld('an oasis with palms').biome, 'desert')
   const village = worldFromSpec(chooseWorld('a village with several houses'))
   let roofs = 0
-  for (let z = 0; z < village.size; z++) {
-    for (let x = 0; x < village.size; x++) {
-      const h = surfaceY(x, z, village)
-      if (blockAt(x, h + 4, z, village) === ROCK && blockAt(x, h + 1, z, village) === 0) roofs += 1
+  let planks = 0
+  let doors = 0
+  let windows = 0
+  for (let y = 1; y < village.height; y++) {
+    for (let z = 0; z < village.size; z++) {
+      for (let x = 0; x < village.size; x++) {
+        const id = blockAt(x, y, z, village)
+        if (id === PLANKS) planks += 1
+        else if (id === DOOR) doors += 1
+        else if (id === WINDOW) windows += 1
+        else if (id === COBBLE && blockAt(x, y - 4, z, village) === 0) roofs += 1
+      }
     }
   }
   assert.ok(roofs >= 20, `village roofs ${roofs}`)
+  assert.ok(planks >= 40, `village planks ${planks}`)
+  assert.ok(doors >= 8, `village doors ${doors}`)
+  assert.ok(windows >= 8, `village windows ${windows}`)
+  const origin = structureOrigin(village)
+  const spawn = spawnPoint(village)
+  assert.ok(spawn.z >= origin.z + 10, `spawn z ${spawn.z} origin ${origin.z}`)
+  assert.ok(Math.abs(spawn.x - origin.x) <= 4)
+  assert.equal(blockAt(Math.floor(spawn.x), Math.floor(spawn.y), Math.floor(spawn.z), village), 0)
+  assert.equal(blockAt(Math.floor(spawn.x), Math.floor(spawn.y) + 1, Math.floor(spawn.z), village), 0)
+  assert.ok(spawn.pitch < -0.05 && spawn.pitch > -0.15, `pitch ${spawn.pitch}`)
   const fall = worldFromSpec(chooseWorld('a mountain waterfall'))
   assert.equal(fall.structure, 'waterfall')
   let falling = 0

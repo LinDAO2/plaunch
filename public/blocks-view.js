@@ -17,7 +17,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const spawn = spawnPoint(world, edits)
   const pos = { x: spawn.x, y: spawn.y, z: spawn.z }
   let yaw = lookYaw(world, pos.x, pos.z)
-  let pitch = VISTA_PITCH
+  let pitch = spawn.pitch ?? VISTA_PITCH
   let looked = false
   let vy = 0
   let grounded = false
@@ -409,7 +409,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     live = true
     if (!looked) {
       yaw = lookYaw(world, pos.x, pos.z)
-      pitch = VISTA_PITCH
+      pitch = spawn.pitch ?? VISTA_PITCH
     }
     const gate = ui.querySelector('#world-start')
     if (gate) gate.hidden = true

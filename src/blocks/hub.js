@@ -164,7 +164,7 @@ export function createWorldHub({ db, config }) {
       y: room.spawn.y,
       z: room.spawn.z,
       yaw: lookYaw(room.world, room.spawn.x, room.spawn.z),
-      pitch: VISTA_PITCH,
+      pitch: room.spawn.pitch ?? VISTA_PITCH,
       movedAt: Date.now(),
       markedAt: Date.now(),
       bucket: { tokens: 6, t: Date.now() },

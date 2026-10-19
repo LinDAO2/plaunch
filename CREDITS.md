@@ -8,19 +8,20 @@ Template games are original Kaplay scripts. They follow the rules of the games b
 
 ## Terrain textures
 
-Photoreal color, normal, and roughness maps for the block world are CC0 and were downscaled to 256×256 JPEG. They live in `public/textures/`.
+Photoreal color, normal, and roughness maps for the block world are CC0. Ground, plank, and cobble tiles used in v1.5.2 are 512×512 JPEG. The older bark, dirt, sand, stone, and snow tiles stay 256×256 JPEG. They live in `public/textures/`.
 
 | File prefix | Poly Haven asset | Page |
 | --- | --- | --- |
-| `grass_` | Grass Ground | https://polyhaven.com/a/grass_ground |
+| `grass_` | Aerial Grass Rock | https://polyhaven.com/a/aerial_grass_rock |
+| `planks_` | Brown Planks 05 | https://polyhaven.com/a/brown_planks_05 |
+| `cobble_` | Cobblestone Floor 01 | https://polyhaven.com/a/cobblestone_floor_01 |
 | `dirt_` | Dirt | https://polyhaven.com/a/dirt |
 | `stone_` | Rock Face | https://polyhaven.com/a/rock_face |
 | `sand_` | Coast Sand 01 | https://polyhaven.com/a/coast_sand_01 |
 | `wood_` | Bark Brown 02 | https://polyhaven.com/a/bark_brown_02 |
-| `leaves_` | Leafy Grass | https://polyhaven.com/a/leafy_grass |
 | `snow_` | Snow 01 | https://polyhaven.com/a/snow_01 |
 
-Poly Haven publishes these under CC0. Credit is appreciated and not required. The water color, normal, and roughness maps (`water_diff.jpg`, `water_nor.jpg`, `water_rough.jpg`) are original. The current ambientCG catalog no longer serves the older Water surface packs, so the water surface is a physical shader with those generated maps rather than a photo tile.
+Poly Haven publishes these under CC0. Credit is appreciated and not required. `grass_` was recolored slightly greener after the download. The leafy-grass photo (`leaves_diff.jpg` and its maps) is no longer sampled by the renderer. Leaf blocks, grass tufts, and flowers use original alpha cutouts: `leaves_cut.png`, `grass_tuft.png`, and `flower_tuft.png`. `door_diff.jpg` is drawn on the plank tile. `window_diff.png` is an original frame with a clear center. The water color, normal, and roughness maps (`water_diff.jpg`, `water_nor.jpg`, `water_rough.jpg`) are original. The current ambientCG catalog no longer serves the older Water surface packs, so the water surface is a physical shader with those generated maps rather than a photo tile.
 
 ## Engine and sound
 

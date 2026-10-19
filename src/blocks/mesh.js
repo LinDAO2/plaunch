@@ -70,7 +70,7 @@ const FACES = [
   }
 ]
 
-const UV = [[0.08, 0.92], [0.92, 0.92], [0.92, 0.08], [0.08, 0.08]]
+const UV = [[0, 1], [1, 1], [1, 0], [0, 0]]
 const ORDER = [0, 1, 2, 0, 2, 3]
 
 function showFace(id, neighbor) {

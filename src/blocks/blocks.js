@@ -12,6 +12,10 @@ export const CANDY = 9
 export const FROST = 10
 export const CLAY = 11
 export const GLOW = 12
+export const PLANKS = 13
+export const COBBLE = 14
+export const WINDOW = 15
+export const DOOR = 16
 
 export const BLOCKS = [
   { id: AIR, name: 'Air', solid: false, color: '#000000' },
@@ -26,7 +30,11 @@ export const BLOCKS = [
   { id: CANDY, name: 'Candy', solid: true, color: '#ff5aa5' },
   { id: FROST, name: 'Frost', solid: true, color: '#d7eef8' },
   { id: CLAY, name: 'Clay', solid: true, color: '#c46a4a' },
-  { id: GLOW, name: 'Glow', solid: true, color: '#e6ff3a' }
+  { id: GLOW, name: 'Glow', solid: true, color: '#e6ff3a' },
+  { id: PLANKS, name: 'Planks', solid: true, color: '#a67c52' },
+  { id: COBBLE, name: 'Cobble', solid: true, color: '#8a8680' },
+  { id: WINDOW, name: 'Window', solid: true, color: '#d5e6f2' },
+  { id: DOOR, name: 'Door', solid: true, color: '#6b4428' }
 ]
 
 export const HOTBAR = [TURF, SOIL, ROCK, DUNE, TIMBER, CANOPY, PETAL, CANDY, FROST]
@@ -61,5 +69,5 @@ export function blockRgb(id) {
 }
 
 export function knownBlock(id) {
-  return id === AIR || (Number.isInteger(id) && id >= 1 && id <= GLOW)
+  return id === AIR || (Number.isInteger(id) && id >= 1 && id < BLOCKS.length && Boolean(BLOCKS[id]))
 }

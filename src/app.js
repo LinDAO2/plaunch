@@ -922,15 +922,17 @@ async function dispatch(req, res, ctx, url, { db, config, fetchImpl, hub }) {
   }
 
   if (method === 'GET' && (pathname === '/three.js' || pathname.startsWith('/textures/'))) {
+    const texName = pathname.startsWith('/textures/') ? pathname.slice('/textures/'.length) : ''
     const file = pathname === '/three.js'
       ? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'vendor', 'three', 'three.min.js')
-      : path.join(PUBLIC, 'textures', pathname.slice('/textures/'.length))
-    if (pathname.startsWith('/textures/') && !/^[a-z0-9_-]+\.jpg$/.test(pathname.slice('/textures/'.length))) {
+      : path.join(PUBLIC, 'textures', texName)
+    if (pathname.startsWith('/textures/') && !/^[a-z0-9_-]+\.(jpg|png)$/.test(texName)) {
       return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
     }
+    const ext = pathname === '/three.js' ? '.js' : (texName.endsWith('.png') ? '.png' : '.jpg')
     try {
       const bytes = await readFile(file)
-      return sendJsonRaw(res, 200, bytes, ctx, pathname === '/three.js' ? '.js' : '.jpg', pathname)
+      return sendJsonRaw(res, 200, bytes, ctx, ext, pathname)
     } catch {
       return sendJson(res, 404, { error: 'Not found', code: 'not_found' }, ctx)
     }

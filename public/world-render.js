@@ -2,7 +2,7 @@ import { frameCoverage } from '/blocks/frame-check.js'
 import { meshRegion } from '/blocks/mesh.js'
 import { hash2, WATER } from '/blocks/terrain.js'
 import {
-  CANOPY, CANDY, CLAY, DUNE, FROST, GLOW, PETAL, POOL, ROCK, SOIL, TIMBER, TURF
+  CANOPY, CANDY, CLAY, COBBLE, DOOR, DUNE, FROST, GLOW, PETAL, PLANKS, POOL, ROCK, SOIL, TIMBER, TURF, WINDOW
 } from '/blocks/blocks.js'
 
 let THREE = globalThis.THREE
@@ -60,7 +60,7 @@ export function detectQuality() {
     bloom: !low,
     shadow: low ? 512 : 2048,
     pixelRatio: low ? 1 : Math.min(window.devicePixelRatio || 1, 1.5),
-    anisotropy: low ? 1 : 4
+    anisotropy: low ? 4 : 8
   }
 }
 
@@ -71,6 +71,10 @@ function faceKey(tile, ny) {
   if (tile === ROCK) return 'stone'
   if (tile === DUNE) return 'sand'
   if (tile === TIMBER) return 'wood'
+  if (tile === PLANKS) return 'planks'
+  if (tile === COBBLE) return 'cobble'
+  if (tile === DOOR) return 'door'
+  if (tile === WINDOW) return 'window'
   if (tile === CANOPY) return 'leaves'
   if (tile === FROST) return 'snow'
   if (tile === PETAL) return 'petal'
@@ -79,11 +83,15 @@ function faceKey(tile, ny) {
   return 'stone'
 }
 
-function loadMap(loader, url, color) {
+function loadMap(loader, url, color, repeat = 1) {
   const tex = loader.load(url)
   tex.wrapS = THREE.RepeatWrapping
   tex.wrapT = THREE.RepeatWrapping
   tex.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace
+  tex.generateMipmaps = true
+  tex.minFilter = THREE.LinearMipmapLinearFilter
+  tex.magFilter = THREE.LinearFilter
+  if (repeat !== 1) tex.repeat.set(repeat, repeat)
   return tex
 }
 
@@ -103,9 +111,10 @@ ${motion}`
 }
 
 function pbrMaterial(loader, name, extra = {}) {
-  const map = loadMap(loader, `/textures/${name}_diff.jpg`, true)
-  const normalMap = loadMap(loader, `/textures/${name}_nor.jpg`, false)
-  const roughnessMap = loadMap(loader, `/textures/${name}_rough.jpg`, false)
+  const repeat = extra.repeat ?? (name === 'grass' || name === 'dirt' || name === 'sand' || name === 'stone' || name === 'snow' ? 2 : 1)
+  const map = loadMap(loader, `/textures/${name}_diff.jpg`, true, repeat)
+  const normalMap = loadMap(loader, `/textures/${name}_nor.jpg`, false, repeat)
+  const roughnessMap = loadMap(loader, `/textures/${name}_rough.jpg`, false, repeat)
   const sway = extra.sway === true
   const params = {
     map,
@@ -117,19 +126,44 @@ function pbrMaterial(loader, name, extra = {}) {
     side: extra.side !== undefined ? extra.side : THREE.DoubleSide
   }
   const material = new THREE.MeshStandardMaterial(params)
-  material.customProgramCacheKey = () => (sway ? `sway:${name}` : `pbr:${name}`)
+  material.customProgramCacheKey = () => (sway ? `sway:${name}` : `pbr:${name}:${repeat}`)
   material.onBeforeCompile = (shader) => {
     patchVertex(shader, sway ? LEAF_SWAY : '')
-    if (name !== 'leaves') return
+    if (name !== 'grass') return
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
       `#include <map_fragment>
-      float leafSky = smoothstep(0.42, 0.7, diffuseColor.b) * smoothstep(0.12, 0.4, diffuseColor.b - diffuseColor.r);
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.40, 0.15), leafSky);
-      diffuseColor.a = 1.0;`
+      diffuseColor.rgb *= vec3(0.90, 1.12, 0.80);`
     )
   }
   return material
+}
+
+function cutoutMaterial(loader, url, extra = {}) {
+  const map = loadMap(loader, url, true, 1)
+  const sway = extra.sway === true
+  const material = new THREE.MeshStandardMaterial({
+    map,
+    alphaTest: extra.alphaTest ?? 0.45,
+    roughness: extra.roughness ?? 0.8,
+    metalness: 0,
+    vertexColors: extra.vertexColors !== false,
+    side: THREE.DoubleSide
+  })
+  material.customProgramCacheKey = () => (sway ? `cut-sway:${url}` : `cut:${url}`)
+  material.onBeforeCompile = (shader) => {
+    patchVertex(shader, sway ? LEAF_SWAY : '')
+  }
+  return material
+}
+
+function diffuseMaterial(loader, url, extra = {}) {
+  return new THREE.MeshStandardMaterial({
+    map: loadMap(loader, url, true, 1),
+    roughness: extra.roughness ?? 0.72,
+    metalness: 0,
+    vertexColors: true
+  })
 }
 
 function boulderMaterial(loader) {
@@ -221,7 +255,7 @@ function attachSky(scene, tier) {
         col += uHorizon * glow * 0.18;
         col += vec3(1.0, 0.88, 0.64) * halo * 0.08 * uHalo;
         float band = pow(1.0 - max(dir.y, 0.0), 4.0);
-        col = mix(col, uHorizon, band * 0.45);
+        col = mix(col, uHorizon, band * 0.18);
         gl_FragColor = vec4(col, 1.0);
       }
     `
@@ -339,7 +373,10 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
           : '#7aa0dc'
   const haze = new THREE.Color(hazeHex)
   const fogFar = world?.biome === 'candy' || world?.biome === 'moon'
-  scene.fog = new THREE.FogExp2(haze, fogFar ? (quality.tier === 'low' ? 0.0022 : 0.0012) : (quality.tier === 'low' ? 0.0058 : 0.0035))
+  const fogDensity = fogFar
+    ? (quality.tier === 'low' ? 0.0022 : 0.0012)
+    : (quality.tier === 'low' ? 0.0018 : 0.00115)
+  scene.fog = new THREE.FogExp2(haze, fogDensity)
   const camera = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
   const sky = attachSky(scene, quality.tier)
 
@@ -379,16 +416,14 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
     stone: pbrMaterial(loader, 'stone'),
     sand: pbrMaterial(loader, 'sand'),
     wood: pbrMaterial(loader, 'wood'),
-    leaves: pbrMaterial(loader, 'leaves', { sway: true, roughness: 0.85, side: THREE.DoubleSide }),
-    tuft: pbrMaterial(loader, 'grass', { sway: true, roughness: 0.8, side: THREE.DoubleSide }),
+    planks: pbrMaterial(loader, 'planks'),
+    cobble: pbrMaterial(loader, 'cobble'),
+    leaves: cutoutMaterial(loader, '/textures/leaves_cut.png', { sway: true, roughness: 0.72, alphaTest: 0.4 }),
+    tuft: cutoutMaterial(loader, '/textures/grass_tuft.png', { sway: true, roughness: 0.7, alphaTest: 0.45 }),
+    flower: cutoutMaterial(loader, '/textures/flower_tuft.png', { sway: true, roughness: 0.55, alphaTest: 0.4 }),
     snow: pbrMaterial(loader, 'snow'),
-    flower: new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.55,
-      metalness: 0,
-      vertexColors: true,
-      side: THREE.DoubleSide
-    }),
+    door: diffuseMaterial(loader, '/textures/door_diff.jpg', { roughness: 0.7 }),
+    window: cutoutMaterial(loader, '/textures/window_diff.png', { roughness: 0.28, alphaTest: 0.5, vertexColors: true }),
     water: new THREE.MeshPhysicalMaterial({
       color: 0x2f86a0,
       map: loadMap(loader, '/textures/water_diff.jpg', true),
@@ -456,7 +491,7 @@ uniform vec2 uResolution;
 ${shader.fragmentShader}`
     shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', waterReflect)
   }
-  materials.leaves.color = new THREE.Color(0x8faf78)
+  materials.leaves.color = new THREE.Color(0xffffff)
 
   const pmrem = new THREE.PMREMGenerator(renderer)
   const envScene = new THREE.Scene()
@@ -560,7 +595,7 @@ ${shader.fragmentShader}`
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(bag.uvs, 2))
       geo.setAttribute('color', new THREE.Float32BufferAttribute(bag.colors, 3))
       const view = new THREE.Mesh(geo, materials[key] || materials.stone)
-      view.castShadow = key !== 'water' && key !== 'leaves'
+      view.castShadow = key !== 'water' && key !== 'window' && key !== 'leaves'
       view.receiveShadow = key !== 'water'
       if (key === 'water') {
         view.renderOrder = 2
@@ -946,13 +981,12 @@ ${shader.fragmentShader}`
         if ((sample(x, h + 1, z) | 0) !== 0) continue
         const ground = hid
         const n = hash2(x, z, (world.seed || 1) + 41)
-        if (ground === TURF && n > 0.72) {
-          pushCross(take('tuft'), x, z, h + 1, 0.9, 0.16, [0.42 + n * 0.1, 0.62, 0.3])
+        const low = quality.tier === 'low'
+        if (ground === TURF && n > (low ? 0.93 : 0.84)) {
+          pushCross(take('tuft'), x, z, h + 1, 0.48, 0.22, [1, 1, 1])
         }
-        if (ground === TURF && hash2(x, z, (world.seed || 1) + 47) > 0.9) {
-          const palette = [[0.96, 0.86, 0.42], [0.94, 0.95, 0.9], [0.58, 0.74, 0.9], [0.84, 0.7, 0.36]]
-          const petal = palette[Math.floor(hash2(x, z, (world.seed || 1) + 48) * palette.length) % palette.length]
-          pushCross(take('flower'), x, z, h + 1, 0.7, 0.1, petal)
+        if (!low && ground === TURF && hash2(x, z, (world.seed || 1) + 47) > 0.93) {
+          pushCross(take('flower'), x, z, h + 1, 0.36, 0.16, [1, 1, 1])
         }
         const stony = ground === TURF || ground === DUNE || ground === ROCK || ground === FROST
         const cactusHere = quality.tier === 'high' &&
@@ -964,9 +998,8 @@ ${shader.fragmentShader}`
           hash2(x, z, (world.seed || 1) + 67) > 0.2
         if (cactusHere) {
           pushCactus(take('cactus'), x, z, h + 1)
-        } else if (stony && boulderHere(x, z)) {
-          if (quality.tier === 'high') pushBoulder(take('rock'), x, z, h + 1)
-          else pushCross(take('rock'), x, z, h + 1, 0.38, 0.28, [0.62, 0.6, 0.56])
+        } else if (stony && boulderHere(x, z) && quality.tier === 'high') {
+          pushBoulder(take('rock'), x, z, h + 1)
         }
       }
     }
@@ -1088,7 +1121,7 @@ ${shader.fragmentShader}`
   function applyCycle(cycle) {
     const light = Math.max(0.08, Math.min(1, cycle?.light ?? 1))
     const zenith = new THREE.Color(cycle?.hex || '#87b8f0')
-    const horizon = zenith.clone().lerp(new THREE.Color('#f2efe6'), light > 0.45 ? 0.55 : 0.25)
+    const horizon = zenith.clone().lerp(new THREE.Color('#e7eef6'), light > 0.45 ? 0.22 : 0.12)
     if (light < 0.35) horizon.lerp(new THREE.Color('#1b2433'), 0.45)
     sky.material.uniforms.uZenith.value.copy(zenith)
     sky.material.uniforms.uHorizon.value.copy(horizon)
@@ -1099,7 +1132,12 @@ ${shader.fragmentShader}`
     scene.fog.color.copy(haze).lerp(horizon, light > 0.5 ? 0.08 : 0.28)
     scene.background.copy(horizon)
     hemi.color.copy(zenith)
-    hemi.groundColor.set(0x8a5a32)
+    const bounce = world?.biome === 'desert' ? 0xc4a574
+      : world?.biome === 'snow' ? 0xb7c4d0
+        : world?.biome === 'candy' ? 0xe7a0c4
+          : world?.biome === 'moon' ? 0x3a4250
+            : 0x3d6b32
+    hemi.groundColor.set(light > 0.4 ? bounce : 0x243028)
     hemi.intensity = 0.12 + light * 0.22
     sun.intensity = 0.45 + light * 3.6
     sun.color.set(light > 0.55 ? 0xffe2b0 : 0xffc49a)
