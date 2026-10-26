@@ -52,15 +52,18 @@ export function createArenaHub({ db, config }) {
   const timer = setInterval(() => {
     for (const room of rooms.values()) {
       if (!room.players.size) continue
-      if (room.match.over) {
-        room.hold += 0.05
-        if (room.hold >= 5) {
-          restartMatch(room.match)
+      const live = [...room.players.values()].some((item) => item.live)
+      if (live) {
+        if (room.match.over) {
+          room.hold += 0.05
+          if (room.hold >= 5) {
+            restartMatch(room.match)
+            room.hold = 0
+          }
+        } else {
           room.hold = 0
+          stepMatch(room.match, 0.05)
         }
-      } else {
-        room.hold = 0
-        stepMatch(room.match, 0.05)
       }
       const snap = packSnap(room.match)
       for (const player of room.players.values()) send(player.ws, { ...snap, you: player.actorId })
@@ -135,10 +138,20 @@ export function createArenaHub({ db, config }) {
       name,
       ws,
       msgs: { tokens: 30, t: Date.now() },
-      gone: false
+      gone: false,
+      live: false
     }
     room.players.set(actor.id, player)
     send(ws, packWelcome(room.match, actor))
+
+    const arm = () => {
+      if (player.live) return
+      const others = [...room.players.values()].some((item) => item.live)
+      player.live = true
+      // A socket can sit on the play screen while an older round is already
+      // underway. The first player to press Play gets that round restarted.
+      if (!others && room.match.elapsed > 0.05) restartMatch(room.match)
+    }
 
     ws.on('message', (raw) => {
       if (player.gone) return
@@ -146,10 +159,16 @@ export function createArenaHub({ db, config }) {
       if (text.length > 600) return
       let msg
       try { msg = JSON.parse(text) } catch { return }
-      if (!msg || msg.t !== 'in') return
+      if (!msg) return
+      if (msg.t === 'go') {
+        arm()
+        return
+      }
+      if (msg.t !== 'in') return
       if (!takeMsg(player, Date.now())) return
       const body = room.match.actors.find((item) => item.id === actor.id)
       if (!body) return
+      arm()
       applyInput(body, msg)
     })
 

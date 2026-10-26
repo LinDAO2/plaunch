@@ -40,7 +40,7 @@ export const BLOCKS = [
 export const HOTBAR = [TURF, SOIL, ROCK, DUNE, TIMBER, CANOPY, PETAL, CANDY, FROST]
 
 export function hotbarFor(biome) {
-  if (biome === 'candy') return [CANDY, PETAL, GLOW, TURF, SOIL, ROCK, DUNE, TIMBER, CANOPY, FROST]
+  if (biome === 'candy') return [CANDY, PETAL, GLOW, ROCK]
   return HOTBAR.filter((id) => id !== PETAL && id !== CANDY)
 }
 

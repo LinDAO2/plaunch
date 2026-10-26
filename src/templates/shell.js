@@ -359,5 +359,6 @@ function boot() {
   })
   go('start')
   window.__state.phase = 'start'
+  if (window.parent !== window) arm()
 }
 `

@@ -16,6 +16,8 @@ let freeformBest = 0
 let board = { scores: [], unverified: [] }
 let boardTab = 'checked'
 let worldBoardTimer = null
+let startWorld = null
+let embedStarted = false
 
 function formatPlayed(ms) {
   const seconds = Math.max(0, Math.round(Number(ms) / 1000))
@@ -228,7 +230,9 @@ $('report-send').addEventListener('click', async () => {
 
 $('embed-play').addEventListener('click', () => {
   $('embed-gate').hidden = true
+  embedStarted = true
   $('play').click()
+  if (startWorld) startWorld()
 })
 
 async function boot() {
@@ -269,7 +273,9 @@ async function boot() {
       $('score').hidden = true
       $('sound-toggle').hidden = true
       if ($('goal-banner')) $('goal-banner').hidden = true
-      mountWorld({ spec: game.spec, slug: game.id, field: $('field') })
+      const mounted = mountWorld({ spec: game.spec, slug: game.id, field: $('field') })
+      startWorld = mounted.start
+      if (embed && embedStarted) mounted.start()
       await loadWorldBoard()
       worldBoardTimer = setInterval(() => { loadWorldBoard().catch(() => {}) }, 4000)
       await api(`/games/${game.id}/events`, 'POST', { type: 'game_viewed', eventId: crypto.randomUUID() }).catch(() => {})

@@ -366,16 +366,19 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#9ebfd4')
+  const candyWorld = world?.biome === 'candy'
   const hazeHex = world?.biome === 'desert' ? '#d2b48c'
     : world?.biome === 'snow' ? '#c5d4e6'
-      : world?.biome === 'candy' ? '#f4d0e2'
+      : candyWorld ? '#4a2040'
         : world?.biome === 'moon' ? '#8aa4c8'
           : '#7aa0dc'
   const haze = new THREE.Color(hazeHex)
-  const fogFar = world?.biome === 'candy' || world?.biome === 'moon'
-  const fogDensity = fogFar
-    ? (quality.tier === 'low' ? 0.0022 : 0.0012)
-    : (quality.tier === 'low' ? 0.0018 : 0.00115)
+  const fogFar = world?.biome === 'moon'
+  const fogDensity = candyWorld
+    ? 0.0007
+    : fogFar
+      ? (quality.tier === 'low' ? 0.0022 : 0.0012)
+      : (quality.tier === 'low' ? 0.0018 : 0.00115)
   scene.fog = new THREE.FogExp2(haze, fogDensity)
   const camera = new THREE.PerspectiveCamera(58, 1, 0.08, 420)
   const sky = attachSky(scene, quality.tier)
@@ -437,9 +440,9 @@ export function createWorldRenderer(canvas, { world, sample, onLit } = {}) {
       vertexColors: true,
       side: THREE.DoubleSide
     }),
-    petal: flatMaterial(0xd98cab, { roughness: 0.55 }),
-    candy: flatMaterial(0xe25b93, { roughness: 0.42 }),
-    glow: flatMaterial(0xd6e25a, { roughness: 0.4, emissive: 0xc6d84a, emissiveIntensity: 0.6 }),
+    petal: flatMaterial(0xc21d62, { roughness: 0.42 }),
+    candy: flatMaterial(0xff2f78, { roughness: 0.34 }),
+    glow: flatMaterial(0xeaff3a, { roughness: 0.28, emissive: 0xb6e010, emissiveIntensity: 0.85 }),
     cactus: new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.86,
@@ -582,7 +585,10 @@ ${shader.fragmentShader}`
         bag.positions.push(mesh.positions[vi * 3], mesh.positions[vi * 3 + 1], mesh.positions[vi * 3 + 2])
         bag.normals.push(nx, ny, nz)
         bag.uvs.push(mesh.uvs[vi * 2], mesh.uvs[vi * 2 + 1])
-        const shade = 0.72 + mesh.colors[vi * 3] * 0.28
+        const baked = mesh.colors[vi * 3]
+        const shade = (key === 'candy' || key === 'petal' || key === 'glow')
+          ? 0.38 + baked * 0.62
+          : 0.72 + baked * 0.28
         bag.colors.push(shade, shade, shade)
       }
     }
@@ -1142,6 +1148,14 @@ ${shader.fragmentShader}`
     sun.intensity = 0.45 + light * 3.6
     sun.color.set(light > 0.55 ? 0xffe2b0 : 0xffc49a)
     renderer.toneMappingExposure = 0.62 + light * 0.55
+    if (world?.biome === 'candy') {
+      hemi.intensity = 0.14 + light * 0.1
+      hemi.groundColor.set(light > 0.4 ? 0x3d142e : 0x140812)
+      sun.intensity = 1.35 + light * 3.1
+      sun.color.set(0xfff4dc)
+      renderer.toneMappingExposure = 0.7 + light * 0.16
+      if (scene.fog) scene.fog.density = 0.0007
+    }
   }
 
   function renderReflection() {
@@ -1177,12 +1191,30 @@ ${shader.fragmentShader}`
     reflectRes.value.set(canvas.width || 2, canvas.height || 2)
   }
 
+  function leafCell(x, y, z) {
+    return sample(Math.floor(x), Math.floor(y), Math.floor(z)) === CANOPY
+  }
+
+  function clearEye(eye, dir) {
+    if (!eye || !dir || !leafCell(eye.x, eye.y, eye.z)) return eye
+    const back = {
+      x: eye.x - dir.x * 0.85,
+      y: eye.y - dir.y * 0.2,
+      z: eye.z - dir.z * 0.85
+    }
+    if (!leafCell(back.x, back.y, back.z)) return back
+    const down = { x: eye.x, y: eye.y - 0.9, z: eye.z }
+    if (!leafCell(down.x, down.y, down.z)) return down
+    return eye
+  }
+
   function render(frame) {
     resize()
     TIME.value = (frame.now || 0) / 1000
-    const eyeY = frame.eye.y
-    camera.position.set(frame.eye.x, eyeY, frame.eye.z)
-    look.set(frame.eye.x + frame.dir.x, eyeY + frame.dir.y, frame.eye.z + frame.dir.z)
+    const eye = clearEye(frame.eye, frame.dir)
+    const eyeY = eye.y
+    camera.position.set(eye.x, eyeY, eye.z)
+    look.set(eye.x + frame.dir.x, eyeY + frame.dir.y, eye.z + frame.dir.z)
     camera.lookAt(look)
     applyCycle(frame.cycle)
     renderReflection()

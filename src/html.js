@@ -18,6 +18,22 @@ export function hasCredit(credit) {
   return Boolean(credit?.author || credit?.builtOn?.name || credit?.inspiredBy?.length)
 }
 
+export function terrainCredit(biome) {
+  if (biome === 'candy') {
+    return 'Candy, petal, and glow are original colors. Stone uses Rock Face from Poly Haven, CC0. Water is an original physical surface.'
+  }
+  if (biome === 'moon') {
+    return 'Terrain photos from Poly Haven, CC0: Rock Face, Snow 01. Glow is an original color. Water is an original physical surface.'
+  }
+  if (biome === 'desert') {
+    return 'Terrain photos from Poly Haven, CC0: Coast Sand 01, Dirt, Rock Face. Water is an original physical surface.'
+  }
+  if (biome === 'snow') {
+    return 'Terrain photos from Poly Haven, CC0: Snow 01, Rock Face, Bark Brown 02. Water is an original physical surface.'
+  }
+  return 'Terrain photos from Poly Haven, CC0: Aerial Grass Rock, Dirt, Rock Face. Leaves and grass tufts are original cutouts. Water is an original physical surface.'
+}
+
 export function creditMarkup(credit) {
   if (!credit) return ''
   const parts = []
@@ -64,7 +80,7 @@ export async function renderPlayPage(game, { embed = false, origin = '', site = 
     MECHANIC: escapeHtml(String(game.type || '').toUpperCase()),
     BODY_CLASS: classes.join(' '),
     GATE_ATTR: embed ? '' : 'hidden',
-    CREDIT: `${creditMarkup(game.credit)}${game.type === 'world' ? ' <span class="tex-credit">Terrain photos from Poly Haven, CC0: Grass Ground, Dirt, Rock Face, Coast Sand 01, Bark Brown 02, Leafy Grass, Snow 01. Water is an original physical surface.</span>' : ''}`,
+    CREDIT: `${creditMarkup(game.credit)}${game.type === 'world' ? ` <span class="tex-credit">${escapeHtml(terrainCredit(game.spec?.biome))}</span>` : ''}`,
     SHARE_META: card ? card.tags : '',
     SANDBOX_NOTE: sandboxNote
   }

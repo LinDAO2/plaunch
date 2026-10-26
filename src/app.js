@@ -77,7 +77,7 @@ import {
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public')
 const BLOCKS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'blocks')
-const BLOCK_FILES = new Set(['blocks.js', 'terrain.js', 'mesh.js', 'spec.js', 'goals.js', 'frame-check.js'])
+const BLOCK_FILES = new Set(['blocks.js', 'terrain.js', 'mesh.js', 'spec.js', 'goals.js', 'frame-check.js', 'rules.js'])
 const FILES = new Map([
   ['/style.css', 'style.css'],
   ['/app.js', 'app.js'],

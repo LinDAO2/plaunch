@@ -1,5 +1,6 @@
-import { blockOf, hotbarFor, isSolid } from '/blocks/blocks.js'
-import { VISTA_PITCH, goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
+import { CANOPY, blockOf, hotbarFor, isSolid } from '/blocks/blocks.js'
+import { VISTA_PITCH, goalProgress, goalReadout, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
+import { placeTarget } from '/blocks/rules.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
 import { createWorldRenderer } from '/world-render.js'
 
@@ -52,6 +53,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     <p class="world-with" id="world-with"></p>
     <p class="world-toast" id="world-toast"></p>
     <button type="button" id="world-start" class="world-start"><span>Play</span></button>
+    <p id="world-cleared" class="world-cleared" hidden><b>Goal cleared</b><span id="world-cleared-sub"></span></p>
     <div class="crosshair" aria-hidden="true"></div>
     <div class="names" id="world-names"></div>
     <div class="stick touch-only" id="world-stick"><i></i></div>
@@ -69,6 +71,8 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   const goalTitle = ui.querySelector('#world-goal-title')
   const goalSub = ui.querySelector('#world-goal-sub')
   const goalFill = ui.querySelector('#world-goal-fill')
+  const clearedEl = ui.querySelector('#world-cleared')
+  const clearedSub = ui.querySelector('#world-cleared-sub')
   const namesEl = ui.querySelector('#world-names')
   const hotbar = ui.querySelector('#world-hotbar')
   const stickEl = ui.querySelector('#world-stick')
@@ -118,14 +122,15 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   function paintGoal() {
     const progress = goalProgress(world, edits, picked)
     state.goal = progress
-    const built = Math.min(progress.built, progress.raise)
-    const have = Math.min(progress.have, progress.sparks)
-    goalTitle.textContent = progress.done ? 'Clear' : `${progress.label} ${built}/${progress.raise}`
-    goalSub.textContent = progress.done
-      ? `${progress.label} ${progress.raise}/${progress.raise} · Sparks ${progress.sparks}/${progress.sparks}`
-      : `Sparks ${have}/${progress.sparks}`
+    const readout = goalReadout(progress)
+    goalTitle.textContent = readout.title
+    goalSub.textContent = readout.sub
     goalEl.classList.toggle('clear', progress.done)
     goalFill.style.width = `${Math.round(progress.ratio * 100)}%`
+    if (clearedEl) {
+      clearedEl.hidden = !readout.banner
+      if (clearedSub) clearedSub.textContent = readout.bannerSub
+    }
   }
   paintGoal()
 
@@ -165,7 +170,9 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         for (let z = z0; z <= z1; z++) {
-          if (isSolid(sample(x, y, z))) return true
+          const id = sample(x, y, z)
+          if (id === CANOPY) continue
+          if (isSolid(id)) return true
         }
       }
     }
@@ -230,6 +237,14 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   }
 
   function placeCell() {
+    const aimed = placeTarget({
+      eye: { x: pos.x, y: pos.y + EYE, z: pos.z },
+      dir: lookVector(),
+      pitch,
+      sample,
+      reach: 5.2
+    })
+    if (aimed && sample(aimed.x, aimed.y, aimed.z) === 0 && inWorld(aimed.x, aimed.y, aimed.z)) return aimed
     const cast = raycast(5.2)
     if (cast.hit && cast.prev && sample(cast.prev.x, cast.prev.y, cast.prev.z) === 0 && inWorld(cast.prev.x, cast.prev.y, cast.prev.z)) {
       return cast.prev
@@ -414,10 +429,13 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     const gate = ui.querySelector('#world-start')
     if (gate) gate.hidden = true
   }
-  ui.querySelector('#world-start').addEventListener('pointerdown', (event) => {
-    event.preventDefault()
+  function start() {
     unlockAudio()
     goLive()
+  }
+  ui.querySelector('#world-start').addEventListener('pointerdown', (event) => {
+    event.preventDefault()
+    start()
   })
   window.addEventListener('keydown', (event) => {
     unlockAudio()
@@ -553,10 +571,21 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
     vy -= 26 * dt
     if (jumpQueued && grounded) { vy = 8.2; grounded = false }
     jumpQueued = false
-    pos.x += vx * dt
-    if (hits(pos.x, pos.y, pos.z)) pos.x -= vx * dt
-    pos.z += vz * dt
-    if (hits(pos.x, pos.y, pos.z)) pos.z -= vz * dt
+    const slide = (dx, dz) => {
+      const nx = pos.x + dx
+      const nz = pos.z + dz
+      if (!hits(nx, pos.y, nz)) {
+        pos.x = nx
+        pos.z = nz
+        return
+      }
+      if (!grounded || hits(pos.x, pos.y + 1, pos.z) || hits(nx, pos.y + 1, nz)) return
+      pos.y += 1
+      pos.x = nx
+      pos.z = nz
+    }
+    slide(vx * dt, 0)
+    slide(0, vz * dt)
     pos.y += vy * dt
     if (hits(pos.x, pos.y, pos.z)) {
       if (vy < 0) grounded = true
@@ -666,6 +695,7 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   if (offline || !slug) state.ready = true
 
   return {
+    start,
     destroy() {
       stopped = true
       cancelAnimationFrame(raf)

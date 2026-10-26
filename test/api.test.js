@@ -360,6 +360,10 @@ describe('http api', { concurrency: false }, () => {
     assert.match(candyCard.text, /name="twitter:player" content="https:\/\/play\.example\/play\/blocks-candy-moon\?embed=1"/)
     assert.match(candyCard.text, /property="og:title" content="Blocks: Candy Moon"/)
     assert.equal(candyCard.text.includes('style='), false)
+    assert.match(candyCard.text, /original colors/)
+    assert.equal(/Grass Ground|Leafy Grass|Bark Brown|Snow 01/.test(candyCard.text), false)
+    const grassPlay = await client.request('GET', '/play/blocks-grassland')
+    assert.match(grassPlay.text, /Aerial Grass Rock/)
     for (const id of ['blocks-grassland', 'blocks-candy-moon']) {
       const embedWorld = await client.request('GET', `/play/${id}?embed=1`)
       assert.equal(embedWorld.status, 200)

@@ -5,11 +5,14 @@ import { generateIdea } from '../src/ai/idea.js'
 import { heuristicTier } from '../src/ai/classify.js'
 import { validateGameSpec } from '../src/ai/gamespec.js'
 import { aoFactor, meshRegion } from '../src/blocks/mesh.js'
-import { validateEdit } from '../src/blocks/rules.js'
-import { CYCLE_MS, VISTA_PITCH, goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '../src/blocks/goals.js'
-import { hotbarFor, isSolid, CANDY, PETAL } from '../src/blocks/blocks.js'
+import { placeTarget, validateEdit } from '../src/blocks/rules.js'
+import { CYCLE_MS, VISTA_PITCH, goalCopy, goalProgress, goalReadout, goalTargets, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '../src/blocks/goals.js'
+import { blockOf, hotbarFor, isSolid, CANDY, PETAL, PLANKS, ROCK, SOIL, TIMBER, TURF } from '../src/blocks/blocks.js'
 import { featuredWorlds, wantsWorld } from '../src/blocks/spec.js'
-import { blockAt, spawnPoint, worldFromSpec } from '../src/blocks/terrain.js'
+import { blockAt, spawnPoint, structureOrigin, surfaceY, worldFromSpec } from '../src/blocks/terrain.js'
+import { inReach } from '../src/blocks/rules.js'
+import { readFileSync } from 'node:fs'
+import { terrainCredit } from '../src/html.js'
 import { validSpec } from '../testing/helpers.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -88,8 +91,13 @@ test('world prompts become a shared block spec and minecraft is not a runtime', 
 })
 
 test('realistic hotbars leave out petal and candy', () => {
+  assert.deepEqual(hotbarFor('candy').map((id) => blockOf(id).name), ['Candy', 'Petal', 'Glow', 'Rock'])
   assert.equal(hotbarFor('candy').includes(CANDY), true)
   assert.equal(hotbarFor('candy').includes(PETAL), true)
+  assert.equal(hotbarFor('candy').includes(ROCK), true)
+  assert.equal(hotbarFor('candy').includes(TURF), false)
+  assert.equal(hotbarFor('candy').includes(SOIL), false)
+  assert.equal(hotbarFor('candy').includes(TIMBER), false)
   for (const biome of ['grassland', 'desert', 'snow', 'moon']) {
     const bar = hotbarFor(biome)
     assert.equal(bar.includes(CANDY), false)
@@ -184,6 +192,22 @@ test('landmark height and sparks score a shared goal', () => {
   assert.equal(done.have, 6)
   assert.equal(done.done, true)
   assert.equal(done.ratio, 1)
+  const origin = structureOrigin(grassland)
+  const ground = surfaceY(origin.x, origin.z, grassland)
+  let peak = 0
+  for (let y = grassland.height - 1; y >= 0; y--) {
+    if (isSolid(blockAt(origin.x, y, origin.z, grassland))) { peak = y; break }
+  }
+  assert.ok(peak <= ground + 2, `tower peak ${peak} ground ${ground}`)
+  const eye = { x: origin.x + 2.05, y: ground + 1 + 1.62, z: origin.z }
+  assert.equal(inReach(eye, origin.x, peak + 1, origin.z), true)
+  assert.equal(inReach(eye, origin.x, peak + goalTargets(grassland).raise, origin.z), true)
+  const candyLine = terrainCredit('candy')
+  assert.match(candyLine, /original colors/)
+  assert.equal(/Grass Ground|Leafy Grass|Bark Brown|Snow 01|Coast Sand/.test(candyLine), false)
+  assert.match(terrainCredit('grassland'), /Aerial Grass Rock/)
+  const embedCss = readFileSync(new URL('../public/play.css', import.meta.url), 'utf8')
+  assert.equal(/html:has\(body\.embed\)[^{]*\{[^}]*max-width:\s*480px/.test(embedCss), false)
   const day = skyCycle('grassland', 0)
   const night = skyCycle('grassland', 0.5)
   assert.notEqual(day.hex, night.hex)
@@ -194,6 +218,80 @@ test('landmark height and sparks score a shared goal', () => {
   assert.equal(skyPhase(0), 0)
   assert.equal(skyPhase(CYCLE_MS), 0)
   assert.equal(skyPhase(CYCLE_MS / 2), 0.5)
+})
+
+test('a player on the ground can finish the grassland tower and clear the goal', () => {
+  const world = worldFromSpec({ biome: 'grassland', terrainSeed: 1107, worldSize: 'medium', structure: 'tower' })
+  const origin = structureOrigin(world)
+  const ground = surfaceY(origin.x, origin.z, world)
+  const edits = new Map()
+  const sample = (x, y, z) => blockAt(x, y, z, world, edits)
+  let planks = 0
+  let topStep = 0
+  for (let step = 0; step <= 3; step++) {
+    for (let y = 0; y < world.height; y++) {
+      if (blockAt(origin.x + 2 + step, y, origin.z, world) === PLANKS) {
+        planks += 1
+        topStep = Math.max(topStep, y)
+      }
+    }
+  }
+  assert.ok(planks >= 4, `stair planks ${planks}`)
+  assert.ok(topStep >= ground + 4, `top step ${topStep} ground ${ground}`)
+  const stepEdits = new Map()
+  const stepSample = (x, y, z) => blockAt(x, y, z, world, stepEdits)
+  const stepEye = { x: origin.x + 5.15, y: topStep + 1 + 1.62, z: origin.z + 0.5 }
+  for (let n = 0; n < 4; n++) {
+    let peak = 0
+    for (let y = world.height - 1; y >= 0; y--) {
+      if (stepSample(origin.x + 1, y, origin.z)) { peak = y; break }
+    }
+    const face = { x: origin.x + 1.85, y: peak + 1.01, z: origin.z + 0.5 }
+    const dx = face.x - stepEye.x
+    const dy = face.y - stepEye.y
+    const dz = face.z - stepEye.z
+    const pitch = Math.max(-1.15, Math.min(1.15, Math.atan2(dy, Math.hypot(dx, dz) || 1)))
+    const yaw = Math.atan2(dx, dz)
+    const dir = { x: Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: Math.cos(yaw) * Math.cos(pitch) }
+    const cell = placeTarget({ eye: stepEye, dir, pitch, sample: stepSample, reach: 5.2 })
+    assert.ok(cell && cell.y > peak, `step raise ${n} ${JSON.stringify(cell)} peak ${peak}`)
+    assert.equal(inReach(stepEye, cell.x, cell.y, cell.z), true)
+    stepEdits.set(`${cell.x},${cell.y},${cell.z}`, TURF)
+  }
+  assert.ok(goalProgress(world, stepEdits, new Set()).built >= 4)
+  const eye = { x: origin.x + 0.5, y: ground + 1 + 1.62, z: origin.z + 3.6 }
+  const raise = goalTargets(world).raise
+  let progress = goalProgress(world, edits, new Set())
+  for (let n = 0; n < raise; n++) {
+    const column = progress.cz + 1
+    let peakY = 0
+    for (let y = world.height - 1; y >= 0; y--) {
+      if (sample(progress.cx, y, column)) { peakY = y; break }
+    }
+    const face = { x: progress.cx + 0.5, y: peakY + 0.95, z: column + 0.98 }
+    const dx = face.x - eye.x
+    const dy = face.y - eye.y
+    const dz = face.z - eye.z
+    const horiz = Math.hypot(dx, dz) || 1
+    const pitch = Math.max(-1.15, Math.min(1.15, Math.atan2(dy, horiz)))
+    const dir = { x: Math.sin(Math.atan2(dx, dz)) * Math.cos(pitch), y: Math.sin(pitch), z: Math.cos(Math.atan2(dx, dz)) * Math.cos(pitch) }
+    const cell = placeTarget({ eye, dir, pitch, sample, reach: 5.2 })
+    assert.ok(cell, `no cell for raise ${n} peak ${peakY}`)
+    assert.equal(inReach(eye, cell.x, cell.y, cell.z), true, `reach ${JSON.stringify(cell)}`)
+    assert.ok(cell.y > peakY, `raise ${n} placed at ${cell.y} beside peak ${peakY}`)
+    edits.set(`${cell.x},${cell.y},${cell.z}`, TURF)
+    progress = goalProgress(world, edits, new Set())
+  }
+  assert.ok(progress.built >= raise, `built ${progress.built}`)
+  const waiting = goalReadout(progress)
+  assert.equal(waiting.banner, false)
+  const spots = sparkSpots(world)
+  const done = goalProgress(world, edits, new Set(spots.map((spot) => spot.id)))
+  const readout = goalReadout(done)
+  assert.equal(done.done, true)
+  assert.equal(readout.banner, true)
+  assert.equal(readout.title, 'Goal cleared')
+  assert.match(readout.bannerSub, /Tower raised/)
 })
 
 test('edit rules reject bad coordinates, blocks, reach, and bursts', () => {
