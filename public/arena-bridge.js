@@ -1,6 +1,7 @@
 export function attachArenaBridge({ frame, slug }) {
   let ws = null
   let opened = false
+  let ready = false
 
   function relay(payload) {
     const target = frame()
@@ -8,11 +9,17 @@ export function attachArenaBridge({ frame, slug }) {
     try { target.contentWindow.postMessage({ type: 'playground-arena-state', payload }, '*') } catch { /* frame gone */ }
   }
 
+  function sendReady() {
+    if (!ready || !ws || ws.readyState !== 1) return
+    try { ws.send(JSON.stringify({ t: 'go' })) } catch { /* closed */ }
+  }
+
   function ensure() {
     if (opened) return
     opened = true
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     ws = new WebSocket(`${proto}//${location.host}/api/arenas/${slug}`)
+    ws.addEventListener('open', () => sendReady())
     ws.addEventListener('message', (event) => {
       let payload = null
       try { payload = JSON.parse(event.data) } catch { return }
@@ -26,6 +33,12 @@ export function attachArenaBridge({ frame, slug }) {
       if (!data || typeof data !== 'object') return false
       if (data.type === 'playground-arena-hello') {
         ensure()
+        return true
+      }
+      if (data.type === 'playground-arena-ready') {
+        ready = true
+        ensure()
+        sendReady()
         return true
       }
       if (data.type !== 'playground-arena-input') return false

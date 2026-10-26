@@ -1231,11 +1231,17 @@ function readKeys() {
     mz = scripted.mz
     if (scripted.yaw !== null) yaw = scripted.yaw
     if (scripted.pitch !== null) pitch = scripted.pitch
-  } else if (theme.mode === 'race' && local.elapsed < 3) {
-    mx = 0
-    mz = 0
-  } else if (theme.mode === 'race' && !held.KeyS && !held.ArrowDown && mz < 0.15) {
-    mz = 1
+  } else {
+    const drive = raceDriveAxes({
+      mode: theme.mode,
+      authority,
+      elapsed: local.elapsed,
+      mx,
+      mz,
+      brake: Boolean(held.KeyS || held.ArrowDown)
+    })
+    mx = drive.mx
+    mz = drive.mz
   }
   const len = Math.hypot(mx, mz)
   if (len > 1) {
@@ -1865,6 +1871,7 @@ function begin() {
   startEl.hidden = true
   bootEl.hidden = true
   window.__state.phase = 'play'
+  try { parent.postMessage({ type: 'playground-arena-ready' }, '*') } catch (err) {}
   const ctx = audioCtx()
   if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {})
 }
@@ -1970,11 +1977,9 @@ window.__arena = {
 function finishBoot() {
   assetsReady = true
   bootEl.hidden = true
-  if (!framed || begin.queued || scripted.on) begin()
-  else {
-    startEl.hidden = false
-    window.__state.phase = 'start'
-  }
+  // The play page loads this frame only after its Play press. Starting here
+  // keeps that press from landing on a second Play screen.
+  begin()
   if (glOk) renderer.render(scene, camera)
 }
 

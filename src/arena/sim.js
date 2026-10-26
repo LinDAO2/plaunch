@@ -360,6 +360,7 @@ export function restartMatch(match) {
       actor.hp = 30
       actor.alive = true
       actor.respawn = 0
+      actor.invuln = 0.4
       return
     }
     place(match, actor, index)
@@ -371,6 +372,20 @@ export function restartMatch(match) {
     const first = match.actors.find((actor) => actor.kind === 'player')
     match.it = first ? first.id : ''
   }
+}
+
+// Local races hold drive input for three seconds of match.elapsed.
+// A server-run race (the play page) never steps that local clock, so the
+// hold must not apply there or the kart stays parked for the whole race.
+export function raceDriveAxes({ mode, authority, elapsed, mx, mz, brake }) {
+  const x = Number.isFinite(mx) ? mx : 0
+  const z = Number.isFinite(mz) ? mz : 0
+  if (mode !== 'race') return { mx: x, mz: z }
+  const clock = Number(elapsed)
+  const counting = authority === 'local' && (!Number.isFinite(clock) || clock < 3)
+  if (counting) return { mx: 0, mz: 0 }
+  if (!brake && z < 0.15) return { mx: x, mz: 1 }
+  return { mx: x, mz: z }
 }
 
 export function applyInput(actor, msg) {
@@ -736,11 +751,13 @@ function tickMatch(match, step) {
   }
   for (const actor of match.actors) {
     if (actor.kind === 'buoy') {
+      if (actor.invuln > 0) actor.invuln -= step
       if (!actor.alive) {
         actor.respawn -= step
         if (actor.respawn <= 0) {
           actor.alive = true
           actor.hp = 30
+          actor.invuln = 0.4
         }
       }
       continue

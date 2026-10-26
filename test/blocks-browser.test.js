@@ -3,7 +3,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { resolveArtifactsDir, startServer } from '../testing/helpers.js'
 
-test('two embed players share a placed block', { timeout: 120000 }, async () => {
+test('two embed players share a placed block', { timeout: 180000 }, async () => {
   const { chromium } = await import('playwright')
   const server = await startServer()
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
@@ -83,7 +83,22 @@ test('two embed players share a placed block', { timeout: 120000 }, async () => 
     })
     assert.equal(controls.stick.display, 'block')
     assert.ok(controls.place.h >= 44 && controls.jump.h >= 44, `phone actions ${controls.place.h} ${controls.jump.h}`)
-    assert.ok(controls.body.w <= 480 && controls.body.h <= 480, `phone embed overflow ${controls.body.w}x${controls.body.h}`)
+    assert.ok(controls.body.w <= 390 && controls.body.h <= 844, `phone embed overflow ${controls.body.w}x${controls.body.h}`)
+    await handset.setViewportSize({ width: 600, height: 400 })
+    const filled = await handset.evaluate(() => {
+      const game = document.querySelector('#game').getBoundingClientRect()
+      return {
+        w: game.width,
+        h: game.height,
+        vw: window.innerWidth,
+        vh: window.innerHeight,
+        sw: document.body.scrollWidth,
+        sh: document.body.scrollHeight
+      }
+    })
+    assert.ok(filled.w >= 560, `600px embed game width ${filled.w}`)
+    assert.ok(filled.h >= filled.vh - 80, `600px embed game height ${filled.h} of ${filled.vh}`)
+    assert.ok(filled.sw <= filled.vw + 1 && filled.sh <= filled.vh + 1, `600 frame overflow ${filled.sw}x${filled.sh}`)
     await handset.goto(`${server.base}/play/blocks-candy-moon`, { waitUntil: 'domcontentloaded' })
     await handset.waitForFunction(() => window.__blocks?.ready)
     await handset.waitForFunction(() => {

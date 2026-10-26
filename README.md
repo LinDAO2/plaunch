@@ -1,4 +1,6 @@
-# Playground — game launchpad v1.5.2
+# Playground — game launchpad v1.5.3
+
+v1.5.3 fixes play-test bugs in the five published games. Circuit Dash accepts keyboard and touch drive while the server runs the race. Beacon Isle buoys can be popped once their short shield expires. An embed Play press starts the game, and the frame fills the card. Arena and Beacon Isle keep a fresh round until that press. The Grassland tower is short enough to raise, with a goal-cleared banner. Candy Moon credits and the block bar match its candy, petal, glow, and stone, and the online label stays readable.
 
 v1.5.2 sharpens the shared block worlds: plank walls, cobble roofs, alpha-cut leaves and grass, tiled ground with mipmaps, and a blue sky with haze only in the distance.
 

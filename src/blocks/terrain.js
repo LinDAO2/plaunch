@@ -270,8 +270,8 @@ function classicTreeBlock(x, y, z, world) {
       if (!hasTree(tx, tz, world)) continue
       const h = surfaceY(tx, tz, world)
       const dy = y - h
-      if (dx === 0 && dz === 0 && dy >= 1 && dy <= 3) return wood
-      const reach = dy === 3 ? 2 : dy === 2 || dy === 4 ? 1 : 0
+      if (dx === 0 && dz === 0 && dy >= 1 && dy <= 4) return wood
+      const reach = dy === 5 ? 2 : dy === 4 || dy === 6 ? 1 : 0
       if (!reach || Math.abs(dx) + Math.abs(dz) > reach) continue
       if (dx === 0 && dz === 0) continue
       return leaf
@@ -307,7 +307,7 @@ function shapedTreeBlock(x, y, z, world) {
       }
       const trunk = (world.landform === 'forest' ? 5 : 6) + extra + Math.floor(hash2(tx, tz, world.seed + 29) * 2)
       if (dx === 0 && dz === 0 && y > h && y <= h + trunk) return wood
-      const branch = h + trunk - 2
+      const branch = h + trunk
       if (y === branch && ((dz === 0 && Math.abs(dx) === 1) || (dx === 0 && Math.abs(dz) === 1))) return wood
       const dy = y - (h + trunk)
       const stacks = world.landform === 'forest'
@@ -453,9 +453,10 @@ function structureAt(x, y, z, world) {
     return ROCK
   }
   if (world.structure === 'tower') {
-    if (ax <= 1 && az <= 1 && y >= h && y <= h + 7) {
+    // Three blocks tall so a player on the ground can stack the goal on top.
+    if (ax <= 1 && az <= 1 && y >= h && y <= h + 2) {
       if (ax === 1 && az === 1) return TIMBER
-      if (y === h + 7) return world.biome === 'candy' ? CANDY : TURF
+      if (y === h + 2) return world.biome === 'candy' ? CANDY : TURF
       return ROCK
     }
     return null

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { inspectFreeform } from '../src/ai/freeform-check.js'
-import { addHuman, applyInput, createMatch, stepMatch } from '../src/arena/sim.js'
+import { addHuman, applyInput, createMatch, raceDriveAxes, restartMatch, stepMatch } from '../src/arena/sim.js'
 import { pickTemplate } from '../src/templates/pick.js'
 import { spliceTemplate } from '../src/templates/splice.js'
 import { templateById } from '../src/templates/catalog.js'
@@ -44,6 +44,79 @@ test('arena rules move, hit, and score without trusting a client position', () =
   assert.match(match.feed.at(-1).text, /zapped/)
   run(match, 2.6)
   assert.equal(bea.alive, true)
+})
+
+test('server-run races keep keyboard and touch drive during the local countdown clock', () => {
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'remote', elapsed: 0, mx: 0, mz: 1, brake: false }),
+    { mx: 0, mz: 1 }
+  )
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'remote', elapsed: 0, mx: -1, mz: 0, brake: false }),
+    { mx: -1, mz: 1 }
+  )
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'wait', elapsed: 0, mx: 0, mz: 1, brake: false }),
+    { mx: 0, mz: 1 }
+  )
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'local', elapsed: 0, mx: 0, mz: 1, brake: false }),
+    { mx: 0, mz: 0 }
+  )
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'local', elapsed: 2.9, mx: 1, mz: 1, brake: false }),
+    { mx: 0, mz: 0 }
+  )
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'local', elapsed: 3, mx: 0, mz: 0, brake: false }),
+    { mx: 0, mz: 1 }
+  )
+  assert.deepEqual(
+    raceDriveAxes({ mode: 'race', authority: 'remote', elapsed: 0, mx: 0, mz: -1, brake: true }),
+    { mx: 0, mz: -1 }
+  )
+  const race = createMatch({
+    theme: { mode: 'race', weapon: 'none', sky: 'day' },
+    config: { speed: 14, bots: 0, seconds: 30, range: 10, damage: 10, quality: 0 },
+    seed: 11
+  })
+  const driver = addHuman(race, 'Rae')
+  const z0 = driver.z
+  run(race, 1.2, () => applyInput(driver, { yaw: Math.PI, pitch: 0, mz: 1, fire: 0 }))
+  assert.ok(driver.z < z0 - 4, `kart should leave the grid, z=${driver.z}`)
+  assert.ok(driver.score >= 100, `gate score ${driver.score}`)
+  race.elapsed = race.config.seconds - 0.02
+  stepMatch(race, 0.05)
+  assert.equal(race.over, true)
+  restartMatch(race)
+  assert.equal(race.over, false)
+  assert.equal(race.elapsed, 0)
+  assert.equal(driver.score, 0)
+  assert.equal(driver.laps, 0)
+})
+
+test('explore buoys drop their spawn shield and can be popped', () => {
+  const isle = createMatch({
+    theme: { mode: 'explore', weapon: 'blaster', sky: 'day' },
+    config: { speed: 8, bots: 0, seconds: 60, range: 24, damage: 40, quality: 0 },
+    seed: 9
+  })
+  const eve = addHuman(isle, 'Eve')
+  const buoy = isle.actors.find((actor) => actor.kind === 'buoy')
+  assert.ok(buoy.invuln > 0)
+  buoy.x = 0
+  buoy.z = 2
+  eve.x = 0
+  eve.z = -2
+  eve.invuln = 0
+  applyInput(eve, { yaw: 0, pitch: 0, mz: 0, fire: 1 })
+  run(isle, 0.3)
+  assert.equal(buoy.alive, true)
+  assert.ok(buoy.invuln < 0.4)
+  run(isle, 1)
+  assert.equal(buoy.alive, false)
+  assert.ok(eve.score >= 25)
+  assert.match(isle.feed.at(-1).text, /popped/)
 })
 
 test('tag, capture, race, and beacon objectives score on the server', () => {
@@ -199,6 +272,71 @@ test('arena rooms are authoritative, rate limited, and capped', async () => {
     assert.equal(full.reason, 'full')
   } finally {
     for (const ws of openSockets) {
+      try { ws.close() } catch { /* closed */ }
+    }
+    await server.close()
+  }
+})
+
+test('a lone joiner keeps a full round until they play, then a kart can score', async () => {
+  const server = await startServer()
+  const wsBase = server.base.replace(/^http/, 'ws')
+  const open = []
+  const connect = (path) => new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${wsBase}${path}`)
+    const messages = []
+    open.push(ws)
+    ws.addEventListener('message', (event) => {
+      try { messages.push(JSON.parse(String(event.data))) } catch { /* ignore */ }
+    })
+    ws.addEventListener('open', () => resolve({ ws, messages }))
+    ws.addEventListener('error', () => reject(new Error(`socket failed for ${path}`)))
+  })
+  const waitFor = async (messages, pred, ms = 4000) => {
+    const start = Date.now()
+    while (Date.now() - start < ms) {
+      const found = messages.find(pred)
+      if (found) return found
+      await new Promise((resolve) => setTimeout(resolve, 30))
+    }
+    throw new Error(`timed out: ${JSON.stringify(messages.slice(-2))}`)
+  }
+  try {
+    const isle = await connect('/api/arenas/beacon-isle')
+    const hello = await waitFor(isle.messages, (msg) => msg.t === 'welcome')
+    assert.equal(hello.snap.mode, 'explore')
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    const held = [...isle.messages].reverse().find((msg) => msg.t === 'snap')
+    assert.ok(held, 'expected a snap before play')
+    assert.equal(held.left, hello.snap.left)
+    assert.equal((held.feed || []).some((item) => /lit a beacon|popped/.test(item.text || '')), false)
+    isle.ws.send(JSON.stringify({ t: 'go' }))
+    const moving = await waitFor(isle.messages, (msg) => msg.t === 'snap' && msg.left < hello.snap.left, 4000)
+    assert.ok(moving.left < hello.snap.left)
+
+    const kart = await connect('/api/arenas/circuit-dash')
+    const raceHello = await waitFor(kart.messages, (msg) => msg.t === 'welcome')
+    const self0 = raceHello.snap.actors.find((actor) => actor.id === raceHello.id)
+    kart.ws.send(JSON.stringify({ t: 'go' }))
+    const drive = setInterval(() => {
+      if (kart.ws.readyState !== 1) return
+      kart.ws.send(JSON.stringify({ t: 'in', seq: 1, yaw: Math.PI, pitch: 0, mx: 0, mz: 1, fire: 0, jump: 0 }))
+    }, 40)
+    let scored
+    try {
+      scored = await waitFor(kart.messages, (msg) => {
+        if (msg.t !== 'snap') return false
+        const self = msg.actors.find((actor) => actor.id === raceHello.id)
+        return Boolean(self && self.score >= 100 && Math.abs(self.z - self0.z) > 1)
+      }, 8000)
+    } finally {
+      clearInterval(drive)
+    }
+    const self = scored.actors.find((actor) => actor.id === raceHello.id)
+    assert.ok(self.score >= 100)
+    assert.ok(Math.abs(self.z - self0.z) > 1)
+  } finally {
+    for (const ws of open) {
       try { ws.close() } catch { /* closed */ }
     }
     await server.close()

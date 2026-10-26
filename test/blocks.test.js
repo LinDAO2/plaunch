@@ -7,9 +7,12 @@ import { validateGameSpec } from '../src/ai/gamespec.js'
 import { aoFactor, meshRegion } from '../src/blocks/mesh.js'
 import { validateEdit } from '../src/blocks/rules.js'
 import { CYCLE_MS, VISTA_PITCH, goalCopy, goalProgress, goalTargets, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '../src/blocks/goals.js'
-import { hotbarFor, isSolid, CANDY, PETAL } from '../src/blocks/blocks.js'
+import { blockOf, hotbarFor, isSolid, CANDY, PETAL, ROCK, SOIL, TIMBER, TURF } from '../src/blocks/blocks.js'
 import { featuredWorlds, wantsWorld } from '../src/blocks/spec.js'
-import { blockAt, spawnPoint, worldFromSpec } from '../src/blocks/terrain.js'
+import { blockAt, spawnPoint, structureOrigin, surfaceY, worldFromSpec } from '../src/blocks/terrain.js'
+import { inReach } from '../src/blocks/rules.js'
+import { readFileSync } from 'node:fs'
+import { terrainCredit } from '../src/html.js'
 import { validSpec } from '../testing/helpers.js'
 import { createClient, startServer } from '../testing/helpers.js'
 
@@ -88,8 +91,13 @@ test('world prompts become a shared block spec and minecraft is not a runtime', 
 })
 
 test('realistic hotbars leave out petal and candy', () => {
+  assert.deepEqual(hotbarFor('candy').map((id) => blockOf(id).name), ['Candy', 'Petal', 'Glow', 'Rock'])
   assert.equal(hotbarFor('candy').includes(CANDY), true)
   assert.equal(hotbarFor('candy').includes(PETAL), true)
+  assert.equal(hotbarFor('candy').includes(ROCK), true)
+  assert.equal(hotbarFor('candy').includes(TURF), false)
+  assert.equal(hotbarFor('candy').includes(SOIL), false)
+  assert.equal(hotbarFor('candy').includes(TIMBER), false)
   for (const biome of ['grassland', 'desert', 'snow', 'moon']) {
     const bar = hotbarFor(biome)
     assert.equal(bar.includes(CANDY), false)
@@ -184,6 +192,22 @@ test('landmark height and sparks score a shared goal', () => {
   assert.equal(done.have, 6)
   assert.equal(done.done, true)
   assert.equal(done.ratio, 1)
+  const origin = structureOrigin(grassland)
+  const ground = surfaceY(origin.x, origin.z, grassland)
+  let peak = 0
+  for (let y = grassland.height - 1; y >= 0; y--) {
+    if (isSolid(blockAt(origin.x, y, origin.z, grassland))) { peak = y; break }
+  }
+  assert.ok(peak <= ground + 2, `tower peak ${peak} ground ${ground}`)
+  const eye = { x: origin.x + 2.05, y: ground + 1 + 1.62, z: origin.z }
+  assert.equal(inReach(eye, origin.x, peak + 1, origin.z), true)
+  assert.equal(inReach(eye, origin.x, peak + goalTargets(grassland).raise, origin.z), true)
+  const candyLine = terrainCredit('candy')
+  assert.match(candyLine, /original colors/)
+  assert.equal(/Grass Ground|Leafy Grass|Bark Brown|Snow 01|Coast Sand/.test(candyLine), false)
+  assert.match(terrainCredit('grassland'), /Aerial Grass Rock/)
+  const embedCss = readFileSync(new URL('../public/play.css', import.meta.url), 'utf8')
+  assert.equal(/html:has\(body\.embed\)[^{]*\{[^}]*max-width:\s*480px/.test(embedCss), false)
   const day = skyCycle('grassland', 0)
   const night = skyCycle('grassland', 0.5)
   assert.notEqual(day.hex, night.hex)
