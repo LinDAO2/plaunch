@@ -63,6 +63,20 @@ function columnPeak(world, edits, x, z) {
   return 0
 }
 
+export function goalReadout(progress) {
+  const built = Math.min(progress.built, progress.raise)
+  const have = Math.min(progress.have, progress.sparks)
+  const noun = String(progress.label || 'landmark').toLowerCase()
+  return {
+    title: progress.done ? 'Goal cleared' : `${progress.label} ${built}/${progress.raise}`,
+    sub: progress.done
+      ? `${progress.label} ${progress.raise}/${progress.raise} · Sparks ${progress.sparks}/${progress.sparks}`
+      : `Stack ${Math.max(0, progress.raise - built)} on the ${noun} · Sparks ${have}/${progress.sparks}`,
+    banner: Boolean(progress.done),
+    bannerSub: `${progress.label} raised · ${progress.sparks} sparks`
+  }
+}
+
 export function goalProgress(world, edits, picked) {
   const { cx, cz, r } = footprint(world)
   const targets = goalTargets(world)

@@ -169,11 +169,17 @@ function rand(match) {
   return match.seed / 4294967296
 }
 
-function wrapAngle(n) {
-  let a = n
-  while (a > Math.PI) a -= Math.PI * 2
-  while (a < -Math.PI) a += Math.PI * 2
+export function wrapYaw(value, fallback = 0) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  let a = n % (Math.PI * 2)
+  if (a > Math.PI) a -= Math.PI * 2
+  if (a < -Math.PI) a += Math.PI * 2
   return a
+}
+
+function wrapAngle(n) {
+  return wrapYaw(n, 0)
 }
 
 function blocked(x, z, walls, radius = ACTOR_R) {
@@ -263,6 +269,9 @@ function place(match, actor, index) {
 export function createMatch({ theme, config, seed = 1 } = {}) {
   const normalizedTheme = normalizeTheme(theme)
   const normalizedConfig = normalizeConfig(config)
+  // A clean lap is a few seconds. Keep the clock short enough that a careful
+  // driver can finish ahead of the bots instead of watching them lap for a minute.
+  if (normalizedTheme.mode === 'race') normalizedConfig.seconds = Math.min(normalizedConfig.seconds, 48)
   const map = buildMap(normalizedTheme)
   const match = {
     theme: normalizedTheme,
@@ -395,7 +404,8 @@ export function applyInput(actor, msg) {
     if (!Number.isFinite(n)) return fallback
     return Math.min(max, Math.max(min, n))
   }
-  actor.yaw = num(msg.yaw, -Math.PI * 4, Math.PI * 4, actor.yaw)
+  // Mouse look accumulates. Clamping at ±4π froze steering after two laps.
+  actor.yaw = wrapYaw(msg.yaw, actor.yaw)
   actor.pitch = num(msg.pitch, -1.15, 1.15, actor.pitch)
   actor.input.mx = num(msg.mx, -1, 1)
   actor.input.mz = num(msg.mz, -1, 1)
@@ -503,9 +513,21 @@ function combat(match, actor, dt) {
   if (victim.hp <= 0) zap(match, actor, victim)
 }
 
+function racePace(match, actor) {
+  if (match.theme.mode !== 'race' || !actor.bot) return 1
+  let best = 0
+  for (const human of match.actors) {
+    if (!human.bot && human.kind === 'player') best = Math.max(best, human.score)
+  }
+  // Cap under the player's top speed. Ease off once a bot is even or ahead
+  // so a clean lap pulls the human back in front.
+  if (actor.score >= best) return 0.75
+  return 0.86
+}
+
 function moveActor(match, actor, dt) {
   if (!actor.alive || actor.kind === 'buoy') return
-  const speed = match.config.speed * (actor.boost > 0 ? 1.65 : 1)
+  const speed = match.config.speed * (actor.boost > 0 ? 1.65 : 1) * racePace(match, actor)
   actor.boost = Math.max(0, actor.boost - dt)
   const mx = actor.input.mx
   const mz = actor.input.mz
@@ -584,7 +606,7 @@ function aimAt(actor, x, z, dt, turn) {
   const want = Math.atan2(x - actor.x, z - actor.z)
   const diff = wrapAngle(want - actor.yaw)
   const step = Math.min(turn * dt, Math.abs(diff))
-  actor.yaw += Math.sign(diff) * step
+  actor.yaw = wrapYaw(actor.yaw + Math.sign(diff) * step)
   return diff
 }
 
@@ -602,6 +624,26 @@ function nearest(actor, list, filter) {
   return best
 }
 
+function freeFromWalls(actor, walls) {
+  let best = null
+  let bestPen = 0
+  for (const wall of walls) {
+    const px = wall.w / 2 + ACTOR_R - Math.abs(actor.x - wall.x)
+    const pz = wall.d / 2 + ACTOR_R - Math.abs(actor.z - wall.z)
+    if (px <= 0 || pz <= 0) continue
+    const pen = Math.min(px, pz)
+    if (pen > bestPen) {
+      bestPen = pen
+      best = { wall, px, pz }
+    }
+  }
+  if (!best) return false
+  if (best.px < best.pz) actor.x += Math.sign(actor.x - best.wall.x || 1) * (best.px + 0.08)
+  else actor.z += Math.sign(actor.z - best.wall.z || 1) * (best.pz + 0.08)
+  actor.stuck = 0
+  return true
+}
+
 function think(match, actor, dt) {
   const mode = match.theme.mode
   actor.input.jump = false
@@ -610,7 +652,20 @@ function think(match, actor, dt) {
   actor.input.mz = 1
   if (mode === 'race') {
     const gate = match.map.checks[actor.gate % match.map.checks.length]
-    if (gate) aimAt(actor, gate.x, gate.z, dt, 2.4)
+    if (gate) {
+      if (actor.stuck > 0.2) freeFromWalls(actor, match.map.walls)
+      if (actor.stuck > 0.2) {
+        actor.yaw = wrapYaw(actor.yaw + dt * 2.8)
+        actor.input.mz = 0.55
+        actor.input.mx = 0
+      } else {
+        // Slide across the gate so the line is not the shortest one through the middle.
+        const lane = ((actor.id.charCodeAt(actor.id.length - 1) % 3) - 1) * 1.1
+        const across = gate.w >= gate.d
+        aimAt(actor, gate.x + (across ? lane : 0), gate.z + (across ? 0 : lane), dt, 2.15)
+        actor.input.mz = 1
+      }
+    }
     return
   }
   if (mode === 'explore') {

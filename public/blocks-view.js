@@ -1,5 +1,6 @@
 import { CANOPY, blockOf, hotbarFor, isSolid } from '/blocks/blocks.js'
-import { VISTA_PITCH, goalProgress, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
+import { VISTA_PITCH, goalProgress, goalReadout, lookYaw, skyCycle, skyPhase, sparkHit, sparkSpots } from '/blocks/goals.js'
+import { placeTarget } from '/blocks/rules.js'
 import { blockAt, skyHex, spawnPoint, worldFromSpec } from '/blocks/terrain.js'
 import { createWorldRenderer } from '/world-render.js'
 
@@ -121,18 +122,14 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   function paintGoal() {
     const progress = goalProgress(world, edits, picked)
     state.goal = progress
-    const built = Math.min(progress.built, progress.raise)
-    const have = Math.min(progress.have, progress.sparks)
-    const noun = progress.label.toLowerCase()
-    goalTitle.textContent = progress.done ? 'Goal cleared' : `${progress.label} ${built}/${progress.raise}`
-    goalSub.textContent = progress.done
-      ? `${progress.label} ${progress.raise}/${progress.raise} · Sparks ${progress.sparks}/${progress.sparks}`
-      : `Stack ${Math.max(0, progress.raise - built)} on the ${noun} · Sparks ${have}/${progress.sparks}`
+    const readout = goalReadout(progress)
+    goalTitle.textContent = readout.title
+    goalSub.textContent = readout.sub
     goalEl.classList.toggle('clear', progress.done)
     goalFill.style.width = `${Math.round(progress.ratio * 100)}%`
     if (clearedEl) {
-      clearedEl.hidden = !progress.done
-      if (clearedSub) clearedSub.textContent = `${progress.label} raised · ${progress.sparks} sparks`
+      clearedEl.hidden = !readout.banner
+      if (clearedSub) clearedSub.textContent = readout.bannerSub
     }
   }
   paintGoal()
@@ -240,6 +237,14 @@ export function mountWorld({ spec, slug, field, offline = false, onStats } = {})
   }
 
   function placeCell() {
+    const aimed = placeTarget({
+      eye: { x: pos.x, y: pos.y + EYE, z: pos.z },
+      dir: lookVector(),
+      pitch,
+      sample,
+      reach: 5.2
+    })
+    if (aimed && sample(aimed.x, aimed.y, aimed.z) === 0 && inWorld(aimed.x, aimed.y, aimed.z)) return aimed
     const cast = raycast(5.2)
     if (cast.hit && cast.prev && sample(cast.prev.x, cast.prev.y, cast.prev.z) === 0 && inWorld(cast.prev.x, cast.prev.y, cast.prev.z)) {
       return cast.prev

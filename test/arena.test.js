@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { inspectFreeform } from '../src/ai/freeform-check.js'
-import { addHuman, applyInput, createMatch, raceDriveAxes, restartMatch, stepMatch } from '../src/arena/sim.js'
+import { addHuman, applyInput, createMatch, raceDriveAxes, restartMatch, stepMatch, wrapYaw } from '../src/arena/sim.js'
 import { pickTemplate } from '../src/templates/pick.js'
 import { spliceTemplate } from '../src/templates/splice.js'
 import { templateById } from '../src/templates/catalog.js'
@@ -93,6 +93,64 @@ test('server-run races keep keyboard and touch drive during the local countdown 
   assert.equal(race.elapsed, 0)
   assert.equal(driver.score, 0)
   assert.equal(driver.laps, 0)
+})
+
+test('yaw past two full spins still steers', () => {
+  const race = createMatch({
+    theme: { mode: 'race', weapon: 'none', sky: 'day' },
+    config: { speed: 14, bots: 0, seconds: 90, range: 10, damage: 10, quality: 0 },
+    seed: 4
+  })
+  assert.equal(race.config.seconds, 48)
+  const driver = addHuman(race, 'Rae')
+  const spun = Math.PI * 4 + Math.PI / 2
+  applyInput(driver, { yaw: spun, pitch: 0, mz: 1, fire: 0 })
+  assert.ok(Math.abs(driver.yaw - Math.PI / 2) < 1e-6, `wrapped yaw ${driver.yaw}`)
+  const x0 = driver.x
+  const z0 = driver.z
+  run(race, 0.5)
+  assert.ok(driver.x > x0 + 4, `kart should keep turning after 4π, x=${driver.x}`)
+  assert.ok(Math.abs(driver.z - z0) < 1.5, `heading should be +x, z=${driver.z}`)
+  applyInput(driver, { yaw: -Math.PI * 4 - Math.PI / 2, pitch: 0, mz: 1, fire: 0 })
+  assert.ok(Math.abs(driver.yaw + Math.PI / 2) < 1e-6)
+  const arena = createMatch({
+    theme: { mode: 'deathmatch', weapon: 'blaster', sky: 'dusk' },
+    config: { speed: 9, bots: 0, seconds: 120, range: 20, damage: 20, quality: 0 },
+    seed: 2
+  })
+  assert.equal(arena.config.seconds, 120)
+  const ada = addHuman(arena, 'Ada')
+  applyInput(ada, { yaw: Math.PI * 6 + 0.4, pitch: 0, mz: 1 })
+  assert.ok(Math.abs(ada.yaw - wrapYaw(0.4)) < 1e-6)
+  const isle = createMatch({
+    theme: { mode: 'explore', weapon: 'blaster', sky: 'day' },
+    config: { speed: 8, bots: 0, seconds: 90, range: 20, damage: 20, quality: 0 },
+    seed: 2
+  })
+  const eve = addHuman(isle, 'Eve')
+  applyInput(eve, { yaw: -Math.PI * 5, pitch: 0, mz: 0 })
+  assert.ok(Math.abs(eve.yaw - wrapYaw(-Math.PI)) < 1e-6)
+})
+
+test('race bots stay slower than a clean driver', () => {
+  const race = createMatch({
+    theme: { mode: 'race', weapon: 'none', sky: 'day' },
+    config: { speed: 14, bots: 4, seconds: 90, range: 12, damage: 10, quality: 0 },
+    seed: 11
+  })
+  const driver = addHuman(race, 'Rae')
+  run(race, 36, () => {
+    const gate = race.map.checks[driver.gate % race.map.checks.length]
+    applyInput(driver, { yaw: Math.atan2(gate.x - driver.x, gate.z - driver.z), pitch: 0, mz: 1, fire: 0 })
+  })
+  const bots = race.actors.filter((actor) => actor.bot)
+  const best = bots.reduce((top, actor) => Math.max(top, actor.score), 0)
+  const bestGates = bots.reduce((top, actor) => Math.max(top, actor.gate), 0)
+  const slowest = bots.reduce((low, actor) => Math.min(low, actor.gate), Infinity)
+  assert.ok(bestGates >= 8, `bots should still be racing, gates=${bestGates}`)
+  assert.ok(slowest >= 4, `a bot parked, gates=${bots.map((actor) => actor.gate).join(',')}`)
+  assert.ok(bestGates < 28, `bots lapped too fast, gates=${bestGates}`)
+  assert.ok(driver.score >= best, `driver ${driver.score} bot ${best}`)
 })
 
 test('explore buoys drop their spawn shield and can be popped', () => {

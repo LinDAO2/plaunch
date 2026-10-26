@@ -20,6 +20,31 @@ export function inBounds(x, y, z, world) {
     && x < world.size && z < world.size && y < world.height
 }
 
+// Looking up at a side face stacks on that block. Looking down keeps the
+// air cell the ray crossed, which is the top of the block.
+export function placeTarget({ eye, dir, pitch, sample, reach = 5.2 } = {}) {
+  if (!eye || !dir || typeof sample !== 'function') return null
+  const limit = Number.isFinite(reach) ? reach : 5.2
+  let prev = null
+  for (let t = 0; t <= limit; t += 0.08) {
+    const x = eye.x + dir.x * t
+    const y = eye.y + dir.y * t
+    const z = eye.z + dir.z * t
+    const bx = Math.floor(x)
+    const by = Math.floor(y)
+    const bz = Math.floor(z)
+    if (sample(bx, by, bz)) {
+      if (!prev) return null
+      const above = { x: bx, y: by + 1, z: bz }
+      if (pitch > 0.08 && prev.y === by && sample(above.x, above.y, above.z) === 0) return above
+      if (sample(prev.x, prev.y, prev.z) === 0) return prev
+      return null
+    }
+    if (!prev || prev.x !== bx || prev.y !== by || prev.z !== bz) prev = { x: bx, y: by, z: bz }
+  }
+  return null
+}
+
 export function inReach(eye, x, y, z) {
   const dx = (x + 0.5) - eye.x
   const dy = (y + 0.5) - eye.y

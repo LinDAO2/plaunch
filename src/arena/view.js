@@ -1719,7 +1719,7 @@ function loop(now) {
   if (aimLock) trackNearest()
   const input = readKeys()
   jumpEdge = false
-  yaw += stick.yaw
+  yaw = wrapYaw(yaw + stick.yaw)
   pitch = Math.max(-1.05, Math.min(1.05, pitch + stick.pitch))
   stick.yaw = 0
   stick.pitch = 0
@@ -1902,7 +1902,7 @@ addEventListener('pointerup', () => {
 addEventListener('mousemove', (event) => {
   if (!playing) return
   if (document.pointerLockElement === canvas) {
-    yaw += event.movementX * 0.0022
+    yaw = wrapYaw(yaw + event.movementX * 0.0022)
     pitch = Math.max(-1.05, Math.min(1.05, pitch - event.movementY * 0.002))
     return
   }
@@ -1910,7 +1910,7 @@ addEventListener('mousemove', (event) => {
   const lx = Number(canvas.dataset.dragX)
   const ly = Number(canvas.dataset.dragY)
   const sens = (0.25 * Math.PI / 180) * (480 / Math.max(1, innerHeight))
-  yaw += (event.clientX - lx) * sens
+  yaw = wrapYaw(yaw + (event.clientX - lx) * sens)
   pitch = Math.max(-1.05, Math.min(1.05, pitch - (event.clientY - ly) * sens))
   canvas.dataset.dragX = String(event.clientX)
   canvas.dataset.dragY = String(event.clientY)

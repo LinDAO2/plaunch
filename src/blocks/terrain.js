@@ -459,6 +459,14 @@ function structureAt(x, y, z, world) {
       if (y === h + 2) return world.biome === 'candy' ? CANDY : TURF
       return ROCK
     }
+    // Plank steps just outside the goal columns. The top step is high enough
+    // to look down onto the fourth block of the raise.
+    const step = x - (ox + 2)
+    if (z === oz && step >= 0 && step <= 3) {
+      const local = surfaceY(x, z, world)
+      const top = h + 1 + step
+      if (y > local && y <= top) return PLANKS
+    }
     return null
   }
   if (world.structure === 'house') {

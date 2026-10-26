@@ -77,7 +77,7 @@ export const ARENA_TEMPLATES = [
     id: 'circuit-dash',
     engine: 'three',
     featured: true,
-    duration: 60,
+    duration: 48,
     name: 'Circuit Dash',
     tags: ['action', 'arcade'],
     keywords: ['kart', 'race', 'circuit'],
@@ -86,7 +86,7 @@ export const ARENA_TEMPLATES = [
       high: ['kart', 'kart race', '3d race', 'circuit dash'],
       medium: ['race', 'racing', 'laps']
     },
-    config: { speed: 14, bots: 4, seconds: 90, range: 12, damage: 10, quality: 0 },
+    config: { speed: 14, bots: 4, seconds: 48, range: 12, damage: 10, quality: 0 },
     theme: {
       palette: palette('#FF9A1F', { bg: '#4FB3FF', ink: '#1B1B2F', mute: '#4A4F5A', floor: '#4A4F5A', wall: '#F4F4F4', sky: '#CDEBFF' }),
       names: { title: 'Circuit Dash', hint: 'WASD drives. Fire or space boosts.', over: 'Race over' },
